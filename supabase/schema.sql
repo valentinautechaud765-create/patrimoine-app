@@ -37,6 +37,7 @@ create table if not exists public.holdings (
   account_id uuid references public.accounts on delete set null,
   name text not null,
   ticker text,
+  asset_class text not null default 'Action',
   quantity numeric(20,8) not null default 0,
   cost_basis numeric(14,2) not null default 0,
   value numeric(14,2) not null default 0,
@@ -116,6 +117,9 @@ create or replace function public.take_net_worth_snapshots() returns void langua
   select u.id, current_date,
     coalesce((select sum(balance) from public.accounts a where a.user_id = u.id and a.kind <> 'investissement'), 0)
     + coalesce((select sum(value) from public.holdings h where h.user_id = u.id), 0)
+    -- comptes-titres synchronisés sans positions détaillées (même calcul que l'appli)
+    + coalesce((select sum(balance) from public.accounts a where a.user_id = u.id and a.kind = 'investissement'
+        and not exists (select 1 from public.holdings h where h.account_id = a.id)), 0)
   from auth.users u
   on conflict (user_id, date) do update set total = excluded.total;
 $$;

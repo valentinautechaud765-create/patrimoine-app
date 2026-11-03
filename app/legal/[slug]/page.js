@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import Logo from "../../Logo.js";
+import Brand from "../../components/Brand.js";
 import { BRAND } from "../../../lib/config.js";
 
 // MODÈLES À FAIRE RELIRE PAR UN PROFESSIONNEL avant le lancement commercial.
@@ -31,10 +31,11 @@ export function generateStaticParams() { return Object.keys(PAGES).map(slug => (
 export default function Legal({ params }) {
   const page = PAGES[params.slug];
   if (!page) notFound();
-  return <main className="glow" style={{ minHeight: "100vh" }}><div className="wrap" style={{ maxWidth: 760, padding: "30px 0 80px" }}>
-    <Link href="/"><Logo /></Link>
-    <h1 style={{ fontWeight: 600, letterSpacing: "-.02em", margin: "36px 0 8px" }}>{page[0]}</h1>
+  return <main className="legal"><div className="container legalIn">
+    <Link href="/" aria-label="Accueil"><Brand size={30} /></Link>
+    <h1>{page[0]}</h1>
     <p className="muted" style={{ fontSize: 13 }}>Dernière mise à jour : à compléter</p>
-    {page[1].map(([t, p]) => <section key={t} style={{ marginTop: 26 }}><h2 style={{ fontSize: 18, fontWeight: 600 }}>{t}</h2><p className="muted">{p}</p></section>)}
+    {page[1].map(([t, p]) => <section key={t}><h2>{t}</h2><p>{p}</p></section>)}
+    <nav className="legalNav">{Object.entries(PAGES).map(([slug, [title]]) => <Link key={slug} href={`/legal/${slug}`} className={slug === params.slug ? "on" : ""}>{title}</Link>)}</nav>
   </div></main>;
 }

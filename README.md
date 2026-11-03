@@ -1,6 +1,6 @@
 # Patrimo — gestion de patrimoine par abonnement
 
-Appli web (installable sur iPhone / Android) qui réunit comptes bancaires, épargne et investissements, avec courbes en temps réel, budgets et abonnement payant.
+Appli web (installable sur iPhone / Android) qui réunit comptes bancaires, épargne et investissements, avec courbe du patrimoine, budgets et abonnement payant.
 
 > Le nom « Patrimo » est provisoire : il se change en une ligne dans `lib/config.js`. Vérifier sur l’INPI que le nom choisi est libre avant le lancement.
 
@@ -9,7 +9,7 @@ Appli web (installable sur iPhone / Android) qui réunit comptes bancaires, épa
 | Formule | Mensuel | Annuel (≈ −30 %) | Pour qui |
 |---|---|---|---|
 | Essentiel | 0 € | 0 € | Découvrir : 1 compte, budget, 30 jours d’historique |
-| **Plus** (mise en avant) | **7,99 €** | 66,99 € | Tout le patrimoine en temps réel, banques illimitées — 14 jours d’essai gratuit |
+| **Plus** (mise en avant) | **7,99 €** | 66,99 € | Banques illimitées, investissements, analyse automatique — 14 jours d’essai gratuit |
 | Pro | 14,99 € | 124,99 € | Investisseurs : dividendes, projections, export, support prioritaire |
 
 Pourquoi ces prix : Finary et les applis équivalentes se situent entre ~8 et ~15 €/mois. Un nouvel entrant convertit mieux légèrement sous le leader. L’annuel mis en avant améliore la trésorerie et réduit les résiliations. L’essai gratuit sans carte est remplacé ici par un essai **avec carte** via Stripe : moins d’inscrits, mais beaucoup plus de clients payants.
