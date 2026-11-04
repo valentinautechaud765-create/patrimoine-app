@@ -113,3 +113,51 @@ test("POWENS_DOMAIN : formats acceptés et refusés", async () => {
   assert.throws(() => powensConfig(), /POWENS_DOMAIN invalide/);
   process.env.POWENS_DOMAIN = "test.biapi.pro";
 });
+
+test("compte déjà saisi à la main (ou importé de Mon Patrimoine) : relié à la banque, aucun doublon de compte ni d'opération", async () => {
+  BANK = bankV1();
+  const db = fakeDb();
+  // Avant la connexion : le compte Revolut saisi à la main, une course notée à la main (1 jour d'écart, autre libellé),
+  // le loyer créé par une opération automatique, et le prêt auto noté dans les dettes.
+  db.tables.accounts.push({ id: "m1", user_id: "u1", powens_account_id: null, name: "Mon Revolut", institution: "Revolut", kind: "courant", balance: 500 });
+  db.tables.accounts.push({ id: "m2", user_id: "u1", powens_account_id: null, name: "Livret BNP", institution: "BNP", kind: "epargne", balance: 50 });
+  db.tables.transactions.push({ id: "t1", user_id: "u1", account_id: "m1", date: "2026-11-01", amount: -23.4, label: "Courses Carrefour", category: "Courses", external_id: null });
+  db.tables.transactions.push({ id: "t2", user_id: "u1", account_id: "m1", date: "2026-11-01", amount: 2450, label: "Salaire", category: "Salaire", external_id: null, recurrence_id: "r1" });
+  db.tables.debts.push({ id: "d1", user_id: "u1", kind: "credit", label: "Prêt auto", initial_amount: 8000, remaining: 6000, powens_account_id: null });
+  const r = await syncUser(db, "u1");
+  const accs = db.tables.accounts, tx = db.tables.transactions;
+  // Le compte courant Revolut est relié au compte saisi à la main (pas de 2e compte) ; le livret Revolut est nouveau ;
+  // le livret BNP n'est pas touché (autre banque).
+  assert.equal(accs.find((a) => a.id === "m1").powens_account_id, "1");
+  assert.equal(accs.find((a) => a.id === "m1").balance, 845.12);
+  assert.equal(accs.find((a) => a.id === "m1").name, "Mon Revolut");          // le nom choisi est gardé
+  assert.equal(accs.find((a) => a.id === "m2").powens_account_id, null);
+  assert.equal(accs.length, 3);
+  assert.equal(r.linkedAccounts, 1); assert.equal(r.newAccounts, 1);
+  // La course et le salaire déjà notés ne sont pas ajoutés une 2e fois : ils reçoivent l'identifiant de la banque
+  assert.equal(tx.filter((t) => Math.abs(t.amount + 23.4) < 0.001).length, 1);
+  assert.equal(tx.find((t) => t.id === "t1").external_id, "powens:100");
+  assert.equal(tx.find((t) => t.id === "t1").category, "Courses");          // la catégorie choisie est gardée
+  assert.equal(tx.filter((t) => t.amount === 2450).length, 1);
+  assert.equal(r.mergedTransactions, 2);
+  // Le crédit déjà noté est relié, pas recréé
+  assert.equal(db.tables.debts.length, 1); assert.equal(db.tables.debts[0].remaining, 5400);
+  // Deuxième synchro : rien ne bouge
+  const r2 = await syncUser(db, "u1");
+  assert.equal(r2.transactions, 0); assert.equal(r2.mergedTransactions, 0); assert.equal(db.tables.accounts.length, 3);
+});
+
+test("banques au nom proche : BNP = BNP Paribas, mais Banque Populaire ≠ Banque Postale", async () => {
+  BANK = { connections: [{ id: 9, connector: { name: "La Banque Postale" } }], accounts: [{ id: 30, id_connection: 9, name: "CCP", type: "checking", balance: 10 }], transactions: [] };
+  const db = fakeDb();
+  db.tables.accounts.push({ id: "bp", user_id: "u1", powens_account_id: null, name: "Compte", institution: "Banque Populaire", kind: "courant", balance: 1 });
+  await syncUser(db, "u1");
+  assert.equal(db.tables.accounts.find((a) => a.id === "bp").powens_account_id, null);
+  assert.equal(db.tables.accounts.length, 2);
+  BANK = { connections: [{ id: 9, connector: { name: "BNP Paribas" } }], accounts: [{ id: 31, id_connection: 9, name: "Compte chèques", type: "checking", balance: 10 }], transactions: [] };
+  const db2 = fakeDb();
+  db2.tables.accounts.push({ id: "bnp", user_id: "u1", powens_account_id: null, name: "Courant", institution: "BNP", kind: "courant", balance: 1 });
+  await syncUser(db2, "u1");
+  assert.equal(db2.tables.accounts.find((a) => a.id === "bnp").powens_account_id, "31");
+  assert.equal(db2.tables.accounts.length, 1);
+});

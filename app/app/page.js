@@ -227,19 +227,24 @@ function App() {
       const today = todayStr(), rows = [], moves = [];
       for (const r of live.current.recurrences || []) {
         if (!r.active) continue;
+        // Compte relié à la banque : la vraie opération arrive par la synchro, on n'en crée pas une deuxième
+        // (l'échéance avance quand même pour rester à jour).
+        const synced = r.account_id && live.current.accounts.some((a) => a.id === r.account_id && a.powens_account_id);
         let due = r.next_date, guard = 0;
         while (due <= today && (!r.end_date || due <= r.end_date) && guard++ < 120) {
-          rows.push({ date: due, label: r.label, amount: Number(r.amount), category: r.category, account_id: r.account_id || null, recurrence_id: r.id });
+          if (!synced) rows.push({ date: due, label: r.label, amount: Number(r.amount), category: r.category, account_id: r.account_id || null, recurrence_id: r.id });
           due = advanceDate(due, r.frequency, r.day);
         }
         if (due !== r.next_date) moves.push({ id: r.id, next_date: due });
       }
-      if (!rows.length) return;
+      if (!rows.length && !moves.length) return;
       let created = rows.map((x, i) => ({ id: "auto" + Date.now() + i, ...x }));
       if (!demo) {
-        const { data: ins, error } = await supabaseBrowser().from("transactions").upsert(rows.map((x) => ({ ...x, user_id: user })), { onConflict: "recurrence_id,date", ignoreDuplicates: true }).select();
-        if (error) return;
-        created = (ins || []).map(clean);
+        if (rows.length) {
+          const { data: ins, error } = await supabaseBrowser().from("transactions").upsert(rows.map((x) => ({ ...x, user_id: user })), { onConflict: "recurrence_id,date", ignoreDuplicates: true }).select();
+          if (error) return;
+          created = (ins || []).map(clean);
+        }
         for (const mv of moves) await supabaseBrowser().from("recurrences").update({ next_date: mv.next_date }).eq("id", mv.id);
       }
       setData((d) => ({ ...d, transactions: byDate([...d.transactions, ...created]), recurrences: d.recurrences.map((r) => ({ ...r, ...(moves.find((m) => m.id === r.id) || {}) })) }));
@@ -378,22 +383,43 @@ function App() {
         ...(file.livrets || []).map((l) => ({ src: l.id, name: l.nom || "Épargne", institution: l.banque || null, kind: "epargne", balance: Math.round((Number(l.valeur) || 0) * 100) / 100 })),
       ];
       const idMap = {}, newAccounts = [], updated = [];
+      // Même banque (« BNP » = « BNP Paribas ») : sert à retrouver un compte déjà relié à la banque
+      const words = (x) => String(x || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/boursorama/g, "boursobank").split(/[^a-z0-9]+/).filter((w) => w && !["la", "le", "de", "du", "sa"].includes(w));
+      const sameBank = (a, b) => { const x = words(a), y = words(b); if (!x.length || !y.length) return false; const [sm, bg] = x.length <= y.length ? [x, y] : [y, x]; return sm.every((w) => bg.includes(w)); };
+      const taken = new Set();
       for (const w of wanted) {
-        const hit = accIndex[keyAcc(w.name, w.institution)];
-        if (hit) { const saved = await write("accounts", { id: hit.id, balance: w.balance, kind: w.kind, updated_at: new Date().toISOString() }); updated.push({ ...hit, ...saved }); idMap[w.src] = hit.id; }
-        else newAccounts.push(w);
+        let hit = accIndex[keyAcc(w.name, w.institution)];
+        if (!hit && w.institution) {
+          // Compte déjà relié à la banque : on le réutilise au lieu de créer un doublon
+          const cands = d.accounts.filter((a) => a.powens_account_id && !taken.has(a.id) && sameBank(a.institution, w.institution) && (a.kind || "courant") === w.kind);
+          const sameName = cands.find((a) => String(a.name).toLowerCase().trim() === String(w.name).toLowerCase().trim());
+          const nWanted = wanted.filter((x) => x.kind === w.kind && sameBank(x.institution, w.institution)).length;
+          hit = sameName || (cands.length === 1 && nWanted === 1 ? cands[0] : null);
+        }
+        if (hit) {
+          taken.add(hit.id); idMap[w.src] = hit.id;
+          // Le solde d'un compte relié à la banque vient de la banque : on n'y touche pas
+          if (hit.powens_account_id) updated.push(hit);
+          else { const saved = await write("accounts", { id: hit.id, balance: w.balance, kind: w.kind, updated_at: new Date().toISOString() }); updated.push({ ...hit, ...saved }); }
+        } else newAccounts.push(w);
       }
       const createdAcc = await insertMany("accounts", newAccounts.map(({ src, ...r }) => ({ ...r, currency: "EUR" })));
       createdAcc.forEach((a, i) => { idMap[newAccounts[i].src] = a.id; });
       // 2. Opérations (sans doublons)
       const seen = {};
       d.transactions.forEach((t) => { const k = t.date + "|" + String(t.label).toLowerCase() + "|" + Number(t.amount).toFixed(2); seen[k] = (seen[k] || 0) + 1; });
-      const txRows = [];
+      const txRows = [], usedTx = new Set();
       for (const o of file.operations || []) {
         const amount = Math.round((o.type === "Rentrée" ? 1 : -1) * Math.abs(Number(o.montant) || 0) * 100) / 100;
         if (!amount || !/^\d{4}-\d{2}-\d{2}$/.test(o.date)) continue;
         const label = String(o.libelle || o.categorie || "Opération").slice(0, 120), k = o.date + "|" + label.toLowerCase() + "|" + amount.toFixed(2);
         if (seen[k]) { seen[k]--; continue; }
+        // Sur un compte relié à la banque, la même opération (même montant, à 3 jours près) y est déjà
+        const acc = idMap[o.compteId];
+        if (acc && d.accounts.some((a) => a.id === acc && a.powens_account_id)) {
+          const twin = d.transactions.find((t) => t.account_id === acc && !usedTx.has(t.id) && Number(t.amount).toFixed(2) === amount.toFixed(2) && Math.abs(new Date(t.date) - new Date(o.date)) <= 3 * 864e5);
+          if (twin) { usedTx.add(twin.id); continue; }
+        }
         txRows.push({ date: o.date, label, amount, category: String(o.categorie || "Autre").slice(0, 40), account_id: idMap[o.compteId] || null });
       }
       const createdTx = await insertMany("transactions", txRows);
