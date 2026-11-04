@@ -24,22 +24,28 @@ export const NAV = [
 ];
 
 /* ---------------- Comptes affichés ---------------- */
-function ScopePicker({ accounts, scope, setScope }) {
+function ScopePicker({ accounts, holdings = [], scope, setScope }) {
   const [openP, setOpen] = useState(false);
-  const label = !scope.length ? "Tous les comptes" : scope.length === 1 ? accounts.find((a) => a.id === scope[0])?.name : `${scope.length} comptes`;
+  // Choix possibles : des comptes (id) et des placements (« h:<id> »)
+  const hName = (id) => holdings.find((h) => "h:" + h.id === id)?.name;
+  const label = !scope.length ? "Tous les comptes" : scope.length === 1 ? (accounts.find((a) => a.id === scope[0])?.name || hName(scope[0])) : `${scope.length} sélectionnés`;
   const toggle = (id) => setScope(scope.includes(id) ? scope.filter((x) => x !== id) : [...scope, id]);
+  const Item = ({ id, title, sub }) => <button className={"scopeItem" + (scope.includes(id) ? " on" : "")} onClick={() => toggle(id)}>
+    <span className="scopeCheck">{scope.includes(id) && <Icon name="check" size={13} stroke={2.6} />}</span>
+    <span className="itemMain"><b>{title}</b><small>{sub}</small></span>
+  </button>;
   return <div className="scopeBar">
     <button className={"scopeBtn" + (scope.length ? " on" : "")} onClick={() => setOpen(!openP)}><Icon name="wallet" size={15} />Affichés : <b>{label}</b><Icon name="chevronDown" size={14} /></button>
     {scope.length > 0 && <button className="link" onClick={() => setScope([])}>Tout afficher</button>}
     {openP && <>
       <div className="scopeBackdrop" onClick={() => setOpen(false)} />
       <div className="scopeMenu">
-        <button className={"scopeItem" + (!scope.length ? " on" : "")} onClick={() => { setScope([]); setOpen(false); }}><span className="scopeCheck">{!scope.length && <Icon name="check" size={13} stroke={2.6} />}</span><b>Tous les comptes</b></button>
-        {accounts.map((a) => <button key={a.id} className={"scopeItem" + (scope.includes(a.id) ? " on" : "")} onClick={() => toggle(a.id)}>
-          <span className="scopeCheck">{scope.includes(a.id) && <Icon name="check" size={13} stroke={2.6} />}</span>
-          <span className="itemMain"><b>{a.name}</b><small>{a.institution || "Saisi à la main"}</small></span>
-        </button>)}
-        <small className="muted" style={{ padding: "6px 10px 2px", display: "block" }}>Le patrimoine, les courbes, le budget et les opérations ne tiennent compte que des comptes cochés.</small>
+        <button className={"scopeItem" + (!scope.length ? " on" : "")} onClick={() => { setScope([]); setOpen(false); }}><span className="scopeCheck">{!scope.length && <Icon name="check" size={13} stroke={2.6} />}</span><b>Tous les comptes et placements</b></button>
+        {accounts.length > 0 && <div className="scopeGroup">Comptes</div>}
+        {accounts.map((a) => <Item key={a.id} id={a.id} title={a.name} sub={a.institution || "Saisi à la main"} />)}
+        {holdings.length > 0 && <div className="scopeGroup">Placements</div>}
+        {holdings.map((h) => <Item key={h.id} id={"h:" + h.id} title={h.name} sub={[h.ticker, h.asset_class].filter(Boolean).join(" · ") || "Placement"} />)}
+        <small className="muted" style={{ padding: "6px 10px 2px", display: "block" }}>Le patrimoine, les courbes, le budget et les opérations ne tiennent compte que de ce qui est coché.</small>
       </div>
     </>}
   </div>;
@@ -110,15 +116,20 @@ export default function AppView({ data, demo, embedded, initialTab = "overview",
   const setScope = (ids) => { setScopeState(ids); try { localStorage.setItem("patrimo.scope", JSON.stringify(ids)); } catch {} };
   const shown = useMemo(() => {
     const hidden = new Set(data.accounts.filter((a) => a.hidden).map((a) => a.id));
-    const valid = scope.filter((id) => data.accounts.some((a) => a.id === id && !a.hidden));
+    // Sélection : comptes (id) et placements (« h:<id> »)
+    const validAcc = scope.filter((id) => data.accounts.some((a) => a.id === id && !a.hidden));
+    const validH = scope.filter((id) => id.startsWith("h:") && data.holdings.some((h) => "h:" + h.id === id));
+    const valid = [...validAcc, ...validH];
     if (!hidden.size && !valid.length) return data;
-    const keep = new Set(data.accounts.filter((a) => !a.hidden && (!valid.length || valid.includes(a.id))).map((a) => a.id));
-    const scoped = valid.length > 0, inScope = (id) => (scoped ? keep.has(id) : !hidden.has(id));
+    const scoped = valid.length > 0;
+    const keep = new Set(data.accounts.filter((a) => !a.hidden && (!scoped || validAcc.includes(a.id))).map((a) => a.id));
+    const keepH = new Set(validH.map((id) => id.slice(2)));
+    const inScope = (id) => (scoped ? keep.has(id) : !hidden.has(id));
     return {
       ...data, scoped, scopeIds: valid,
       accounts: data.accounts.filter((a) => keep.has(a.id)),
       transactions: data.transactions.filter((t) => (t.account_id ? inScope(t.account_id) : !scoped)),
-      holdings: data.holdings.filter((h) => (h.account_id ? inScope(h.account_id) : !scoped)),
+      holdings: data.holdings.filter((h) => keepH.has(h.id) || (h.account_id ? inScope(h.account_id) : !scoped)),
       recurrences: (data.recurrences || []).filter((r) => (r.account_id ? inScope(r.account_id) : !scoped)),
       debts: scoped ? [] : data.debts, snapshots: scoped ? [] : data.snapshots,
     };
@@ -264,7 +275,7 @@ export default function AppView({ data, demo, embedded, initialTab = "overview",
 
           <div className="content" key={tab}>
             {demo && !embedded && <div className="demoBanner"><Icon name="info" size={16} /><span><b>Démonstration</b> · tous les montants affichés sont fictifs.</span><a className="btn sm light" href="/connexion?mode=inscription">Créer mon compte</a></div>}
-            {["overview", "invest", "budget", "ops"].includes(tab) && data.accounts.filter((a) => !a.hidden).length > 1 && <ScopePicker accounts={data.accounts.filter((a) => !a.hidden)} scope={liveData.scopeIds || []} setScope={setScope} />}
+            {["overview", "invest", "budget", "ops"].includes(tab) && (data.accounts.filter((a) => !a.hidden).length + data.holdings.length) > 1 && <ScopePicker accounts={data.accounts.filter((a) => !a.hidden)} holdings={data.holdings.filter((h) => Number(h.quantity) > 0 || Number(h.value) > 0)} scope={liveData.scopeIds || []} setScope={setScope} />}
             {screen}
           </div>
         </div>
