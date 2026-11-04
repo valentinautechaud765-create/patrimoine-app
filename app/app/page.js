@@ -83,7 +83,7 @@ function App() {
     const r = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json", ...(data?.session ? { Authorization: "Bearer " + data.session.access_token } : {}) }, body: JSON.stringify(body || {}) });
     const j = await r.json().catch(() => ({}));
     if (!r.ok) {
-      if (/n’est pas encore configur|manquant/i.test(j.error || "")) throw new Error(path.includes("powens") ? "La connexion bancaire n’est pas encore activée. Elle arrive très bientôt." : "Le paiement en ligne n’est pas encore activé. Il arrive très bientôt.");
+      if (/n’est pas encore configur|manquant/i.test(j.error || "") && !/POWENS_|STRIPE_/.test(j.error || "")) throw new Error(path.includes("powens") ? "La connexion bancaire n’est pas encore activée. Elle arrive très bientôt." : "Le paiement en ligne n’est pas encore activé. Il arrive très bientôt.");
       throw new Error(j.error || "Service momentanément indisponible.");
     }
     return j;

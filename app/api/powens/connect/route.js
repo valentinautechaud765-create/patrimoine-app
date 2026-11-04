@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 import { NextResponse } from "next/server";
-import { powensConfig, encrypt, decrypt } from "../../../../lib/powens.js";
+import { powensConfig, powensFetch, encrypt, decrypt } from "../../../../lib/powens.js";
 import { supabaseAdmin, userFromRequest } from "../../../../lib/supabase.js";
 import { siteUrl } from "../../../../lib/stripe.js";
 export const runtime = "nodejs";
@@ -23,15 +23,13 @@ export async function POST(request) {
     const { data: link } = await db.from("powens_links").select("*").eq("user_id", user.id).maybeSingle();
     let token = link ? decrypt(link.token_cipher) : null;
     if (!token) {
-      const r = await fetch(api + "/auth/init", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ client_id: clientId, client_secret: secret }), cache: "no-store" });
-      const j = await r.json();
-      if (!r.ok || !j.auth_token) throw new Error(j.description || "Powens n’a pas pu créer l’accès.");
+      const j = await powensFetch(api + "/auth/init", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ client_id: clientId, client_secret: secret }) });
+      if (!j.auth_token) throw new Error("Powens n’a pas pu créer l’accès.");
       token = j.auth_token;
       await db.from("powens_links").upsert({ user_id: user.id, powens_user_id: String(j.id_user), token_cipher: encrypt(token) });
     }
-    const c = await fetch(api + "/auth/token/code?type=singleAccess", { headers: { Authorization: "Bearer " + token }, cache: "no-store" });
-    const code = await c.json();
-    if (!c.ok || !code.code) throw new Error(code.description || "Powens n’a pas pu générer le code temporaire.");
+    const code = await powensFetch(api + "/auth/token/code?type=singleAccess", { headers: { Authorization: "Bearer " + token } });
+    if (!code.code) throw new Error("Powens n’a pas pu générer le code temporaire.");
     const state = crypto.randomBytes(24).toString("hex");
     await db.from("powens_links").update({ pending_state: state }).eq("user_id", user.id);
     const url = new URL("https://webview.powens.com/fr/connect");

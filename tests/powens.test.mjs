@@ -42,7 +42,7 @@ globalThis.fetch = async (url) => {
       { id: 102, id_account: 1, date: "2026-11-03", value: -9.99, simplified_wording: "NETFLIX", coming: true },
       { id: 103, id_account: 3, date: "2026-11-03", value: -50, simplified_wording: "CB CARTE" } ] }
     : {};
-  return { ok: true, status: 200, json: async () => body };
+  return { ok: true, status: 200, json: async () => body, text: async () => JSON.stringify(body) };
 };
 
 test("synchro bancaire : comptes, opérations, catégories, et aucun doublon", async () => {
@@ -65,4 +65,21 @@ test("synchro bancaire : comptes, opérations, catégories, et aucun doublon", a
   assert.equal(db.tables.transactions.length, 2);
   assert.equal(db.tables.accounts.length, 2);
   assert.equal(accs[0].name, "Mon compte perso");  // le nom choisi est conservé
+});
+
+test("Powens répond une page HTML : message clair au lieu de « Unexpected token < »", async () => {
+  const { powensFetch } = await import("../lib/powens.js");
+  const saved = globalThis.fetch;
+  globalThis.fetch = async () => ({ ok: false, status: 404, text: async () => "<!DOCTYPE html><html>Not found</html>" });
+  await assert.rejects(powensFetch("https://x.biapi.pro/2.0/auth/init"), /vérifiez POWENS_DOMAIN/);
+  globalThis.fetch = saved;
+});
+
+test("POWENS_DOMAIN : formats acceptés et refusés", async () => {
+  const { powensConfig } = await import("../lib/powens.js");
+  process.env.POWENS_DOMAIN = "https://monappli-sandbox.biapi.pro/2.0/";
+  assert.equal(powensConfig().domain, "monappli-sandbox.biapi.pro");
+  process.env.POWENS_DOMAIN = "webview.powens.com";
+  assert.throws(() => powensConfig(), /POWENS_DOMAIN invalide/);
+  process.env.POWENS_DOMAIN = "test.biapi.pro";
 });
