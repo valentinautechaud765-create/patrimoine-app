@@ -10,6 +10,7 @@ import { InsightList } from "./Overview.js";
 import { HoldingSheet, TradeForm, PortfolioCurve } from "./Holding.js";
 import { Debts, DebtForm, DebtSheet, PaymentForm } from "./Debts.js";
 import { RecurrenceForm } from "./Forms.js";
+import { Avatar } from "./ui.js";
 import { Modal, Head, TxForm, AccountForm, AccountSheet, BudgetForm, HoldingForm, DeleteMeModal, ImportModal } from "./Forms.js";
 
 export const NAV = [
@@ -232,7 +233,7 @@ export default function AppView({ data, demo, embedded, initialTab = "overview",
             <div className="bar" style={{ marginTop: 0 }}><i style={{ width: Math.max(4, (1 - trialLeft / TRIAL_DAYS) * 100) + "%", background: "var(--blue)" }} /></div>
           </div> : <div className="planCard quiet"><b>{planById(plan).name}</b><small>Merci de votre confiance.</small></div>}
           <button className="sideUser" onClick={() => go("settings")}>
-            <span className="avatar">{(first || "?").charAt(0)}</span>
+            <Avatar name={first || "?"} size={34} />
             <span className="itemMain navLabel"><b>{first || "Mon compte"}</b><small>{email || (demo ? "Démonstration" : "")}</small></span>
             <Icon name="chevronRight" size={15} className="faint navLabel" />
           </button>
@@ -257,7 +258,7 @@ export default function AppView({ data, demo, embedded, initialTab = "overview",
               <button className="iconBtn" aria-label={privacy ? "Afficher les montants" : "Masquer les montants"} onClick={() => setPrivacy(!privacy)}><Icon name={privacy ? "eyeOff" : "eye"} size={18} /></button>
               <button className={"iconBtn" + (charts ? " active" : "")} aria-label={charts ? "Masquer les courbes" : "Afficher les courbes"} onClick={() => setCharts(!charts)}><Icon name={charts ? "chart" : "chartOff"} size={18} /></button>
               <button className="iconBtn" aria-label="Ajouter une opération" onClick={() => setModal({ type: "tx" })}><Icon name="plus" size={18} /></button>
-              <button className="avatarBtn" aria-label="Réglages" onClick={() => go("settings")}><span className="avatar">{(first || "?").charAt(0)}</span></button>
+              <button className="avatarBtn" aria-label="Réglages" onClick={() => go("settings")}><Avatar name={first || "?"} size={34} /></button>
             </div>
           </header>
 

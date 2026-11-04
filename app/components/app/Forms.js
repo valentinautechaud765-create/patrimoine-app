@@ -111,7 +111,7 @@ export function AccountSheet({ account, transactions, onClose, onEdit, onAddTx, 
   const inM = mtx.filter((t) => t.amount > 0).reduce((s, t) => s + t.amount, 0), outM = -mtx.filter((t) => t.amount < 0).reduce((s, t) => s + t.amount, 0);
   return <Modal onClose={onClose} wide>
     <div className="sheetHead">
-      <InstIcon name={account.institution || account.name} size={48} />
+      <InstIcon name={account.institution || account.name} kind={account.kind} manual={!account.institution} size={48} />
       <div className="itemMain"><b style={{ fontSize: 17 }}>{account.name}</b><small>{account.institution || "Saisi à la main"} · {KIND_LABEL[account.kind]}</small></div>
       <button type="button" className="iconBtn" onClick={onClose} aria-label="Fermer"><Icon name="x" size={18} /></button>
     </div>

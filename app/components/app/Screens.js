@@ -6,7 +6,7 @@ import { money, money0, signed, pct, dayTitle, monthLabel, todayISO } from "../.
 import { ASSET_COLORS } from "../../../lib/categories.js";
 import { budgetSuggestions, FREQ_LABEL, perMonth } from "../../../lib/model.js";
 import { planById, TRIAL_DAYS, BRAND } from "../../../lib/config.js";
-import { Amount, CatIcon, InstIcon, TickerIcon, Panel, Empty, Locked, ago, KIND_LABEL } from "./ui.js";
+import { Amount, Avatar, CatIcon, InstIcon, TickerIcon, Panel, Empty, Locked, ago, KIND_LABEL } from "./ui.js";
 import { BudgetRow, TxRow, Upcoming } from "./Overview.js";
 import { InvestProjection } from "./Projection.js";
 
@@ -54,12 +54,12 @@ export function Accounts({ m, data, connectBank, syncBank, limits, openPlans, op
     {(data.bankErrors || []).map((e) => <div className="msg info" key={e.bank}><b>{e.bank}</b> demande de confirmer votre identité (sécurité de la banque, environ tous les 180 jours). <button className="link" onClick={connectBank}>Reconnecter</button></div>)}
     {groups.length ? groups.map((g, i) => <section key={g.name} className="card panel fadeIn" style={{ animationDelay: 80 + i * 40 + "ms" }}>
       <div className="instHead">
-        <InstIcon name={g.name} size={44} />
+        <InstIcon name={g.name} manual={g.name === "Saisis à la main"} size={44} />
         <div className="itemMain"><b style={{ fontSize: 16 }}>{g.name}</b><small>{g.list.length} compte{g.list.length > 1 ? "s" : ""}</small></div>
         <b className="num money" style={{ fontSize: 17, fontWeight: 500 }}>{money(g.total)}</b>
       </div>
       <div className="list">{g.list.map((a) => <button className={"item hover tap" + (a.hidden ? " paused" : "")} key={a.id} onClick={() => open("accountView", { id: a.id })}>
-        <span className="kindIco"><Icon name={a.kind === "epargne" ? "piggy" : a.kind === "investissement" ? "trending" : "card"} size={17} /></span>
+        <span className={"kindIco tint k-" + a.kind}><Icon name={a.kind === "epargne" ? "piggy" : a.kind === "investissement" ? "trending" : "card"} size={17} /></span>
         <div className="itemMain"><b>{a.name}{a.hidden && <span className="chip" style={{ height: 20, marginLeft: 8, fontSize: 11 }}>Masqué</span>}</b><small>{KIND_LABEL[a.kind]}{a.powens_account_id ? " · synchronisé" : " · manuel"}{a.hidden ? " · non compté dans le patrimoine" : ""}</small></div>
         <div className="itemSide"><b>{money(a.balance, a.currency)}</b><small className="faint">{a.updated_at ? "Mis à jour " + ago(a.updated_at) : ""}</small></div>
         <Icon name="chevronRight" size={16} className="faint" />
@@ -267,7 +267,7 @@ export function Settings({ data, demo, openPlans, managePlan, logout, resetPassw
   const trialLeft = p.trial_days_left ?? TRIAL_DAYS;
   return <div className="settings">
     <section className="card panel profileCard fadeIn">
-      <span className="avatar lg">{name.charAt(0).toUpperCase()}</span>
+      <Avatar name={name} size={56} />
       {editName === null ? <>
         <div className="itemMain"><b style={{ fontSize: 18 }}>{name}</b><small>{email || "Compte de démonstration"}</small></div>
         <button className="btn sm" onClick={() => setEditName(p.full_name || "")}><Icon name="edit" size={14} />Modifier</button>
