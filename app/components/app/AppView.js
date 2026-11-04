@@ -7,7 +7,7 @@ import { BRAND, PLANS, TRIAL_DAYS, formatPrice, planById, limitsFor } from "../.
 import Overview from "./Overview.js";
 import { Accounts, Investments, Budget, Operations, Settings } from "./Screens.js";
 import { InsightList } from "./Overview.js";
-import { Modal, Head, TxForm, AccountForm, AccountSheet, BudgetForm, HoldingForm, DeleteMeModal } from "./Forms.js";
+import { Modal, Head, TxForm, AccountForm, AccountSheet, BudgetForm, HoldingForm, DeleteMeModal, ImportModal } from "./Forms.js";
 
 export const NAV = [
   { id: "overview", label: "Vue d’ensemble", short: "Accueil", icon: "home" },
@@ -78,7 +78,7 @@ export default function AppView({ data, demo, embedded, initialTab = "overview",
     return active ? total / active : 0;
   };
   const run = async (fn, ...args) => {
-    try { const r = await fn?.(...args); if (r?.message) flash(r.message); return r?.ok !== false; }
+    try { const r = await fn?.(...args); if (r?.message) flash(r.message); return r?.ok === false ? false : (r || true); }
     catch (e) { flash(e.message || "Une erreur est survenue.", "bad"); return false; }
   };
   const title = tab === "overview" ? (first ? `Bonjour, ${first}` : "Vue d’ensemble") : NAV.find((n) => n.id === tab).label;
@@ -91,7 +91,7 @@ export default function AppView({ data, demo, embedded, initialTab = "overview",
     invest: <Investments m={m} data={data} limits={limits} openPlans={openPlans} open={open} />,
     budget: <Budget m={m} data={data} limits={limits} openPlans={openPlans} open={open} />,
     ops: <Operations key={opsCat} data={data} query={query} setQuery={setQuery} limits={limits} openPlans={openPlans} open={open} flash={flash} initialCategory={opsCat} />,
-    settings: <Settings data={data} demo={demo} openPlans={openPlans} managePlan={() => run(actions.managePlan)} logout={() => run(actions.logout)} resetPassword={() => run(actions.resetPassword)} saveName={(n) => run(actions.saveName, n)} privacy={privacy} setPrivacy={setPrivacy} deleteMe={() => open("deleteMe")} />,
+    settings: <Settings data={data} demo={demo} openPlans={openPlans} managePlan={() => run(actions.managePlan)} logout={() => run(actions.logout)} resetPassword={() => run(actions.resetPassword)} saveName={(n) => run(actions.saveName, n)} importData={() => open("import")} privacy={privacy} setPrivacy={setPrivacy} deleteMe={() => open("deleteMe")} />,
   }[tab];
   const viewed = modal?.type === "accountView" ? data.accounts.find((a) => a.id === modal.id) : null;
 
@@ -99,10 +99,10 @@ export default function AppView({ data, demo, embedded, initialTab = "overview",
     <div className={"appRoot" + (embedded ? " embedded" : "") + (privacy ? " privacy" : "")}>
       <div className="shell" ref={scroller} onScroll={embedded ? undefined : (e) => setScrolled(e.currentTarget.scrollTop > 4)}>
         <aside className="side">
-          <div className="brand"><BrandMark size={30} /><span>{BRAND.name}</span></div>
+          <div className="brand"><BrandMark size={30} /><span className="navLabel">{BRAND.name}</span></div>
           {NAV.map((n) => {
             const lock = n.id === "invest" && !limits.investments;
-            return <button key={n.id} className={"navItem" + (tab === n.id ? " on" : "")} onClick={() => go(n.id)}><Icon name={n.icon} size={18} />{n.label}{lock && <Icon name="lock" size={13} className="lockBadge" />}</button>;
+            return <button key={n.id} className={"navItem" + (tab === n.id ? " on" : "")} onClick={() => go(n.id)}><Icon name={n.icon} size={18} /><span className="navLabel">{n.label}</span>{lock && <Icon name="lock" size={13} className="lockBadge" />}</button>;
           })}
           {plan === "free" ? <div className="planCard">
             <span className="planCardIco"><Icon name="sparkles" size={16} /></span>
@@ -115,8 +115,8 @@ export default function AppView({ data, demo, embedded, initialTab = "overview",
           </div> : <div className="planCard quiet"><b>{planById(plan).name}</b><small>Merci de votre confiance.</small></div>}
           <button className="sideUser" onClick={() => go("settings")}>
             <span className="avatar">{(first || "?").charAt(0)}</span>
-            <span className="itemMain"><b>{first || "Mon compte"}</b><small>{email || (demo ? "Démonstration" : "")}</small></span>
-            <Icon name="chevronRight" size={15} className="faint" />
+            <span className="itemMain navLabel"><b>{first || "Mon compte"}</b><small>{email || (demo ? "Démonstration" : "")}</small></span>
+            <Icon name="chevronRight" size={15} className="faint navLabel" />
           </button>
         </aside>
 
@@ -158,6 +158,7 @@ export default function AppView({ data, demo, embedded, initialTab = "overview",
       {viewed && <AccountSheet account={viewed} transactions={data.transactions} onClose={close} onEdit={() => open("account", { account: viewed })} onAddTx={() => open("tx", { account_id: viewed.id })} onOpenTx={(t) => open("tx", { tx: t })} />}
       {modal?.type === "budget" && <BudgetForm budget={modal.budget} suggested={modal.suggested} existing={data.budgets.map((b) => b.category)} average={average} onClose={close} onSave={(b, prev) => run(actions.saveBudget, b, prev)} onDelete={(c) => run(actions.deleteBudget, c)} />}
       {modal?.type === "holding" && <HoldingForm holding={modal.holding} onClose={close} onSave={(h) => run(actions.saveHolding, h)} onDelete={(h) => run(actions.deleteHolding, h)} />}
+      {modal?.type === "import" && <ImportModal email={email} onClose={close} onImport={(f) => run(actions.importMonPatrimoine, f)} />}
       {modal?.type === "deleteMe" && <DeleteMeModal onClose={close} onConfirm={() => run(actions.deleteAccountForever)} />}
       {toast && <div className={"toast " + toast.tone}><Icon name={toast.tone === "bad" ? "info" : "check"} size={16} />{toast.text}</div>}
     </div>

@@ -207,7 +207,7 @@ export function Operations({ data, query, setQuery, limits, openPlans, open, fla
 }
 
 /* ---------------- Réglages ---------------- */
-export function Settings({ data, demo, openPlans, managePlan, logout, resetPassword, saveName, privacy, setPrivacy, deleteMe }) {
+export function Settings({ data, demo, openPlans, managePlan, logout, resetPassword, saveName, privacy, setPrivacy, deleteMe, importData }) {
   const p = data.profile, plan = planById(p.plan || "free"), email = data.session?.user?.email;
   const name = p.full_name || (email ? email.split("@")[0] : "Mon compte");
   const [editName, setEditName] = useState(null);
@@ -232,6 +232,11 @@ export function Settings({ data, demo, openPlans, managePlan, logout, resetPassw
           {p.plan !== "pro" && <button className="btn primary sm" onClick={() => openPlans(p.plan === "plus" ? "pro" : "plus")}><Icon name="sparkles" size={15} />{p.plan === "plus" ? "Passer à Pro" : "Passer à Plus"}</button>}
           {p.plan !== "free" && p.stripe_customer_id && <button className="btn sm" onClick={managePlan}>Gérer</button>}
         </div>
+      </div>
+    </Panel>
+    <Panel title="Données" icon="download">
+      <div className="list">
+        <button className="item hover tap" onClick={importData}><span className="kindIco"><Icon name="upload" size={17} /></span><div className="itemMain"><b>Importer depuis Mon Patrimoine</b><small>Comptes, opérations, budgets, placements et historique.</small></div><Icon name="chevronRight" size={16} className="faint" /></button>
       </div>
     </Panel>
     <Panel title="Affichage" icon="eye">

@@ -199,6 +199,75 @@ function App() {
       setData((d) => ({ ...d, profile: { ...d.profile, full_name } }));
       return { message: "Prénom enregistré" };
     },
+    // Import des données exportées depuis « Mon Patrimoine ». Relançable sans doublons :
+    // comptes et positions retrouvés par leur nom, opérations par date + libellé + montant.
+    async importMonPatrimoine(file) {
+      if (file?.format !== "mon-patrimoine/v1") throw new Error("Ce fichier ne vient pas de Mon Patrimoine.");
+      const d = live.current, sb = demo ? null : supabaseBrowser(), today = new Date().toISOString().slice(0, 10);
+      const keyAcc = (name, inst) => (String(name || "") + "|" + String(inst || "")).toLowerCase().trim();
+      const accIndex = Object.fromEntries(d.accounts.map((a) => [keyAcc(a.name, a.institution), a]));
+      const insertMany = async (table, rows) => {
+        if (!rows.length) return [];
+        if (demo) return rows.map((r, i) => ({ id: "imp" + Date.now() + i + Math.random().toString(36).slice(2, 5), ...r }));
+        const out = [];
+        for (let i = 0; i < rows.length; i += 400) {
+          const { data: saved, error } = await sb.from(table).insert(rows.slice(i, i + 400).map((r) => ({ ...r, user_id: user }))).select();
+          if (error) throw new Error("Import impossible (" + table + ") : " + error.message);
+          out.push(...saved.map(clean));
+        }
+        return out;
+      };
+      // 1. Comptes (courants + livrets)
+      const kindOf = (t) => /épargne|epargne|livret/i.test(String(t || "")) ? "epargne" : "courant";
+      const wanted = [
+        ...(file.comptes || []).map((c) => ({ src: c.id, name: c.nom || "Compte", institution: c.banque || null, kind: kindOf(c.type), balance: Math.round((Number(c.solde) || 0) * 100) / 100 })),
+        ...(file.livrets || []).map((l) => ({ src: l.id, name: l.nom || "Épargne", institution: l.banque || null, kind: "epargne", balance: Math.round((Number(l.valeur) || 0) * 100) / 100 })),
+      ];
+      const idMap = {}, newAccounts = [], updated = [];
+      for (const w of wanted) {
+        const hit = accIndex[keyAcc(w.name, w.institution)];
+        if (hit) { const saved = await write("accounts", { id: hit.id, balance: w.balance, kind: w.kind, updated_at: new Date().toISOString() }); updated.push({ ...hit, ...saved }); idMap[w.src] = hit.id; }
+        else newAccounts.push(w);
+      }
+      const createdAcc = await insertMany("accounts", newAccounts.map(({ src, ...r }) => ({ ...r, currency: "EUR" })));
+      createdAcc.forEach((a, i) => { idMap[newAccounts[i].src] = a.id; });
+      // 2. Opérations (sans doublons)
+      const seen = {};
+      d.transactions.forEach((t) => { const k = t.date + "|" + String(t.label).toLowerCase() + "|" + Number(t.amount).toFixed(2); seen[k] = (seen[k] || 0) + 1; });
+      const txRows = [];
+      for (const o of file.operations || []) {
+        const amount = Math.round((o.type === "Rentrée" ? 1 : -1) * Math.abs(Number(o.montant) || 0) * 100) / 100;
+        if (!amount || !/^\d{4}-\d{2}-\d{2}$/.test(o.date)) continue;
+        const label = String(o.libelle || o.categorie || "Opération").slice(0, 120), k = o.date + "|" + label.toLowerCase() + "|" + amount.toFixed(2);
+        if (seen[k]) { seen[k]--; continue; }
+        txRows.push({ date: o.date, label, amount, category: String(o.categorie || "Autre").slice(0, 40), account_id: idMap[o.compteId] || null });
+      }
+      const createdTx = await insertMany("transactions", txRows);
+      // 3. Placements
+      const classOf = (p) => { const t = (p.type + " " + p.nom + " " + p.ticker).toLowerCase(); return /crypto|bitcoin|btc|eth/.test(t) ? "Crypto" : /etf|tracker|msci|s&p|world/.test(t) ? "ETF" : /oblig/.test(t) ? "Obligations" : /fonds|opcvm|scpi|assurance/.test(t) ? "Fonds" : "Action"; };
+      const hIndex = Object.fromEntries(d.holdings.map((h) => [(h.name + "|" + (h.ticker || "")).toLowerCase(), h]));
+      const newH = [], updH = [];
+      for (const pl of file.placements || []) {
+        const row = { name: pl.nom || pl.ticker || "Placement", ticker: pl.ticker || null, asset_class: classOf(pl), quantity: Number(pl.quantite) || 0, cost_basis: Math.round((Number(pl.investi) || 0) * 100) / 100, value: Math.round((Number(pl.valeur) || 0) * 100) / 100, currency: pl.devise === "USD" ? "USD" : "EUR" };
+        const hit = hIndex[(row.name + "|" + (row.ticker || "")).toLowerCase()];
+        if (hit) { const saved = await write("holdings", { id: hit.id, ...row, updated_at: new Date().toISOString() }); updH.push({ ...hit, ...saved }); }
+        else newH.push(row);
+      }
+      const createdH = await insertMany("holdings", newH);
+      // 4. Budgets
+      const budgets = Object.entries(file.budgets || {}).filter(([, v]) => Number(v) > 0).map(([category, v]) => ({ category: String(category).slice(0, 40), monthly_limit: Math.round(Number(v) * 100) / 100 }));
+      if (!demo && budgets.length) { const { error } = await sb.from("budgets").upsert(budgets.map((b) => ({ ...b, user_id: user }))); if (error) throw new Error("Import impossible (budgets) : " + error.message); }
+      // 5. Historique du patrimoine (courbe)
+      const hist = (file.historique || []).filter((h) => /^\d{4}-\d{2}-\d{2}$/.test(h.date) && h.date < today && Number.isFinite(Number(h.total))).map((h) => ({ date: h.date, total: Math.round(Number(h.total) * 100) / 100 }));
+      if (!demo && hist.length) { const { error } = await sb.from("net_worth_snapshots").upsert(hist.map((h) => ({ ...h, user_id: user }))); if (error) throw new Error("Import impossible (historique) : " + error.message); }
+      setData((x) => {
+        const accounts = [...x.accounts.filter((a) => !updated.some((u) => u.id === a.id)), ...updated, ...createdAcc];
+        const holdings = [...x.holdings.filter((h) => !updH.some((u) => u.id === h.id)), ...updH, ...createdH].sort((a, b) => b.value - a.value);
+        const snaps = Object.fromEntries(x.snapshots.map((sn) => [sn.date, sn])); hist.forEach((h) => { snaps[h.date] = h; });
+        return { ...x, accounts, holdings, transactions: byDate([...x.transactions, ...createdTx]), budgets: [...x.budgets.filter((b) => !budgets.some((n) => n.category === b.category)), ...budgets], snapshots: Object.values(snaps).sort((a, b) => a.date.localeCompare(b.date)) };
+      });
+      return { message: "Import terminé", ok: true, summary: { comptes: createdAcc.length + updated.length, operations: createdTx.length, ignorees: (file.operations || []).length - createdTx.length, placements: createdH.length + updH.length, budgets: budgets.length, jours: hist.length } };
+    },
     async deleteAccountForever() {
       if (demo) return { message: "Démonstration : rien n’est supprimé." };
       await api("/api/compte/supprimer");

@@ -803,3 +803,31 @@ button.budgetRow.tap:hover { background: rgba(255, 255, 255, 0.03); }
 .flowStats b { font-size: 17px; font-weight: 500; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
 .privacy :is(.flowStats b, .kpi small, .insight small, .sheetBalance b, .suggest .chip, .suggest small) { filter: blur(7px); }
 @container app (max-width: 860px) { .flowStats { grid-template-columns: 1fr 1fr; } }
+.filePick { position: relative; display: flex; align-items: center; justify-content: center; gap: 10px; height: 56px; border-radius: 14px; border: 1.5px dashed var(--line2); color: var(--fg2); font-weight: 500; cursor: pointer; transition: border-color 0.15s, background 0.15s; }
+.filePick:hover { border-color: rgba(61, 124, 255, 0.6); background: rgba(61, 124, 255, 0.05); }
+.filePick input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.importGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 8px; }
+.importGrid > div { display: grid; gap: 2px; padding: 12px; border-radius: 14px; background: var(--surface2); border: 1px solid var(--line); }
+.importGrid svg { color: var(--blue2); margin-bottom: 4px; }
+.importGrid b { font-size: 20px; font-weight: 500; }
+.importGrid small { font-size: 12px; color: var(--muted); }
+.importDone { display: grid; justify-items: center; text-align: center; gap: 8px; padding: 8px 0; }
+.importDone .mailIco { background: var(--okSoft); color: var(--ok); border-color: transparent; }
+.importDone b { font-size: 20px; }
+.importDone p { margin: 0; color: var(--fg2); font-size: 14.5px; line-height: 1.55; }
+
+/* Menu latéral compact (comme Mon Patrimoine) : icônes seules, s'ouvre au survol par-dessus la page */
+@container app (min-width: 861px) { .shell { grid-template-columns: 76px minmax(0, 1fr); } }
+.side { width: 76px; overflow: hidden; z-index: 60; padding: 22px 14px; transition: width 0.28s var(--ease), background 0.28s, box-shadow 0.28s, border-color 0.28s; }
+.side .brand { padding: 0 9px 18px; white-space: nowrap; }
+.navItem { padding: 0 15px; white-space: nowrap; gap: 14px; }
+.navItem svg { flex: none; }
+.navLabel { opacity: 0; transition: opacity 0.18s; white-space: nowrap; }
+.side .lockBadge { opacity: 0; transition: opacity 0.18s; }
+.sideUser { padding: 12px 7px 0; }
+.planCard { transition: opacity 0.18s; min-width: 224px; }
+.side:not(:hover) .planCard { opacity: 0; visibility: hidden; }
+.side:hover { width: 252px; background: rgba(12, 14, 20, 0.72); backdrop-filter: blur(22px) saturate(160%); -webkit-backdrop-filter: blur(22px) saturate(160%); box-shadow: 24px 0 70px -24px rgba(0, 0, 0, 0.85); border-right-color: var(--line2); }
+.side:hover .navLabel, .side:hover .lockBadge { opacity: 1; transition-delay: 0.06s; }
+.navItem.on { background: rgba(61, 124, 255, 0.14); }
+@media (hover: none) { .side:active { width: 252px; } }

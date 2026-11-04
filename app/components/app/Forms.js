@@ -41,7 +41,8 @@ export function TxForm({ tx, accounts, defaultAccount, onClose, onSave, onDelete
   const [amount, setAmount] = useState(tx ? str(Math.abs(tx.amount)) : ""), [label, setLabel] = useState(tx?.label || "");
   const [category, setCategory] = useState(tx?.category || "Courses"), [date, setDate] = useState(tx?.date || todayISO());
   const [account, setAccount] = useState(tx?.account_id || defaultAccount || ""), [busy, setBusy] = useState(false);
-  const cats = type === "out" ? EXPENSE_CATEGORIES : ["Salaire", "Remboursement", "Autre"];
+  const base = type === "out" ? EXPENSE_CATEGORIES : ["Salaire", "Remboursement", "Autre"];
+  const cats = tx?.category && !base.includes(tx.category) && (tx.amount > 0) === (type === "in") ? [...base, tx.category] : base;
   const value = num(amount), ok = value > 0 && label.trim();
   const manual = accounts.filter((a) => !a.powens_account_id || a.id === account);
   async function submit(e) {
@@ -174,3 +175,47 @@ export function DeleteMeModal({ onClose, onConfirm }) {
   </Modal>;
 }
 
+
+/* ---------- Import depuis Mon Patrimoine ---------- */
+export function ImportModal({ email, onClose, onImport }) {
+  const [file, setFile] = useState(null), [error, setError] = useState(""), [busy, setBusy] = useState(false), [done, setDone] = useState(null);
+  async function pick(e) {
+    setError(""); setFile(null);
+    const f = e.target.files?.[0]; if (!f) return;
+    try {
+      const json = JSON.parse(await f.text());
+      if (json.format !== "mon-patrimoine/v1") throw new Error();
+      setFile(json);
+    } catch { setError("Ce fichier n’est pas un export de Mon Patrimoine. Utilise le bouton « Transférer vers Patrimo » dans les paramètres de Mon Patrimoine."); }
+  }
+  const counts = file && [
+    ["wallet", "Comptes", (file.comptes?.length || 0) + (file.livrets?.length || 0)],
+    ["list", "Opérations", file.operations?.length || 0],
+    ["trending", "Placements", file.placements?.length || 0],
+    ["target", "Budgets", Object.keys(file.budgets || {}).length],
+    ["calendar", "Jours d’historique", file.historique?.length || 0],
+  ];
+  return <Modal onClose={busy ? () => {} : onClose}>
+    <div className="modalForm">
+      <Head title="Importer depuis Mon Patrimoine" sub={done ? null : "Tes données sont ajoutées à ton compte Patrimo. Tu peux relancer l’import sans créer de doublons."} onClose={busy ? () => {} : onClose} />
+      {done ? <>
+        <div className="importDone"><span className="mailIco"><Icon name="checkCircle" size={26} /></span><b>Import terminé</b>
+          <p>{done.comptes} compte{done.comptes > 1 ? "s" : ""}, {done.operations} opération{done.operations > 1 ? "s" : ""} ajoutée{done.operations > 1 ? "s" : ""}{done.ignorees > 0 ? ` (${done.ignorees} déjà présente${done.ignorees > 1 ? "s" : ""})` : ""}, {done.placements} placement{done.placements > 1 ? "s" : ""}, {done.budgets} budget{done.budgets > 1 ? "s" : ""} et {done.jours} jour{done.jours > 1 ? "s" : ""} d’historique.</p></div>
+        <button className="btn primary lg block" onClick={onClose}>Voir mon patrimoine</button>
+      </> : <>
+        <ol className="mailSteps">
+          <li><span>1</span><div>Dans <b>Mon Patrimoine</b>, ouvre les <b>Paramètres</b> puis touche <b>« Transférer vers Patrimo »</b> : un fichier est téléchargé.</div></li>
+          <li><span>2</span><div>Choisis ce fichier ci-dessous, vérifie le résumé, puis importe.</div></li>
+        </ol>
+        <label className="filePick"><Icon name="upload" size={18} /><span>{file ? "Fichier prêt · changer" : "Choisir le fichier"}</span><input type="file" accept=".json,application/json" onChange={pick} /></label>
+        {error && <div className="msg err">{error}</div>}
+        {file && <>
+          {file.email && email && file.email.toLowerCase() !== email.toLowerCase() && <div className="msg info">Ce fichier vient du compte {file.email}, différent de ton compte Patrimo ({email}).</div>}
+          <div className="importGrid">{counts.map(([i, l, n]) => <div key={l}><Icon name={i} size={16} /><b>{n}</b><small>{l}</small></div>)}</div>
+          <p className="formHint"><Icon name="info" size={14} />Export du {new Date(file.exportedAt).toLocaleString("fr-FR", { dateStyle: "long", timeStyle: "short" })}. Les soldes et la valeur des placements sont ceux de ce moment-là.</p>
+          <button className="btn primary lg block" disabled={busy} onClick={async () => { setBusy(true); setError(""); const r = await onImport(file); setBusy(false); if (r && r.summary) setDone(r.summary); }}>{busy ? "Import en cours…" : "Importer mes données"}</button>
+        </>}
+      </>}
+    </div>
+  </Modal>;
+}
