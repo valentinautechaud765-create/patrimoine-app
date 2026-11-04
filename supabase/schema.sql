@@ -1,6 +1,6 @@
 -- =====================================================================
 -- Patrimo — schéma de base de données (Supabase / PostgreSQL)
--- À coller une fois dans Supabase → SQL Editor → Run.
+-- À coller dans Supabase → SQL Editor → Run (peut être relancé sans risque).
 -- Chaque table est protégée par RLS : un utilisateur ne voit que ses données.
 -- =====================================================================
 
@@ -91,6 +91,8 @@ alter table public.net_worth_snapshots enable row level security;
 alter table public.powens_links enable row level security;
 
 -- Le profil se lit mais ne se modifie pas depuis le navigateur (la formule est gérée par Stripe).
+drop policy if exists "profil: lecture" on public.profiles;
+drop policy if exists "profil: nom" on public.profiles;
 create policy "profil: lecture" on public.profiles for select using (auth.uid() = id);
 create policy "profil: nom" on public.profiles for update using (auth.uid() = id) with check (auth.uid() = id);
 revoke update on public.profiles from authenticated;
@@ -98,6 +100,7 @@ grant update (full_name) on public.profiles to authenticated;
 
 do $$ declare t text; begin
   foreach t in array array['accounts','holdings','transactions','budgets','net_worth_snapshots'] loop
+    execute format('drop policy if exists "%1$s: propriétaire" on public.%1$s', t);
     execute format('create policy "%1$s: propriétaire" on public.%1$s for all using (auth.uid() = user_id) with check (auth.uid() = user_id)', t);
   end loop;
 end $$;
@@ -123,5 +126,10 @@ create or replace function public.take_net_worth_snapshots() returns void langua
   from auth.users u
   on conflict (user_id, date) do update set total = excluded.total;
 $$;
--- Activer l'extension pg_cron (Database → Extensions), puis :
--- select cron.schedule('patrimoine-quotidien', '55 23 * * *', 'select public.take_net_worth_snapshots()');
+-- Fonction réservée au serveur : personne ne peut l'appeler depuis le navigateur.
+revoke execute on function public.take_net_worth_snapshots() from public, anon, authenticated;
+revoke execute on function public.handle_new_user() from public, anon, authenticated;
+
+-- Photo automatique chaque soir à 23 h 55 (heure UTC)
+create extension if not exists pg_cron;
+select cron.schedule('patrimoine-quotidien', '55 23 * * *', 'select public.take_net_worth_snapshots()');
