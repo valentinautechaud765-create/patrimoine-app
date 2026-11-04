@@ -1,11 +1,16 @@
 "use client";
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import AppView from "../components/app/AppView.js";
 import { BrandMark } from "../components/Brand.js";
 import { supabaseBrowser, supabaseConfigured } from "../../lib/supabase.js";
 import { demoData } from "../../lib/demo.js";
 import { OWNER_EMAILS } from "../../lib/config.js";
+import { computeModel } from "../../lib/model.js";
+
+const NUM = ["amount", "quantity", "cost_basis", "value", "balance", "monthly_limit", "total"];
+const clean = (r) => { const o = { ...r }; NUM.forEach((k) => { if (k in o) o[k] = Number(o[k]) || 0; }); return o; };
+const byDate = (l) => l.sort((a, b) => String(b.date).localeCompare(String(a.date)));
 
 const NOTICES = {
   "paiement=ok": { text: "Abonnement activé. Bienvenue !", tone: "ok" },
@@ -78,13 +83,46 @@ function App() {
   }, [data?.session]);
 
   const user = data?.session?.user?.id;
-  const insert = async (table, row, key, sort) => {
-    if (demo) { const item = { id: "local" + Date.now(), ...row }; setData((d) => ({ ...d, [key]: sort([...d[key], item]) })); return; }
-    const { data: saved, error } = await supabaseBrowser().from(table).insert({ ...row, user_id: user }).select().single();
+  const live = useRef(data); live.current = data;
+
+  // Écriture générique : ajout (sans id) ou modification (avec id). En démo, tout reste en mémoire.
+  async function write(table, row) {
+    if (demo) return { ...row, id: row.id || "local" + Date.now() + Math.random().toString(36).slice(2, 6) };
+    const sb = supabaseBrowser(), { id, user_id, created_at, ...fields } = row;
+    const q = id ? sb.from(table).update(fields).eq("id", id) : sb.from(table).insert({ ...fields, user_id: user });
+    const { data: saved, error } = await q.select().single();
     if (error) throw new Error("Enregistrement impossible : " + error.message);
-    const clean = { ...saved }; ["amount", "quantity", "cost_basis", "value"].forEach((k) => { if (k in clean) clean[k] = Number(clean[k]) || 0; });
-    setData((d) => ({ ...d, [key]: sort([...d[key], clean]) }));
-  };
+    return clean(saved);
+  }
+  async function erase(table, match) {
+    if (demo) return;
+    let q = supabaseBrowser().from(table).delete();
+    for (const [k, v] of Object.entries(match)) q = q.eq(k, v);
+    const { error } = await q;
+    if (error) throw new Error("Suppression impossible : " + error.message);
+  }
+  const replace = (key, row, sort = (l) => l) => setData((d) => ({ ...d, [key]: sort([...d[key].filter((x) => x.id !== row.id), row]) }));
+  const drop = (key, id) => setData((d) => ({ ...d, [key]: d[key].filter((x) => x.id !== id) }));
+
+  // Comptes saisis à la main : le solde suit les opérations qu'on y enregistre.
+  // (Les comptes synchronisés avec la banque gardent le solde donné par la banque.)
+  async function shiftBalance(accountId, delta) {
+    const acc = live.current.accounts.find((a) => a.id === accountId);
+    if (!acc || acc.powens_account_id || !delta) return;
+    const saved = await write("accounts", { id: acc.id, balance: Math.round((Number(acc.balance) + delta) * 100) / 100, updated_at: new Date().toISOString() });
+    replace("accounts", { ...acc, ...saved });
+  }
+
+  // Photo du jour du patrimoine, pour que la courbe se construise même sans attendre la tâche du soir.
+  const snapTimer = useRef(0);
+  useEffect(() => {
+    if (demo || !data?.session) return;
+    clearTimeout(snapTimer.current);
+    snapTimer.current = setTimeout(() => {
+      const total = Math.round(computeModel(live.current).total * 100) / 100, date = new Date().toISOString().slice(0, 10);
+      supabaseBrowser().from("net_worth_snapshots").upsert({ user_id: user, date, total }).then(() => {});
+    }, 1500);
+  }, [data?.accounts, data?.holdings, demo, user]); // eslint-disable-line
 
   const actions = {
     notice,
@@ -103,21 +141,69 @@ function App() {
       const { url } = await api("/api/powens/connect");
       window.location.href = url;
     },
-    async addTransaction(t) {
-      await insert("transactions", t, "transactions", (l) => l.sort((a, b) => String(b.date).localeCompare(String(a.date))));
-      return { message: "Opération ajoutée" };
+    async saveTransaction(t) {
+      const before = t.id ? live.current.transactions.find((x) => x.id === t.id) : null;
+      const saved = await write("transactions", t);
+      replace("transactions", { ...before, ...t, ...saved }, byDate);
+      const deltas = {};
+      if (before?.account_id) deltas[before.account_id] = (deltas[before.account_id] || 0) - Number(before.amount);
+      if (saved.account_id) deltas[saved.account_id] = (deltas[saved.account_id] || 0) + Number(saved.amount);
+      for (const [acc, delta] of Object.entries(deltas)) await shiftBalance(acc, Math.round(delta * 100) / 100);
+      return { message: before ? "Opération modifiée" : "Opération ajoutée" };
     },
-    async addHolding(h) {
-      await insert("holdings", h, "holdings", (l) => l.sort((a, b) => b.value - a.value));
-      return { message: "Position ajoutée" };
+    async deleteTransaction(t) {
+      await erase("transactions", { id: t.id });
+      drop("transactions", t.id);
+      if (t.account_id) await shiftBalance(t.account_id, -Number(t.amount));
+      return { message: "Opération supprimée" };
     },
-    async saveBudget(b) {
+    async saveAccount(a) {
+      const saved = await write("accounts", { ...a, updated_at: new Date().toISOString() });
+      replace("accounts", { ...a, ...saved });
+      return { message: a.id ? "Compte modifié" : "Compte ajouté" };
+    },
+    async deleteAccount(a) {
+      await erase("accounts", { id: a.id });
+      setData((d) => ({ ...d, accounts: d.accounts.filter((x) => x.id !== a.id), transactions: d.transactions.map((t) => t.account_id === a.id ? { ...t, account_id: null } : t) }));
+      return { message: "Compte supprimé" };
+    },
+    async saveHolding(h) {
+      const saved = await write("holdings", { ...h, updated_at: new Date().toISOString() });
+      replace("holdings", { ...h, ...saved }, (l) => l.sort((x, y) => y.value - x.value));
+      return { message: h.id ? "Position mise à jour" : "Position ajoutée" };
+    },
+    async deleteHolding(h) {
+      await erase("holdings", { id: h.id });
+      drop("holdings", h.id);
+      return { message: "Position supprimée" };
+    },
+    async saveBudget(b, previous) {
       if (!demo) {
-        const { error } = await supabaseBrowser().from("budgets").upsert({ ...b, user_id: user });
+        if (previous && previous !== b.category) await erase("budgets", { category: previous });
+        const { error } = await supabaseBrowser().from("budgets").upsert({ category: b.category, monthly_limit: b.monthly_limit, user_id: user });
         if (error) throw new Error("Enregistrement impossible : " + error.message);
       }
-      setData((d) => ({ ...d, budgets: [...d.budgets.filter((x) => x.category !== b.category), b] }));
-      return { message: "Budget créé" };
+      setData((d) => ({ ...d, budgets: [...d.budgets.filter((x) => x.category !== b.category && x.category !== previous), { category: b.category, monthly_limit: b.monthly_limit }] }));
+      return { message: previous ? "Budget modifié" : "Budget créé" };
+    },
+    async deleteBudget(category) {
+      await erase("budgets", { category });
+      setData((d) => ({ ...d, budgets: d.budgets.filter((x) => x.category !== category) }));
+      return { message: "Budget supprimé" };
+    },
+    async saveName(full_name) {
+      if (!demo) {
+        const { error } = await supabaseBrowser().from("profiles").update({ full_name }).eq("id", user);
+        if (error) throw new Error("Enregistrement impossible : " + error.message);
+      }
+      setData((d) => ({ ...d, profile: { ...d.profile, full_name } }));
+      return { message: "Prénom enregistré" };
+    },
+    async deleteAccountForever() {
+      if (demo) return { message: "Démonstration : rien n’est supprimé." };
+      await api("/api/compte/supprimer");
+      await supabaseBrowser().auth.signOut();
+      router.replace("/?compte=supprime");
     },
     async resetPassword() {
       if (demo) return { message: "Démonstration : aucun e-mail n’est envoyé." };

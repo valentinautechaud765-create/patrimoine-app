@@ -76,3 +76,27 @@ export function Ring({ value, size = 44, thickness = 4, color = "#3d7cff" }) {
     <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth={thickness} strokeDasharray={`${v * C} ${C}`} strokeLinecap="round" />
   </svg>;
 }
+
+// Barres groupées revenus / dépenses par mois, avec info-bulle au survol ou au toucher
+export function FlowBars({ series, height = 180, format = (v) => v, label = (m) => m }) {
+  const [hover, setHover] = useState(null);
+  const max = Math.max(1, ...series.flatMap((s) => [s.income, s.spent]));
+  const sel = hover == null ? series.length - 1 : hover, cur = series[sel];
+  return <div className="flow">
+    <div className="flowTip">
+      <span className="flowMonth">{label(cur.month)}</span>
+      <span><i className="dot" style={{ background: "var(--blue)" }} />Revenus <b>{format(cur.income)}</b></span>
+      <span><i className="dot" style={{ background: "rgba(255,255,255,.35)" }} />Dépenses <b>{format(cur.spent)}</b></span>
+      <span className={cur.net >= 0 ? "ok" : "bad"}>Solde <b>{cur.net >= 0 ? "+" : "−"}{format(Math.abs(cur.net))}</b></span>
+    </div>
+    <div className="flowBars" style={{ minHeight: height }} onMouseLeave={() => setHover(null)}>
+      {series.map((s, i) => <button key={s.month} className={"flowCol" + (i === sel ? " on" : "")} onMouseEnter={() => setHover(i)} onClick={() => setHover(i)} aria-label={label(s.month)}>
+        <span className="flowPair">
+          <i className="in" style={{ height: (s.income / max) * 100 + "%" }} />
+          <i className="out" style={{ height: (s.spent / max) * 100 + "%" }} />
+        </span>
+        <small>{label(s.month).slice(0, 3)}</small>
+      </button>)}
+    </div>
+  </div>;
+}

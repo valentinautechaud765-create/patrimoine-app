@@ -1,8 +1,9 @@
 "use client";
 import { useMemo, useState } from "react";
 import Icon from "../Icon.js";
-import { AreaChart } from "../Charts.js";
-import { money, money0, signed, pct, todayISO, dayLabel } from "../../../lib/format.js";
+import { AreaChart, Donut, FlowBars } from "../Charts.js";
+import { money, money0, signed, pct, todayISO, dayLabel, monthLabel } from "../../../lib/format.js";
+import { monthlySeries, recurring } from "../../../lib/model.js";
 import { cat } from "../../../lib/categories.js";
 import { Amount, CatIcon, InstIcon, Panel, Empty, Locked, ago, KIND_LABEL } from "./ui.js";
 
@@ -86,25 +87,27 @@ export function InsightList({ list }) {
   </div>)}</div>;
 }
 
-export function TxRow({ t, onClick }) {
-  return <div className="item">
+export function TxRow({ t, onClick, showDate }) {
+  const Tag = onClick ? "button" : "div";
+  return <Tag className={"item" + (onClick ? " hover tap" : "")} onClick={onClick}>
     <CatIcon category={t.category} />
-    <div className="itemMain"><b>{t.label}</b><small>{t.category}</small></div>
-    <div className="itemSide"><b className={t.amount > 0 ? "ok" : ""}>{t.amount > 0 ? "+" : "−"}{money(Math.abs(t.amount)).replace("-", "")}</b></div>
-  </div>;
+    <div className="itemMain"><b>{t.label}</b><small>{showDate ? dayLabel(t.date) + " · " : ""}{t.category}</small></div>
+    <div className="itemSide"><b className={t.amount > 0 ? "ok" : ""}>{t.amount > 0 ? "+" : "−"}{money(Math.abs(t.amount))}</b></div>
+  </Tag>;
 }
 
-export function BudgetRow({ b }) {
+export function BudgetRow({ b, onClick }) {
   const over = b.spent > b.monthly_limit, fast = !over && b.pace > b.expected + 0.12;
   const color = over ? "var(--bad)" : fast ? "var(--warn)" : cat(b.category).color;
-  return <div className="budgetRow">
+  const Tag = onClick ? "button" : "div";
+  return <Tag className={"budgetRow" + (onClick ? " tap" : "")} onClick={onClick}>
     <CatIcon category={b.category} />
     <div style={{ minWidth: 0 }}>
       <div className="budgetLine"><b>{b.category}</b><span className="num"><span style={{ color: over ? "var(--bad)" : "var(--fg)" }}>{money0(b.spent)}</span><span className="muted"> / {money0(b.monthly_limit)}</span></span></div>
       <div className="bar"><i style={{ width: Math.min(100, b.pace * 100) + "%", background: color }} /><span className="pace" style={{ left: `calc(${Math.min(100, b.expected * 100)}% - 1px)` }} title="Rythme attendu à cette date" /></div>
       <small className="budgetNote">{over ? <span className="bad">Dépassé de {money0(b.spent - b.monthly_limit)}</span> : fast ? <span style={{ color: "var(--warn)" }}>Rythme élevé · reste {money0(b.monthly_limit - b.spent)}</span> : <span className="muted">Reste {money0(b.monthly_limit - b.spent)}</span>}</small>
     </div>
-  </div>;
+  </Tag>;
 }
 
 function Projection({ m, data }) {
@@ -139,18 +142,95 @@ function Projection({ m, data }) {
   </>;
 }
 
-export default function Overview({ m, data, limits, go, openPlans, list }) {
+// Moyennes sur les mois complets affichés (le mois en cours, incomplet, est exclu)
+function FlowStats({ series }) {
+  const full = series.slice(0, -1).filter((x) => x.count > 0);
+  if (!full.length) return null;
+  const avg = (k) => full.reduce((n, x) => n + x[k], 0) / full.length;
+  const inc = avg("income"), out = avg("spent"), rate = inc > 0 ? ((inc - out) / inc) * 100 : null;
+  return <div className="flowStats">
+    <div><small>Revenus moyens</small><b>{money0(inc)}</b></div>
+    <div><small>Dépenses moyennes</small><b>{money0(out)}</b></div>
+    <div><small>Mis de côté / mois</small><b className={inc - out >= 0 ? "ok" : "bad"}>{inc - out >= 0 ? "+" : "−"}{money0(Math.abs(inc - out))}</b></div>
+    {rate !== null && <div><small>Taux d’épargne moyen</small><b>{Math.round(rate)} %</b></div>}
+  </div>;
+}
+
+// Premiers pas : disparaît une fois tout fait
+function GettingStarted({ data, open, go }) {
+  const steps = [
+    { done: data.accounts.length > 0, icon: "wallet", title: "Ajouter un compte", text: "Saisissez vos comptes ou connectez votre banque.", act: () => open("account") },
+    { done: data.transactions.length > 0, icon: "list", title: "Enregistrer une opération", text: "Une dépense ou un revenu, en quelques secondes.", act: () => open("tx") },
+    { done: data.budgets.length > 0, icon: "target", title: "Fixer un budget", text: "Un plafond par catégorie, avec alerte de rythme.", act: () => open("budget") },
+    { done: data.holdings.length > 0, icon: "trending", title: "Suivre vos placements", text: "Actions, ETF, crypto : vos plus-values au même endroit.", act: () => go("invest") },
+  ];
+  const done = steps.filter((s) => s.done).length;
+  if (done === steps.length) return null;
+  return <section className="card panel startCard fadeIn">
+    <div className="startHead">
+      <div><div className="eyebrow">Bien démarrer</div><h3>Configurez votre espace en 2 minutes</h3></div>
+      <div className="startProgress"><b>{done}/{steps.length}</b><div className="bar"><i style={{ width: (done / steps.length) * 100 + "%", background: "var(--blue)" }} /></div></div>
+    </div>
+    <div className="startSteps">{steps.map((s) => <button key={s.title} className={"startStep" + (s.done ? " done" : "")} onClick={s.act} disabled={s.done}>
+      <span className="startIco"><Icon name={s.done ? "check" : s.icon} size={17} stroke={s.done ? 2.4 : 1.8} /></span>
+      <span className="itemMain"><b>{s.title}</b><small>{s.done ? "Fait" : s.text}</small></span>
+      {!s.done && <Icon name="chevronRight" size={16} className="faint" />}
+    </button>)}</div>
+  </section>;
+}
+
+function CategoryPanel({ m, goOps }) {
+  const parts = Object.entries(m.byCat).map(([label, value]) => ({ label, value, color: cat(label).color })).sort((a, b) => b.value - a.value);
+  if (!parts.length) return <Empty icon="pie" title="Aucune dépense ce mois-ci" text="La répartition apparaîtra dès vos premières dépenses." />;
+  return <div className="catPanel">
+    <Donut parts={parts} size={150} thickness={14} center={<div><small className="muted" style={{ fontSize: 11 }}>Ce mois</small><div className="money" style={{ fontWeight: 500 }}>{money0(m.spent)}</div></div>} />
+    <div className="list catList">{parts.slice(0, 6).map((p) => {
+      const prev = m.prevByCatToDate[p.label] || 0, diff = prev > 0 ? ((p.value - prev) / prev) * 100 : null;
+      return <button key={p.label} className="item hover tap" onClick={() => goOps(p.label)}>
+        <CatIcon category={p.label} size={32} />
+        <div className="itemMain"><b>{p.label}</b><small>{Math.round((p.value / (m.spent || 1)) * 100)} % des dépenses</small></div>
+        <div className="itemSide"><b>{money0(p.value)}</b>{diff !== null && <small className={diff > 0 ? "bad" : "ok"}>{pct(diff, 0)}</small>}</div>
+      </button>;
+    })}</div>
+  </div>;
+}
+
+export function Upcoming({ data, compact }) {
+  const items = useMemo(() => recurring(data.transactions), [data.transactions]);
+  const month = todayISO().slice(0, 7), rest = items.filter((r) => r.next.startsWith(month));
+  const due = -rest.filter((r) => r.amount < 0).reduce((s, r) => s + r.amount, 0), incoming = rest.filter((r) => r.amount > 0).reduce((s, r) => s + r.amount, 0);
+  if (!items.length) return <Empty icon="repeat" title="Rien de détecté pour l’instant" text="Loyer, abonnements, salaire… ils apparaîtront ici après deux mois d’opérations." />;
+  return <>
+    <div className="upSum"><div><small>Reste à prélever ce mois</small><b>{money0(due)}</b></div>{incoming > 0 && <div><small>Rentrées attendues</small><b className="ok">+{money0(incoming)}</b></div>}</div>
+    <div className="list">{items.slice(0, compact ? 5 : 20).map((r) => {
+      const d = new Date(r.next + "T12:00:00"), days = Math.round((d - new Date(todayISO() + "T12:00:00")) / 864e5);
+      return <div className="item" key={r.label + r.amount}>
+        <span className="dateChip"><b>{d.getDate()}</b><small>{d.toLocaleDateString("fr-FR", { month: "short" }).replace(".", "")}</small></span>
+        <div className="itemMain"><b>{r.label}</b><small>{r.category} · {days <= 0 ? "aujourd’hui" : days === 1 ? "demain" : `dans ${days} jours`}</small></div>
+        <div className="itemSide"><b className={r.amount > 0 ? "ok" : ""}>{r.amount > 0 ? "+" : "−"}{money(Math.abs(r.amount))}</b></div>
+      </div>;
+    })}</div>
+    <p className="finePrint" style={{ margin: "8px 0 4px", justifyContent: "flex-start" }}><Icon name="info" size={13} />Dates estimées d’après vos opérations des 3 derniers mois.</p>
+  </>;
+}
+
+export default function Overview({ m, data, limits, go, openPlans, list, open, goOps }) {
   const accounts = [...data.accounts].sort((a, b) => b.balance - a.balance);
+  const series = useMemo(() => {
+    const s = monthlySeries(data.transactions, 6), first = s.findIndex((x) => x.count > 0);
+    return first < 0 ? [] : s.slice(Math.min(first, s.length - 3));
+  }, [data.transactions]);
   return <>
     <NetWorth m={m} data={data} limits={limits} openPlans={openPlans} />
+    <GettingStarted data={data} open={open} go={go} />
     <Kpis m={m} />
     <div className="grid g3">
-      <Panel title="Comptes" action="Tout voir" onAction={() => go("accounts")} className="span2 fadeIn">
-        {accounts.length ? <div className="list">{accounts.slice(0, 5).map((a) => <div className="item" key={a.id}>
-          <InstIcon name={a.institution} />
-          <div className="itemMain"><b>{a.name}</b><small>{a.institution} · {KIND_LABEL[a.kind]}</small></div>
-          <div className="itemSide"><b>{money(a.balance, a.currency)}</b><small className="faint">{a.updated_at ? "Synchro " + ago(a.updated_at) : ""}</small></div>
-        </div>)}</div> : <Empty icon="bank" title="Aucun compte pour l’instant" text="Connectez votre banque pour voir vos soldes se mettre à jour tout seuls."><button className="btn primary sm" onClick={() => go("accounts")}><Icon name="plus" size={15} />Connecter une banque</button></Empty>}
+      <Panel title="Comptes" action={accounts.length ? "Tout voir" : null} onAction={() => go("accounts")} className="span2 fadeIn">
+        {accounts.length ? <div className="list">{accounts.slice(0, 5).map((a) => <button className="item hover tap" key={a.id} onClick={() => open("accountView", { id: a.id })}>
+          <InstIcon name={a.institution || a.name} />
+          <div className="itemMain"><b>{a.name}</b><small>{a.institution ? a.institution + " · " : ""}{KIND_LABEL[a.kind]}</small></div>
+          <div className="itemSide"><b>{money(a.balance, a.currency)}</b><small className="faint">{a.powens_account_id ? "Synchro " : "Mis à jour "}{ago(a.updated_at)}</small></div>
+        </button>)}</div> : <Empty icon="bank" title="Aucun compte pour l’instant" text="Ajoutez vos comptes à la main, ou connectez votre banque."><button className="btn primary sm" onClick={() => open("account")}><Icon name="plus" size={15} />Ajouter un compte</button></Empty>}
       </Panel>
       <Panel title="Analyse du mois" icon="sparkles" className="fadeIn">
         <Locked on={!limits.insights} title="Analyse automatique" text="Repérez les dépenses qui dérapent avant la fin du mois." onUnlock={() => openPlans("plus")}>
@@ -158,15 +238,28 @@ export default function Overview({ m, data, limits, go, openPlans, list }) {
         </Locked>
       </Panel>
     </div>
-    <div className="grid g2">
-      <Panel title="Budgets" action="Gérer" onAction={() => go("budget")} className="fadeIn">
-        {m.budgets.length ? m.budgets.slice(0, 4).map((b) => <BudgetRow key={b.category} b={b} />) : <Empty icon="target" title="Pas encore de budget" text="Fixez un plafond par catégorie : on vous prévient si le rythme s’emballe." />}
+    <div className="grid g3">
+      <Panel title="Revenus et dépenses" icon="trending" className="span2 fadeIn flowPanel">
+        {series.length ? <><FlowBars series={series} format={money0} label={monthLabel} /><FlowStats series={series} /></> : <Empty icon="trending" title="Pas encore d’historique" text="Vos revenus et dépenses mois par mois s’afficheront ici." />}
       </Panel>
-      <Panel title="Dernières opérations" action="Historique" onAction={() => go("ops")} className="fadeIn">
-        {data.transactions.length ? <div className="list">{data.transactions.slice(0, 6).map((t) => <TxRow key={t.id} t={t} />)}</div> : <Empty icon="list" title="Aucune opération" text="Elles arrivent automatiquement depuis votre banque, ou ajoutez-les à la main." />}
+      <Panel title="Dépenses par catégorie" icon="pie" className="fadeIn">
+        <CategoryPanel m={m} goOps={goOps} />
       </Panel>
     </div>
-    <Panel title="Projection du patrimoine" icon="trending" className="fadeIn">
+    <div className="grid g3">
+      <Panel title="Budgets" action="Gérer" onAction={() => go("budget")} className="fadeIn">
+        {m.budgets.length ? m.budgets.slice(0, 4).map((b) => <BudgetRow key={b.category} b={b} onClick={() => open("budget", { budget: b })} />) : <Empty icon="target" title="Pas encore de budget" text="Fixez un plafond par catégorie : on vous prévient si le rythme s’emballe."><button className="btn primary sm" onClick={() => open("budget")}><Icon name="plus" size={15} />Créer un budget</button></Empty>}
+      </Panel>
+      <Panel title="À venir" icon="repeat" className="fadeIn">
+        <Locked on={!limits.insights} title="Prélèvements à venir" text="Loyer, abonnements, salaire : détectés automatiquement." onUnlock={() => openPlans("plus")}>
+          <Upcoming data={data} compact />
+        </Locked>
+      </Panel>
+      <Panel title="Dernières opérations" action={data.transactions.length ? "Historique" : null} onAction={() => go("ops")} className="fadeIn">
+        {data.transactions.length ? <div className="list">{data.transactions.slice(0, 6).map((t) => <TxRow key={t.id} t={t} onClick={() => open("tx", { tx: t })} />)}</div> : <Empty icon="list" title="Aucune opération" text="Elles arrivent depuis votre banque, ou ajoutez-les à la main."><button className="btn primary sm" onClick={() => open("tx")}><Icon name="plus" size={15} />Ajouter</button></Empty>}
+      </Panel>
+    </div>
+    <Panel title="Projection du patrimoine" icon="layers" className="fadeIn">
       <Locked on={!limits.projection} plan="Pro" title="Projection jusqu’à 20 ans" text="Voyez où vous mène votre rythme d’épargne actuel." onUnlock={() => openPlans("pro")}>
         <Projection m={m} data={data} />
       </Locked>

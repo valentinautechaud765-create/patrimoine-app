@@ -3,12 +3,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Icon from "../Icon.js";
 import { BrandMark } from "../Brand.js";
 import { computeModel, insights } from "../../../lib/model.js";
-import { money, todayISO } from "../../../lib/format.js";
-import { CATEGORIES, EXPENSE_CATEGORIES, ASSET_COLORS, cat } from "../../../lib/categories.js";
 import { BRAND, PLANS, TRIAL_DAYS, formatPrice, planById, limitsFor } from "../../../lib/config.js";
 import Overview from "./Overview.js";
 import { Accounts, Investments, Budget, Operations, Settings } from "./Screens.js";
 import { InsightList } from "./Overview.js";
+import { Modal, Head, TxForm, AccountForm, AccountSheet, BudgetForm, HoldingForm, DeleteMeModal } from "./Forms.js";
 
 export const NAV = [
   { id: "overview", label: "Vue d’ensemble", short: "Accueil", icon: "home" },
@@ -19,18 +18,7 @@ export const NAV = [
   { id: "settings", label: "Réglages", short: "Réglages", icon: "settings" },
 ];
 
-/* ---------------- Fenêtres ---------------- */
-function Modal({ onClose, children, wide }) {
-  useEffect(() => {
-    const k = (e) => e.key === "Escape" && onClose();
-    window.addEventListener("keydown", k); return () => window.removeEventListener("keydown", k);
-  }, [onClose]);
-  return <div className="overlay" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-    <div className={"modal" + (wide ? " wide" : "")} role="dialog" aria-modal="true">{children}</div>
-  </div>;
-}
-const Head = ({ title, sub, onClose }) => <div className="modalHead"><div><h2>{title}</h2>{sub && <p>{sub}</p>}</div><button className="iconBtn" onClick={onClose} aria-label="Fermer"><Icon name="x" size={18} /></button></div>;
-
+/* ---------------- Formules ---------------- */
 function PlansModal({ current, initial, trialUsed, onClose, onChoose }) {
   const [plan, setPlan] = useState(initial === "pro" ? "pro" : "plus"), [billing, setBilling] = useState("yearly"), [busy, setBusy] = useState(false);
   const opts = PLANS.filter((p) => p.id !== "free");
@@ -55,71 +43,13 @@ function PlansModal({ current, initial, trialUsed, onClose, onChoose }) {
   </Modal>;
 }
 
-function TxModal({ accounts, onClose, onSave }) {
-  const [type, setType] = useState("out"), [amount, setAmount] = useState(""), [label, setLabel] = useState(""), [category, setCategory] = useState("Courses"), [date, setDate] = useState(todayISO()), [account, setAccount] = useState(""), [busy, setBusy] = useState(false);
-  const cats = type === "out" ? EXPENSE_CATEGORIES : ["Salaire", "Remboursement", "Autre"];
-  const value = Number(String(amount).replace(",", "."));
-  async function submit(e) {
-    e.preventDefault(); if (!(value > 0) || !label.trim()) return;
-    setBusy(true);
-    const ok = await onSave({ date, label: label.trim(), amount: type === "out" ? -value : value, category, account_id: account || null });
-    setBusy(false); if (ok !== false) onClose();
-  }
-  return <Modal onClose={onClose}>
-    <form onSubmit={submit} className="modalForm">
-      <Head title="Nouvelle opération" onClose={onClose} />
-      <div className="seg billingSeg"><button type="button" className={type === "out" ? "on" : ""} onClick={() => { setType("out"); setCategory("Courses"); }}>Dépense</button><button type="button" className={type === "in" ? "on" : ""} onClick={() => { setType("in"); setCategory("Salaire"); }}>Revenu</button></div>
-      <label className="amountField"><span className={type === "out" ? "" : "ok"}>{type === "out" ? "−" : "+"}</span><input inputMode="decimal" placeholder="0,00" value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^\d.,]/g, ""))} autoFocus aria-label="Montant" /><span>€</span></label>
-      <label className="label">Libellé<input className="input" placeholder={type === "out" ? "Ex. Carrefour, Uber…" : "Ex. Salaire, remboursement…"} value={label} onChange={(e) => setLabel(e.target.value)} /></label>
-      <div className="label">Catégorie<div className="catGrid">{cats.map((c) => <button type="button" key={c} className={"catPick" + (category === c ? " on" : "")} style={{ "--c": cat(c).color }} onClick={() => setCategory(c)}><Icon name={cat(c).icon} size={18} /><span>{c}</span></button>)}</div></div>
-      <div className="grid g2" style={{ gap: 12 }}>
-        <label className="label">Date<input className="input" type="date" value={date} onChange={(e) => setDate(e.target.value)} /></label>
-        <label className="label">Compte<select className="input" value={account} onChange={(e) => setAccount(e.target.value)}><option value="">Aucun</option>{accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</select></label>
-      </div>
-      <button className="btn primary lg block" disabled={busy || !(value > 0) || !label.trim()}>{busy ? "Enregistrement…" : "Ajouter l’opération"}</button>
-    </form>
-  </Modal>;
-}
-
-function BudgetModal({ existing, onClose, onSave }) {
-  const free = EXPENSE_CATEGORIES.filter((c) => c !== "Épargne" && !existing.includes(c));
-  const [category, setCategory] = useState(free[0] || ""), [limit, setLimit] = useState(""), [busy, setBusy] = useState(false);
-  const value = Number(String(limit).replace(",", "."));
-  return <Modal onClose={onClose}>
-    <form className="modalForm" onSubmit={async (e) => { e.preventDefault(); if (!(value > 0) || !category) return; setBusy(true); const ok = await onSave({ category, monthly_limit: value }); setBusy(false); if (ok !== false) onClose(); }}>
-      <Head title="Nouveau budget" sub="Un plafond mensuel pour une catégorie." onClose={onClose} />
-      <div className="label">Catégorie<div className="catGrid">{free.map((c) => <button type="button" key={c} className={"catPick" + (category === c ? " on" : "")} style={{ "--c": cat(c).color }} onClick={() => setCategory(c)}><Icon name={cat(c).icon} size={18} /><span>{c}</span></button>)}</div></div>
-      <label className="amountField"><input inputMode="decimal" placeholder="0" value={limit} onChange={(e) => setLimit(e.target.value.replace(/[^\d.,]/g, ""))} aria-label="Plafond mensuel" /><span>€ / mois</span></label>
-      <button className="btn primary lg block" disabled={busy || !(value > 0) || !category}>{busy ? "Enregistrement…" : "Créer le budget"}</button>
-    </form>
-  </Modal>;
-}
-
-function HoldingModal({ onClose, onSave }) {
-  const [f, setF] = useState({ name: "", ticker: "", asset_class: "ETF", quantity: "", cost_basis: "", value: "" }), [busy, setBusy] = useState(false);
-  const n = (v) => Number(String(v).replace(",", "."));
-  const set = (k) => (e) => setF({ ...f, [k]: k === "ticker" ? e.target.value.toUpperCase() : e.target.value });
-  const ok = f.name.trim() && n(f.quantity) > 0 && n(f.cost_basis) >= 0 && n(f.value) >= 0 && f.cost_basis !== "" && f.value !== "";
-  return <Modal onClose={onClose}>
-    <form className="modalForm" onSubmit={async (e) => { e.preventDefault(); if (!ok) return; setBusy(true); const r = await onSave({ name: f.name.trim(), ticker: f.ticker.trim() || null, asset_class: f.asset_class, quantity: n(f.quantity), cost_basis: n(f.cost_basis), value: n(f.value), currency: "EUR" }); setBusy(false); if (r !== false) onClose(); }}>
-      <Head title="Ajouter une position" sub="Action, ETF, crypto, fonds…" onClose={onClose} />
-      <div className="seg billingSeg" style={{ flexWrap: "wrap" }}>{Object.keys(ASSET_COLORS).map((c) => <button type="button" key={c} className={f.asset_class === c ? "on" : ""} onClick={() => setF({ ...f, asset_class: c })}>{c}</button>)}</div>
-      <div className="grid g2" style={{ gap: 12 }}>
-        <label className="label">Nom<input className="input" placeholder="Ex. Amundi MSCI World" value={f.name} onChange={set("name")} /></label>
-        <label className="label">Symbole<input className="input" placeholder="Ex. CW8" value={f.ticker} onChange={set("ticker")} /></label>
-        <label className="label">Quantité<input className="input" inputMode="decimal" value={f.quantity} onChange={set("quantity")} /></label>
-        <label className="label">Montant investi (€)<input className="input" inputMode="decimal" value={f.cost_basis} onChange={set("cost_basis")} /></label>
-      </div>
-      <label className="label">Valeur actuelle (€)<input className="input" inputMode="decimal" value={f.value} onChange={set("value")} /></label>
-      <button className="btn primary lg block" disabled={busy || !ok}>{busy ? "Enregistrement…" : "Ajouter la position"}</button>
-    </form>
-  </Modal>;
-}
-
 /* ---------------- Coque de l'appli ---------------- */
 export default function AppView({ data, demo, embedded, initialTab = "overview", actions = {}, initialModal = null }) {
   const [tab, setTab] = useState(initialTab), [modal, setModal] = useState(initialModal), [toast, setToast] = useState(null);
   const [query, setQuery] = useState(""), [bell, setBell] = useState(false), [scrolled, setScrolled] = useState(false);
+  const [privacy, setPrivacyState] = useState(false), [opsCat, setOpsCat] = useState("");
+  useEffect(() => { if (embedded) return; try { setPrivacyState(localStorage.getItem("patrimo.privacy") === "1"); } catch {} }, [embedded]);
+  const setPrivacy = (v) => { setPrivacyState(v); try { localStorage.setItem("patrimo.privacy", v ? "1" : "0"); } catch {} };
   const toastTimer = useRef(0), searchRef = useRef(null), scroller = useRef(null);
   const m = useMemo(() => computeModel(data), [data]);
   const list = useMemo(() => insights(m), [m]);
@@ -137,7 +67,16 @@ export default function AppView({ data, demo, embedded, initialTab = "overview",
 
   function flash(text, tone = "ok") { clearTimeout(toastTimer.current); setToast({ text, tone }); toastTimer.current = setTimeout(() => setToast(null), 3600); }
   const openPlans = (which = "plus") => setModal({ type: "plans", plan: which });
-  const go = (t) => { setTab(t); setBell(false); };
+  const go = (t) => { setTab(t); setBell(false); if (t !== "ops") setOpsCat(""); };
+  const open = (type, payload = {}) => setModal({ type, ...payload });
+  const close = () => setModal(null);
+  const goOps = (category) => { setOpsCat(category); setTab("ops"); };
+  const average = (category) => {
+    const months = [1, 2, 3].map((k) => { const d = new Date(); d.setDate(15); d.setMonth(d.getMonth() - k); return d.toISOString().slice(0, 7); });
+    const active = months.filter((mo) => data.transactions.some((t) => String(t.date).startsWith(mo))).length;
+    const total = -data.transactions.filter((t) => t.category === category && t.amount < 0 && months.some((mo) => String(t.date).startsWith(mo))).reduce((n, t) => n + Number(t.amount), 0);
+    return active ? total / active : 0;
+  };
   const run = async (fn, ...args) => {
     try { const r = await fn?.(...args); if (r?.message) flash(r.message); return r?.ok !== false; }
     catch (e) { flash(e.message || "Une erreur est survenue.", "bad"); return false; }
@@ -147,16 +86,17 @@ export default function AppView({ data, demo, embedded, initialTab = "overview",
   const trialing = p.plan_status === "trialing", trialLeft = p.trial_days_left ?? TRIAL_DAYS;
 
   const screen = {
-    overview: <Overview m={m} data={data} limits={limits} go={go} openPlans={openPlans} list={list} />,
-    accounts: <Accounts m={m} data={data} limits={limits} openPlans={openPlans} connectBank={() => run(actions.connectBank)} />,
-    invest: <Investments m={m} data={data} limits={limits} openPlans={openPlans} addHolding={() => setModal({ type: "holding" })} />,
-    budget: <Budget m={m} limits={limits} openPlans={openPlans} addBudget={() => setModal({ type: "budget" })} />,
-    ops: <Operations data={data} query={query} setQuery={setQuery} limits={limits} openPlans={openPlans} addTx={() => setModal({ type: "tx" })} flash={flash} />,
-    settings: <Settings data={data} demo={demo} openPlans={openPlans} managePlan={() => run(actions.managePlan)} logout={() => run(actions.logout)} resetPassword={() => run(actions.resetPassword)} />,
+    overview: <Overview m={m} data={data} limits={limits} go={go} openPlans={openPlans} list={list} open={open} goOps={goOps} />,
+    accounts: <Accounts m={m} data={data} limits={limits} openPlans={openPlans} open={open} connectBank={() => run(actions.connectBank)} />,
+    invest: <Investments m={m} data={data} limits={limits} openPlans={openPlans} open={open} />,
+    budget: <Budget m={m} data={data} limits={limits} openPlans={openPlans} open={open} />,
+    ops: <Operations key={opsCat} data={data} query={query} setQuery={setQuery} limits={limits} openPlans={openPlans} open={open} flash={flash} initialCategory={opsCat} />,
+    settings: <Settings data={data} demo={demo} openPlans={openPlans} managePlan={() => run(actions.managePlan)} logout={() => run(actions.logout)} resetPassword={() => run(actions.resetPassword)} saveName={(n) => run(actions.saveName, n)} privacy={privacy} setPrivacy={setPrivacy} deleteMe={() => open("deleteMe")} />,
   }[tab];
+  const viewed = modal?.type === "accountView" ? data.accounts.find((a) => a.id === modal.id) : null;
 
   return (
-    <div className={"appRoot" + (embedded ? " embedded" : "")}>
+    <div className={"appRoot" + (embedded ? " embedded" : "") + (privacy ? " privacy" : "")}>
       <div className="shell" ref={scroller} onScroll={embedded ? undefined : (e) => setScrolled(e.currentTarget.scrollTop > 4)}>
         <aside className="side">
           <div className="brand"><BrandMark size={30} /><span>{BRAND.name}</span></div>
@@ -184,6 +124,7 @@ export default function AppView({ data, demo, embedded, initialTab = "overview",
           <header className={"topbar" + (scrolled ? " scrolled" : "")}>
             <div className="topTitle"><h1>{title}</h1>{tab === "overview" && <small>{today.charAt(0).toUpperCase() + today.slice(1)}</small>}</div>
             <label className="search"><Icon name="search" size={16} /><input ref={searchRef} placeholder="Rechercher…" value={query} onChange={(e) => { setQuery(e.target.value); if (tab !== "ops") setTab("ops"); }} /><kbd>⌘K</kbd></label>
+            <button className="iconBtn" aria-label={privacy ? "Afficher les montants" : "Masquer les montants"} title={privacy ? "Afficher les montants" : "Masquer les montants"} onClick={() => setPrivacy(!privacy)}><Icon name={privacy ? "eyeOff" : "eye"} size={18} /></button>
             <div className="bellWrap">
               <button className="iconBtn" aria-label="Notifications" onClick={() => setBell(!bell)}><Icon name="bell" size={18} />{limits.insights && list.length > 0 && <i className="badgeDot" />}</button>
               {bell && <div className="popover"><div className="popHead">Notifications</div>{limits.insights ? <InsightList list={list} /> : <div className="muted" style={{ fontSize: 13.5, padding: "6px 0 4px" }}>Les alertes de budget et l’analyse automatique arrivent avec Plus. <button className="link" onClick={() => { setBell(false); openPlans("plus"); }}>Découvrir</button></div>}</div>}
@@ -194,6 +135,7 @@ export default function AppView({ data, demo, embedded, initialTab = "overview",
           <header className="mobileTop">
             <div className="topTitle"><h1>{title}</h1>{tab === "overview" && <small>{today.charAt(0).toUpperCase() + today.slice(1)}</small>}</div>
             <div style={{ display: "flex", gap: 8 }}>
+              <button className="iconBtn" aria-label={privacy ? "Afficher les montants" : "Masquer les montants"} onClick={() => setPrivacy(!privacy)}><Icon name={privacy ? "eyeOff" : "eye"} size={18} /></button>
               <button className="iconBtn" aria-label="Ajouter une opération" onClick={() => setModal({ type: "tx" })}><Icon name="plus" size={18} /></button>
               <button className="avatarBtn" aria-label="Réglages" onClick={() => go("settings")}><span className="avatar">{(first || "?").charAt(0)}</span></button>
             </div>
@@ -211,9 +153,12 @@ export default function AppView({ data, demo, embedded, initialTab = "overview",
       </div>
 
       {modal?.type === "plans" && <PlansModal current={plan} initial={modal.plan} trialUsed={p.trial_used} onClose={() => setModal(null)} onChoose={(pl, b) => run(actions.checkout, pl, b)} />}
-      {modal?.type === "tx" && <TxModal accounts={data.accounts} onClose={() => setModal(null)} onSave={(t) => run(actions.addTransaction, t)} />}
-      {modal?.type === "budget" && <BudgetModal existing={m.budgets.map((b) => b.category)} onClose={() => setModal(null)} onSave={(b) => run(actions.saveBudget, b)} />}
-      {modal?.type === "holding" && <HoldingModal onClose={() => setModal(null)} onSave={(h) => run(actions.addHolding, h)} />}
+      {modal?.type === "tx" && <TxForm tx={modal.tx} defaultAccount={modal.account_id} accounts={data.accounts} onClose={close} onSave={(t) => run(actions.saveTransaction, t)} onDelete={(t) => run(actions.deleteTransaction, t)} />}
+      {modal?.type === "account" && <AccountForm account={modal.account} onClose={close} onSave={(a) => run(actions.saveAccount, a)} onDelete={(a) => run(actions.deleteAccount, a)} />}
+      {viewed && <AccountSheet account={viewed} transactions={data.transactions} onClose={close} onEdit={() => open("account", { account: viewed })} onAddTx={() => open("tx", { account_id: viewed.id })} onOpenTx={(t) => open("tx", { tx: t })} />}
+      {modal?.type === "budget" && <BudgetForm budget={modal.budget} suggested={modal.suggested} existing={data.budgets.map((b) => b.category)} average={average} onClose={close} onSave={(b, prev) => run(actions.saveBudget, b, prev)} onDelete={(c) => run(actions.deleteBudget, c)} />}
+      {modal?.type === "holding" && <HoldingForm holding={modal.holding} onClose={close} onSave={(h) => run(actions.saveHolding, h)} onDelete={(h) => run(actions.deleteHolding, h)} />}
+      {modal?.type === "deleteMe" && <DeleteMeModal onClose={close} onConfirm={() => run(actions.deleteAccountForever)} />}
       {toast && <div className={"toast " + toast.tone}><Icon name={toast.tone === "bad" ? "info" : "check"} size={16} />{toast.text}</div>}
     </div>
   );
