@@ -8,6 +8,7 @@ import Overview from "./Overview.js";
 import { Accounts, Investments, Budget, Operations, Settings } from "./Screens.js";
 import { InsightList } from "./Overview.js";
 import { HoldingSheet, TradeForm, PortfolioCurve } from "./Holding.js";
+import { RecurrenceForm } from "./Forms.js";
 import { Modal, Head, TxForm, AccountForm, AccountSheet, BudgetForm, HoldingForm, DeleteMeModal, ImportModal } from "./Forms.js";
 
 export const NAV = [
@@ -227,7 +228,7 @@ export default function AppView({ data, demo, embedded, initialTab = "overview",
       </div>
 
       {modal?.type === "plans" && <PlansModal current={plan} initial={modal.plan} trialUsed={p.trial_used} onClose={() => setModal(null)} onChoose={(pl, b) => run(actions.checkout, pl, b)} />}
-      {modal?.type === "tx" && <TxForm tx={modal.tx} defaultAccount={modal.account_id} accounts={data.accounts} onClose={close} onSave={(t) => run(actions.saveTransaction, t)} onDelete={(t) => run(actions.deleteTransaction, t)} />}
+      {modal?.type === "tx" && <TxForm tx={modal.tx} defaultAccount={modal.account_id} accounts={data.accounts} onClose={close} onSave={(t, f) => run(actions.saveTransaction, t, f)} onDelete={(t) => run(actions.deleteTransaction, t)} />}
       {modal?.type === "account" && <AccountForm account={modal.account} onClose={close} onSave={(a) => run(actions.saveAccount, a)} onDelete={(a) => run(actions.deleteAccount, a)} />}
       {viewed && <AccountSheet account={viewed} transactions={data.transactions} onClose={close} onEdit={() => open("account", { account: viewed })} onAddTx={() => open("tx", { account_id: viewed.id })} onOpenTx={(t) => open("tx", { tx: t })} />}
       {modal?.type === "budget" && <BudgetForm budget={modal.budget} suggested={modal.suggested} existing={data.budgets.map((b) => b.category)} average={average} onClose={close} onSave={(b, prev) => run(actions.saveBudget, b, prev)} onDelete={(c) => run(actions.deleteBudget, c)} />}
@@ -235,6 +236,7 @@ export default function AppView({ data, demo, embedded, initialTab = "overview",
       {modal?.type === "import" && <ImportModal email={email} onClose={close} onImport={(f) => run(actions.importMonPatrimoine, f)} />}
       {modal?.type === "holdingView" && viewedH && <HoldingSheet holding={viewedH} trades={tradesOf(viewedH.id)} tradesMissing={data.tradesMissing} fetchHistory={actions.fetchHistory} onClose={close} onEdit={() => open("holding", { holding: data.holdings.find((h) => h.id === viewedH.id) })} onTrade={(type) => open("trade", { id: viewedH.id, tradeType: type })} onOpenTrade={(t) => open("trade", { id: viewedH.id, trade: t })} />}
       {modal?.type === "trade" && viewedH && <TradeForm holding={viewedH} trade={modal.trade} initialType={modal.tradeType} eurPerUsd={market.eurPerUsd} onClose={() => open("holdingView", { id: viewedH.id })} onSave={(t) => run(actions.saveTrade, t)} onDelete={(t) => run(actions.deleteTrade, t)} />}
+      {modal?.type === "recurrence" && <RecurrenceForm rec={modal.rec} accounts={data.accounts} missing={data.recurrencesMissing} onClose={close} onSave={(r) => run(actions.saveRecurrence, r)} onDelete={(r) => run(actions.deleteRecurrence, r)} />}
       {modal?.type === "deleteMe" && <DeleteMeModal onClose={close} onConfirm={() => run(actions.deleteAccountForever)} />}
       {toast && <div className={"toast " + toast.tone}><Icon name={toast.tone === "bad" ? "info" : "check"} size={16} />{toast.text}</div>}
     </div>

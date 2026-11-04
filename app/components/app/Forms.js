@@ -41,6 +41,7 @@ export function TxForm({ tx, accounts, defaultAccount, onClose, onSave, onDelete
   const [amount, setAmount] = useState(tx ? str(Math.abs(tx.amount)) : ""), [label, setLabel] = useState(tx?.label || "");
   const [category, setCategory] = useState(tx?.category || "Courses"), [date, setDate] = useState(tx?.date || todayISO());
   const [account, setAccount] = useState(tx?.account_id || defaultAccount || ""), [busy, setBusy] = useState(false);
+  const [repeat, setRepeat] = useState(false), [repeatFreq, setRepeatFreq] = useState("mensuelle");
   const base = type === "out" ? EXPENSE_CATEGORIES : ["Salaire", "Remboursement", "Autre"];
   const cats = tx?.category && !base.includes(tx.category) && (tx.amount > 0) === (type === "in") ? [...base, tx.category] : base;
   const value = num(amount), ok = value > 0 && label.trim();
@@ -48,7 +49,7 @@ export function TxForm({ tx, accounts, defaultAccount, onClose, onSave, onDelete
   async function submit(e) {
     e.preventDefault(); if (!ok) return;
     setBusy(true);
-    const done = await onSave({ ...(tx?.id ? { id: tx.id } : {}), date, label: label.trim(), amount: type === "out" ? -value : value, category, account_id: account || null });
+    const done = await onSave({ ...(tx?.id ? { id: tx.id } : {}), date, label: label.trim(), amount: type === "out" ? -value : value, category, account_id: account || null }, repeat && !editing ? repeatFreq : null);
     setBusy(false); if (done !== false) onClose();
   }
   return <Modal onClose={onClose}>
@@ -63,6 +64,8 @@ export function TxForm({ tx, accounts, defaultAccount, onClose, onSave, onDelete
         <label className="label">Compte<select className="input" value={account} onChange={(e) => setAccount(e.target.value)}><option value="">Aucun</option>{manual.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</select></label>
       </div>
       {account && !accounts.find((a) => a.id === account)?.powens_account_id && <p className="formHint"><Icon name="info" size={14} />Le solde de ce compte sera mis à jour automatiquement.</p>}
+      {!editing && <label className="item switchRow" style={{ borderTop: 0, padding: 0 }}><span className="kindIco"><Icon name="repeat" size={17} /></span><div className="itemMain"><b>Répéter automatiquement</b><small>{repeat ? `${{ mensuelle: "Chaque mois", hebdomadaire: "Chaque semaine", trimestrielle: "Chaque trimestre", annuelle: "Chaque année" }[repeatFreq]}, à partir de cette date` : "Salaire, loyer, abonnement…"}</small></div><input type="checkbox" className="switch" checked={repeat} onChange={(e) => setRepeat(e.target.checked)} /></label>}
+      {repeat && !editing && <div className="seg billingSeg freqSeg">{[["mensuelle", "Mois"], ["hebdomadaire", "Semaine"], ["trimestrielle", "Trimestre"], ["annuelle", "Année"]].map(([v, l]) => <button type="button" key={v} className={repeatFreq === v ? "on" : ""} onClick={() => setRepeatFreq(v)}>{l}</button>)}</div>}
       <button className="btn primary lg block" disabled={busy || !ok}>{busy ? "Enregistrement…" : editing ? "Enregistrer" : "Ajouter l’opération"}</button>
       {editing && <DeleteButton onConfirm={async () => { if (await onDelete(tx) !== false) onClose(); }} label="Supprimer l’opération" />}
     </form>
@@ -217,5 +220,52 @@ export function ImportModal({ email, onClose, onImport }) {
         </>}
       </>}
     </div>
+  </Modal>;
+}
+
+/* ---------- Opération automatique ---------- */
+const FREQS = [["mensuelle", "Mois"], ["hebdomadaire", "Semaine"], ["trimestrielle", "Trimestre"], ["annuelle", "Année"]];
+export function RecurrenceForm({ rec, accounts, missing, onClose, onSave, onDelete }) {
+  const editing = Boolean(rec?.id);
+  const [type, setType] = useState(rec && rec.amount > 0 ? "in" : "out");
+  const [amount, setAmount] = useState(rec ? str(Math.abs(rec.amount)) : ""), [label, setLabel] = useState(rec?.label || "");
+  const [category, setCategory] = useState(rec?.category || "Logement"), [account, setAccount] = useState(rec?.account_id || "");
+  const [frequency, setFrequency] = useState(rec?.frequency || "mensuelle");
+  const [next, setNext] = useState(rec?.next_date || ""), [end, setEnd] = useState(rec?.end_date || ""), [active, setActive] = useState(rec ? rec.active : true), [busy, setBusy] = useState(false);
+  const day = next ? Number(next.slice(8, 10)) : null;
+  const base = type === "out" ? EXPENSE_CATEGORIES : ["Salaire", "Remboursement", "Autre"];
+  const cats = rec?.category && !base.includes(rec.category) ? [...base, rec.category] : base;
+  const value = num(amount), ok = value > 0 && label.trim() && /^\d{4}-\d{2}-\d{2}$/.test(next);
+  const rule = !day ? "" : frequency === "hebdomadaire" ? `chaque ${new Date(next + "T12:00:00").toLocaleDateString("fr-FR", { weekday: "long" })}` : frequency === "annuelle" ? `chaque année le ${new Date(next + "T12:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "long" })}` : frequency === "trimestrielle" ? `le ${day} tous les 3 mois` : `le ${day} de chaque mois`;
+  const presets = [1, 5, 7, 10, 15, 25, 28].map((d) => {
+    const t = new Date(), dim = new Date(t.getFullYear(), t.getMonth() + 1, 0).getDate();
+    let x = new Date(t.getFullYear(), t.getMonth(), Math.min(d, dim), 12);
+    if (x.toISOString().slice(0, 10) < todayISO()) x = new Date(t.getFullYear(), t.getMonth() + 1, Math.min(d, new Date(t.getFullYear(), t.getMonth() + 2, 0).getDate()), 12);
+    return [d, x.toISOString().slice(0, 10)];
+  });
+  return <Modal onClose={onClose}>
+    <form className="modalForm" onSubmit={async (e) => {
+      e.preventDefault(); if (!ok) return; setBusy(true);
+      const r = await onSave({ ...(editing ? { id: rec.id } : {}), label: label.trim(), amount: type === "out" ? -value : value, category, account_id: account || null, frequency, day: day || 1, next_date: next, end_date: end || null, active });
+      setBusy(false); if (r !== false) onClose();
+    }}>
+      <Head title={editing ? "Modifier l’opération automatique" : "Nouvelle opération automatique"} sub="Créée toute seule à chaque échéance : salaire, loyer, abonnement, virement…" onClose={onClose} />
+      {missing && <div className="msg info">Mise à jour de la base nécessaire : dans Supabase → SQL Editor, colle à nouveau <b>schema.sql</b> puis clique sur Run (aucune donnée n’est effacée).</div>}
+      <div className="seg billingSeg"><button type="button" className={type === "out" ? "on" : ""} onClick={() => { setType("out"); if (!EXPENSE_CATEGORIES.includes(category)) setCategory("Logement"); }}>Dépense</button><button type="button" className={type === "in" ? "on" : ""} onClick={() => { setType("in"); setCategory("Salaire"); }}>Revenu</button></div>
+      <label className="amountField"><span className={type === "out" ? "" : "ok"}>{type === "out" ? "−" : "+"}</span><input inputMode="decimal" placeholder="0,00" value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^\d.,]/g, ""))} autoFocus={!editing} aria-label="Montant" /><span>€</span></label>
+      <label className="label">Libellé<input className="input" placeholder={type === "out" ? "Ex. Loyer, Netflix, Virement Livret A…" : "Ex. Salaire, APL…"} value={label} onChange={(e) => setLabel(e.target.value)} maxLength={80} /></label>
+      <div className="label">Fréquence<div className="seg billingSeg freqSeg">{FREQS.map(([v, l]) => <button type="button" key={v} className={frequency === v ? "on" : ""} onClick={() => setFrequency(v)}>{l}</button>)}</div></div>
+      {frequency !== "hebdomadaire" && frequency !== "annuelle" && <div className="label">Jour du mois<div className="dayPick">{presets.map(([d, iso]) => <button type="button" key={d} className={day === d ? "on" : ""} onClick={() => setNext(iso)}>{d}</button>)}</div></div>}
+      <div className="grid g2" style={{ gap: 12 }}>
+        <label className="label">{editing ? "Prochaine échéance" : "Première échéance"}<input className="input" type="date" value={next} onChange={(e) => setNext(e.target.value)} /></label>
+        <label className="label">Fin (facultatif)<input className="input" type="date" value={end} onChange={(e) => setEnd(e.target.value)} /></label>
+      </div>
+      {rule && <p className="formHint"><Icon name="repeat" size={14} />{type === "out" ? "Dépense" : "Revenu"} de {value > 0 ? money(value) : "…"} {rule}, à partir du {new Date(next + "T12:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}{end ? ` jusqu’au ${new Date(end + "T12:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}` : ""}.{next < todayISO() ? " Les échéances déjà passées seront créées tout de suite." : ""}</p>}
+      <div className="label">Catégorie<CatGrid list={cats} value={category} onChange={setCategory} /></div>
+      <label className="label">Compte<select className="input" value={account} onChange={(e) => setAccount(e.target.value)}><option value="">Aucun</option>{accounts.filter((a) => !a.powens_account_id || a.id === account).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</select></label>
+      {editing && <label className="item switchRow" style={{ borderTop: 0, padding: 0 }}><div className="itemMain"><b>Active</b><small>Désactivez-la pour la mettre en pause sans la supprimer.</small></div><input type="checkbox" className="switch" checked={active} onChange={(e) => setActive(e.target.checked)} /></label>}
+      <button className="btn primary lg block" disabled={busy || !ok || missing}>{busy ? "Enregistrement…" : editing ? "Enregistrer" : "Créer l’opération automatique"}</button>
+      {editing && <DeleteButton onConfirm={async () => { if (await onDelete(rec) !== false) onClose(); }} label="Supprimer l’opération automatique" />}
+    </form>
   </Modal>;
 }

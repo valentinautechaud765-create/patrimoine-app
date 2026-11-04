@@ -4,7 +4,7 @@ import Icon from "../Icon.js";
 import { Donut, Ring } from "../Charts.js";
 import { money, money0, signed, pct, dayTitle, monthLabel, todayISO } from "../../../lib/format.js";
 import { ASSET_COLORS } from "../../../lib/categories.js";
-import { budgetSuggestions } from "../../../lib/model.js";
+import { budgetSuggestions, FREQ_LABEL, perMonth } from "../../../lib/model.js";
 import { planById, TRIAL_DAYS, BRAND } from "../../../lib/config.js";
 import { Amount, CatIcon, InstIcon, TickerIcon, Panel, Empty, Locked, ago, KIND_LABEL } from "./ui.js";
 import { BudgetRow, TxRow, Upcoming } from "./Overview.js";
@@ -162,7 +162,35 @@ export function Budget({ m, data, limits, openPlans, open }) {
 }
 
 /* ---------------- Opérations ---------------- */
+/* ---------------- Opérations automatiques ---------------- */
+function Recurrences({ data, open }) {
+  const list = [...(data.recurrences || [])].sort((a, b) => (b.active - a.active) || String(a.next_date).localeCompare(String(b.next_date)));
+  const acc = Object.fromEntries(data.accounts.map((a) => [a.id, a.name]));
+  const active = list.filter((r) => r.active);
+  const outM = -active.filter((r) => r.amount < 0).reduce((n, r) => n + perMonth(r), 0), inM = active.filter((r) => r.amount > 0).reduce((n, r) => n + perMonth(r), 0);
+  const when = (r) => r.frequency === "hebdomadaire" ? "Chaque " + new Date(r.next_date + "T12:00:00").toLocaleDateString("fr-FR", { weekday: "long" }) : r.frequency === "annuelle" ? "Chaque année le " + new Date(r.next_date + "T12:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "long" }) : r.frequency === "trimestrielle" ? `Le ${r.day} tous les 3 mois` : `Le ${r.day} de chaque mois`;
+  return <>
+    <section className="card panel recHead fadeIn">
+      <div className="recStats">
+        <div><small>Revenus automatiques / mois</small><b className="ok">+{money0(inM)}</b></div>
+        <div><small>Dépenses automatiques / mois</small><b>−{money0(outM)}</b></div>
+        <div><small>Solde des automatiques</small><b className={inM - outM >= 0 ? "ok" : "bad"}>{inM - outM >= 0 ? "+" : "−"}{money0(Math.abs(inM - outM))}</b></div>
+      </div>
+      <button className="btn primary" onClick={() => open("recurrence")}><Icon name="plus" size={16} />Nouvelle opération automatique</button>
+    </section>
+    {data.recurrencesMissing && <div className="msg info">Pour activer les opérations automatiques, une petite mise à jour de la base est nécessaire : dans Supabase → SQL Editor, colle à nouveau <b>schema.sql</b> puis clique sur Run (aucune donnée n’est effacée).</div>}
+    <section className="card panel">
+      {list.length ? <div className="list">{list.map((r) => <button key={r.id} className={"item hover tap" + (r.active ? "" : " paused")} onClick={() => open("recurrence", { rec: r })}>
+        <CatIcon category={r.category} />
+        <div className="itemMain"><b>{r.label}{!r.active && <span className="chip" style={{ height: 20, marginLeft: 8, fontSize: 11 }}>En pause</span>}</b><small>{when(r)}{acc[r.account_id] ? " · " + acc[r.account_id] : ""}{r.end_date ? " · jusqu’au " + new Date(r.end_date + "T12:00:00").toLocaleDateString("fr-FR") : ""}</small></div>
+        <div className="itemSide"><b className={r.amount > 0 ? "ok" : ""}>{r.amount > 0 ? "+" : "−"}{money(Math.abs(r.amount))}</b><small className="faint">{r.active ? "Prochaine : " + new Date(r.next_date + "T12:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "short" }) : FREQ_LABEL[r.frequency]}</small></div>
+      </button>)}</div> : <Empty icon="repeat" title="Aucune opération automatique" text="Salaire le 7, loyer le 5, abonnements, virement vers le livret… Créez-les une fois, Patrimo les ajoute tout seul à chaque échéance."><button className="btn primary sm" onClick={() => open("recurrence")}><Icon name="plus" size={15} />Créer la première</button></Empty>}
+    </section>
+  </>;
+}
+
 export function Operations({ data, query, setQuery, limits, openPlans, open, flash, initialCategory = "" }) {
+  const [view, setView] = useState("history");
   const [kind, setKind] = useState("all"), [category, setCategory] = useState(initialCategory), [month, setMonth] = useState("");
   const months = useMemo(() => [...new Set(data.transactions.map((t) => String(t.date).slice(0, 7)))].sort().reverse(), [data.transactions]);
   const list = useMemo(() => {
@@ -185,7 +213,10 @@ export function Operations({ data, query, setQuery, limits, openPlans, open, fla
     const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" })); a.download = `${BRAND.name.toLowerCase()}-operations${month ? "-" + month : ""}.csv`; a.click();
     flash("Export téléchargé");
   }
+  const switcher = <div className="seg opsSwitch"><button className={view === "history" ? "on" : ""} onClick={() => setView("history")}><Icon name="list" size={14} />Historique</button><button className={view === "auto" ? "on" : ""} onClick={() => setView("auto")}><Icon name="repeat" size={14} />Automatiques{(data.recurrences || []).filter((r) => r.active).length > 0 && <span className="countPill">{data.recurrences.filter((r) => r.active).length}</span>}</button></div>;
+  if (view === "auto") return <>{switcher}<Recurrences data={data} open={open} /></>;
   return <>
+    {switcher}
     <section className="card panel opsBar">
       <div className="search wide"><Icon name="search" size={16} /><input placeholder="Rechercher un libellé, une catégorie, un montant…" value={query} onChange={(e) => setQuery(e.target.value)} />{query && <button className="clear" onClick={() => setQuery("")} aria-label="Effacer"><Icon name="x" size={14} /></button>}</div>
       <div className="filters">

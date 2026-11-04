@@ -80,6 +80,26 @@ create table if not exists public.trades (
 );
 create index if not exists trades_holding_date on public.trades (holding_id, date);
 
+-- Opérations automatiques (salaire, loyer, abonnements, virements…).
+-- next_date = prochaine échéance à créer ; l'appli crée les opérations dues à chaque ouverture.
+create table if not exists public.recurrences (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users on delete cascade,
+  label text not null,
+  amount numeric(14,2) not null,
+  category text not null default 'Autre',
+  account_id uuid references public.accounts on delete set null,
+  frequency text not null default 'mensuelle' check (frequency in ('hebdomadaire','mensuelle','trimestrielle','annuelle')),
+  day int not null default 1 check (day between 1 and 31),
+  next_date date not null,
+  end_date date,
+  active boolean not null default true,
+  created_at timestamptz not null default now()
+);
+-- Chaque opération créée automatiquement est reliée à sa règle : jamais deux fois la même échéance.
+alter table public.transactions add column if not exists recurrence_id uuid references public.recurrences on delete set null;
+create unique index if not exists transactions_recurrence_date on public.transactions (recurrence_id, date);
+
 -- Valeur du patrimoine chaque jour (pour les courbes)
 create table if not exists public.net_worth_snapshots (
   user_id uuid not null references auth.users on delete cascade,
@@ -106,6 +126,7 @@ alter table public.budgets enable row level security;
 alter table public.net_worth_snapshots enable row level security;
 alter table public.powens_links enable row level security;
 alter table public.trades enable row level security;
+alter table public.recurrences enable row level security;
 
 -- Le profil se lit mais ne se modifie pas depuis le navigateur (la formule est gérée par Stripe).
 drop policy if exists "profil: lecture" on public.profiles;
@@ -116,7 +137,7 @@ revoke update on public.profiles from authenticated;
 grant update (full_name) on public.profiles to authenticated;
 
 do $$ declare t text; begin
-  foreach t in array array['accounts','holdings','transactions','budgets','net_worth_snapshots','trades'] loop
+  foreach t in array array['accounts','holdings','transactions','budgets','net_worth_snapshots','trades','recurrences'] loop
     execute format('drop policy if exists "%1$s: propriétaire" on public.%1$s', t);
     execute format('create policy "%1$s: propriétaire" on public.%1$s for all using (auth.uid() = user_id) with check (auth.uid() = user_id)', t);
   end loop;

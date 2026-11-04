@@ -6,7 +6,7 @@ import { BrandMark } from "../components/Brand.js";
 import { supabaseBrowser, supabaseConfigured } from "../../lib/supabase.js";
 import { demoData } from "../../lib/demo.js";
 import { OWNER_EMAILS } from "../../lib/config.js";
-import { computeModel, positionFromTrades } from "../../lib/model.js";
+import { computeModel, positionFromTrades, advanceDate, firstDate } from "../../lib/model.js";
 
 const NUM = ["amount", "quantity", "cost_basis", "value", "balance", "monthly_limit", "total"];
 const clean = (r) => { const o = { ...r }; NUM.forEach((k) => { if (k in o) o[k] = Number(o[k]) || 0; }); return o; };
@@ -29,12 +29,12 @@ function App() {
   const demo = !supabaseConfigured;
 
   const load = useCallback(async () => {
-    if (demo) { setData({ ...demoData(), trades: [], session: null }); return; }
+    if (demo) { setData({ ...demoData(), trades: [], recurrences: [], session: null }); return; }
     const sb = supabaseBrowser();
     const { data: s } = await sb.auth.getSession();
     if (!s.session) { router.replace("/connexion"); return; }
     // Chaque requête ne renvoie que les lignes de l'utilisateur connecté (règles RLS côté base).
-    const [profile, accounts, holdings, transactions, budgets, snapshots, trades] = await Promise.all([
+    const [profile, accounts, holdings, transactions, budgets, snapshots, trades, recurrences] = await Promise.all([
       sb.from("profiles").select("*").eq("id", s.session.user.id).maybeSingle(),
       sb.from("accounts").select("*").order("created_at"),
       sb.from("holdings").select("*").order("value", { ascending: false }),
@@ -42,6 +42,7 @@ function App() {
       sb.from("budgets").select("*"),
       sb.from("net_worth_snapshots").select("date,total").order("date"),
       sb.from("trades").select("*").order("date"),
+      sb.from("recurrences").select("*").order("next_date"),
     ]);
     const pr = profile.data || { plan: "free" };
     // Propriétaire : accès complet. Le serveur l'enregistre dans la base ; l'affichage est débloqué
@@ -64,6 +65,8 @@ function App() {
       snapshots: num(snapshots.data, ["total"]),
       trades: num(trades.data, ["quantity", "price", "fees", "amount"]),
       tradesMissing: Boolean(trades.error),
+      recurrences: num(recurrences.data, ["amount"]),
+      recurrencesMissing: Boolean(recurrences.error),
       session: s.session,
     });
   }, [demo, router]);
@@ -137,6 +140,37 @@ function App() {
     }, 1500);
   }, [data?.accounts, data?.holdings, demo, user]); // eslint-disable-line
 
+  // Opérations automatiques : à chaque ouverture, on crée les échéances arrivées (une seule fois chacune,
+  // grâce au lien recurrence_id + date). Le solde des comptes saisis à la main suit.
+  const materialized = useRef(false);
+  useEffect(() => {
+    if (!data || materialized.current || data.recurrencesMissing) return;
+    materialized.current = true;
+    (async () => {
+      const today = todayStr(), rows = [], moves = [];
+      for (const r of live.current.recurrences || []) {
+        if (!r.active) continue;
+        let due = r.next_date, guard = 0;
+        while (due <= today && (!r.end_date || due <= r.end_date) && guard++ < 120) {
+          rows.push({ date: due, label: r.label, amount: Number(r.amount), category: r.category, account_id: r.account_id || null, recurrence_id: r.id });
+          due = advanceDate(due, r.frequency, r.day);
+        }
+        if (due !== r.next_date) moves.push({ id: r.id, next_date: due });
+      }
+      if (!rows.length) return;
+      let created = rows.map((x, i) => ({ id: "auto" + Date.now() + i, ...x }));
+      if (!demo) {
+        const { data: ins, error } = await supabaseBrowser().from("transactions").upsert(rows.map((x) => ({ ...x, user_id: user })), { onConflict: "recurrence_id,date", ignoreDuplicates: true }).select();
+        if (error) return;
+        created = (ins || []).map(clean);
+        for (const mv of moves) await supabaseBrowser().from("recurrences").update({ next_date: mv.next_date }).eq("id", mv.id);
+      }
+      setData((d) => ({ ...d, transactions: byDate([...d.transactions, ...created]), recurrences: d.recurrences.map((r) => ({ ...r, ...(moves.find((m) => m.id === r.id) || {}) })) }));
+      const deltas = {}; created.forEach((t) => { if (t.account_id) deltas[t.account_id] = (deltas[t.account_id] || 0) + Number(t.amount); });
+      for (const [acc, delta] of Object.entries(deltas)) await shiftBalance(acc, Math.round(delta * 100) / 100);
+    })();
+  }, [data]); // eslint-disable-line
+
   const actions = {
     notice,
     async checkout(plan, billing) {
@@ -154,7 +188,8 @@ function App() {
       const { url } = await api("/api/powens/connect");
       window.location.href = url;
     },
-    async saveTransaction(t) {
+    async saveTransaction(t, repeatFreq) {
+      if (repeatFreq && live.current.recurrencesMissing) throw new Error("Mise à jour de la base nécessaire pour les opérations automatiques : relance supabase/schema.sql dans Supabase (SQL Editor → Run).");
       const before = t.id ? live.current.transactions.find((x) => x.id === t.id) : null;
       const saved = await write("transactions", t);
       replace("transactions", { ...before, ...t, ...saved }, byDate);
@@ -162,6 +197,14 @@ function App() {
       if (before?.account_id) deltas[before.account_id] = (deltas[before.account_id] || 0) - Number(before.amount);
       if (saved.account_id) deltas[saved.account_id] = (deltas[saved.account_id] || 0) + Number(saved.amount);
       for (const [acc, delta] of Object.entries(deltas)) await shiftBalance(acc, Math.round(delta * 100) / 100);
+      if (repeatFreq) {
+        // L'opération du jour est créée normalement ; la règle reprend à l'échéance suivante.
+        const rule = { label: t.label, amount: t.amount, category: t.category, account_id: t.account_id || null, frequency: repeatFreq, day: Number(String(t.date).slice(8, 10)) || 1, next_date: advanceDate(t.date, repeatFreq, Number(String(t.date).slice(8, 10))), active: true };
+        const r = await write("recurrences", rule);
+        await write("transactions", { id: saved.id, recurrence_id: r.id }).catch(() => {});
+        replace("recurrences", { ...rule, ...r });
+        return { message: "Opération ajoutée et répétée automatiquement" };
+      }
       return { message: before ? "Opération modifiée" : "Opération ajoutée" };
     },
     async deleteTransaction(t) {
@@ -286,6 +329,23 @@ function App() {
         tradeCount = createdT.length;
         if (createdT.length) setData((x) => ({ ...x, trades: [...x.trades, ...createdT] }));
       }
+      // 3 bis. Opérations automatiques : les échéances passées sont déjà dans les opérations importées,
+      // on reprend donc à partir de la prochaine échéance (pas de doublon).
+      let recCount = 0;
+      if (!d.recurrencesMissing && Array.isArray(file.recurrences) && file.recurrences.length) {
+        const have = new Set((d.recurrences || []).map((r) => (r.label + "|" + Number(r.amount).toFixed(2)).toLowerCase()));
+        const freqOf = (f) => ["hebdomadaire", "mensuelle", "annuelle"].includes(f) ? f : "mensuelle";
+        const recRows = file.recurrences.filter((r) => Number(r.montant) > 0).map((r) => {
+          const amount = Math.round((r.type === "Rentrée" ? 1 : -1) * Math.abs(Number(r.montant)) * 100) / 100, frequency = freqOf(r.frequence);
+          const day = Math.min(31, Math.max(1, Number(r.jour) || Number(String(r.dateDebut).slice(8, 10)) || 1));
+          let next = /^\d{4}-\d{2}-\d{2}$/.test(r.dateDebut) ? r.dateDebut : today, guard = 0;
+          while (next <= today && guard++ < 600) next = advanceDate(next, frequency, day);
+          return { label: String(r.libelle || r.categorie || "Opération").slice(0, 120), amount, category: String(r.categorie || "Autre").slice(0, 40), account_id: idMap[r.compteId] || null, frequency, day, next_date: next, end_date: /^\d{4}-\d{2}-\d{2}$/.test(r.dateFin) ? r.dateFin : null, active: r.active !== false };
+        }).filter((r) => !have.has((r.label + "|" + r.amount.toFixed(2)).toLowerCase()));
+        const createdR = await insertMany("recurrences", recRows);
+        recCount = createdR.length;
+        if (createdR.length) setData((x) => ({ ...x, recurrences: [...(x.recurrences || []), ...createdR] }));
+      }
       // 4. Budgets
       const budgets = Object.entries(file.budgets || {}).filter(([, v]) => Number(v) > 0).map(([category, v]) => ({ category: String(category).slice(0, 40), monthly_limit: Math.round(Number(v) * 100) / 100 }));
       if (!demo && budgets.length) { const { error } = await sb.from("budgets").upsert(budgets.map((b) => ({ ...b, user_id: user }))); if (error) throw new Error("Import impossible (budgets) : " + error.message); }
@@ -298,7 +358,7 @@ function App() {
         const snaps = Object.fromEntries(x.snapshots.map((sn) => [sn.date, sn])); hist.forEach((h) => { snaps[h.date] = h; });
         return { ...x, accounts, holdings, transactions: byDate([...x.transactions, ...createdTx]), budgets: [...x.budgets.filter((b) => !budgets.some((n) => n.category === b.category)), ...budgets], snapshots: Object.values(snaps).sort((a, b) => a.date.localeCompare(b.date)) };
       });
-      return { message: "Import terminé", ok: true, summary: { comptes: createdAcc.length + updated.length, operations: createdTx.length, ignorees: (file.operations || []).length - createdTx.length, placements: createdH.length + updH.length, transactionsBourse: tradeCount, budgets: budgets.length, jours: hist.length } };
+      return { message: "Import terminé", ok: true, summary: { comptes: createdAcc.length + updated.length, operations: createdTx.length, ignorees: (file.operations || []).length - createdTx.length, placements: createdH.length + updH.length, transactionsBourse: tradeCount, automatiques: recCount, budgets: budgets.length, jours: hist.length } };
     },
     // Cours de bourse en direct (serveur Patrimo → Tradegate / Yahoo / Twelve Data)
     async fetchQuotes(symbols, withDay) {
@@ -342,6 +402,18 @@ function App() {
       const r = await fetch(`/api/cours?historique=${encodeURIComponent(symbols.join(","))}&periode=${period}`, { headers: token ? { Authorization: "Bearer " + token } : {} });
       if (!r.ok) throw new Error("Courbe indisponible");
       return r.json();
+    },
+    async saveRecurrence(r) {
+      if (live.current.recurrencesMissing) throw new Error("Mise à jour de la base nécessaire : relance le script supabase/schema.sql dans Supabase (SQL Editor → Run).");
+      const saved = await write("recurrences", r);
+      replace("recurrences", { ...r, ...saved }, (l) => l.sort((a, b) => String(a.next_date).localeCompare(String(b.next_date))));
+      materialized.current = false; setData((d) => ({ ...d })); // crée tout de suite une échéance déjà passée
+      return { message: r.id ? "Opération automatique modifiée" : "Opération automatique créée" };
+    },
+    async deleteRecurrence(r) {
+      await erase("recurrences", { id: r.id });
+      drop("recurrences", r.id);
+      return { message: "Opération automatique supprimée (les opérations déjà passées sont conservées)" };
     },
     async deleteAccountForever() {
       if (demo) return { message: "Démonstration : rien n’est supprimé." };

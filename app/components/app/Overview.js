@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import Icon from "../Icon.js";
 import { AreaChart, Donut, FlowBars } from "../Charts.js";
 import { money, money0, signed, pct, todayISO, dayLabel, monthLabel } from "../../../lib/format.js";
-import { monthlySeries, recurring } from "../../../lib/model.js";
+import { monthlySeries, recurring, advanceDate } from "../../../lib/model.js";
 import { cat } from "../../../lib/categories.js";
 import { Amount, CatIcon, InstIcon, Panel, Empty, Locked, ago, KIND_LABEL } from "./ui.js";
 
@@ -200,21 +200,30 @@ function CategoryPanel({ m, goOps }) {
 }
 
 export function Upcoming({ data, compact }) {
-  const items = useMemo(() => recurring(data.transactions), [data.transactions]);
+  // Opérations automatiques programmées d'abord, puis celles détectées dans l'historique (sans doublon)
+  const items = useMemo(() => {
+    const today = todayISO(), horizon = new Date(Date.now() + 45 * 864e5).toISOString().slice(0, 10), planned = [];
+    (data.recurrences || []).filter((r) => r.active).forEach((r) => {
+      let d = r.next_date, g = 0;
+      while (d <= horizon && (!r.end_date || d <= r.end_date) && g++ < 10) { if (d >= today) planned.push({ label: r.label, category: r.category, amount: Number(r.amount), next: d, planned: true }); d = advanceDate(d, r.frequency, r.day); }
+    });
+    const names = new Set(planned.map((p) => p.label.toLowerCase().trim()));
+    return [...planned, ...recurring(data.transactions).filter((r) => !names.has(String(r.label).toLowerCase().trim()))].sort((a, b) => a.next.localeCompare(b.next));
+  }, [data.transactions, data.recurrences]);
   const month = todayISO().slice(0, 7), rest = items.filter((r) => r.next.startsWith(month));
   const due = -rest.filter((r) => r.amount < 0).reduce((s, r) => s + r.amount, 0), incoming = rest.filter((r) => r.amount > 0).reduce((s, r) => s + r.amount, 0);
-  if (!items.length) return <Empty icon="repeat" title="Rien de détecté pour l’instant" text="Loyer, abonnements, salaire… ils apparaîtront ici après deux mois d’opérations." />;
+  if (!items.length) return <Empty icon="repeat" title="Rien de prévu pour l’instant" text="Créez vos opérations automatiques (salaire, loyer…) dans Opérations → Automatiques. Elles sont aussi détectées après deux mois d’historique." />;
   return <>
     <div className="upSum"><div><small>Reste à prélever ce mois</small><b>{money0(due)}</b></div>{incoming > 0 && <div><small>Rentrées attendues</small><b className="ok">+{money0(incoming)}</b></div>}</div>
     <div className="list">{items.slice(0, compact ? 5 : 20).map((r) => {
       const d = new Date(r.next + "T12:00:00"), days = Math.round((d - new Date(todayISO() + "T12:00:00")) / 864e5);
-      return <div className="item" key={r.label + r.amount}>
+      return <div className="item" key={r.label + r.amount + r.next}>
         <span className="dateChip"><b>{d.getDate()}</b><small>{d.toLocaleDateString("fr-FR", { month: "short" }).replace(".", "")}</small></span>
-        <div className="itemMain"><b>{r.label}</b><small>{r.category} · {days <= 0 ? "aujourd’hui" : days === 1 ? "demain" : `dans ${days} jours`}</small></div>
+        <div className="itemMain"><b>{r.label}</b><small>{r.planned ? "Automatique" : r.category} · {days <= 0 ? "aujourd’hui" : days === 1 ? "demain" : `dans ${days} jours`}</small></div>
         <div className="itemSide"><b className={r.amount > 0 ? "ok" : ""}>{r.amount > 0 ? "+" : "−"}{money(Math.abs(r.amount))}</b></div>
       </div>;
     })}</div>
-    <p className="finePrint" style={{ margin: "8px 0 4px", justifyContent: "flex-start" }}><Icon name="info" size={13} />Dates estimées d’après vos opérations des 3 derniers mois.</p>
+    {items.some((r) => !r.planned) && <p className="finePrint" style={{ margin: "8px 0 4px", justifyContent: "flex-start" }}><Icon name="info" size={13} />Les lignes non automatiques sont estimées d’après vos 3 derniers mois.</p>}
   </>;
 }
 
