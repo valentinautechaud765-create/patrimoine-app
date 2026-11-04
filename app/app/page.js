@@ -214,7 +214,15 @@ function App() {
       return { message: "Opération supprimée" };
     },
     async saveAccount(a) {
-      const saved = await write("accounts", { ...a, updated_at: new Date().toISOString() });
+      let saved;
+      try { saved = await write("accounts", { ...a, updated_at: new Date().toISOString() }); }
+      catch (e) {
+        // Base pas encore mise à jour (colonne « rate ») : on enregistre le reste et on prévient.
+        if (!/rate/i.test(e.message) || !("rate" in a)) throw e;
+        const { rate, ...rest } = a; saved = await write("accounts", { ...rest, updated_at: new Date().toISOString() });
+        replace("accounts", { ...rest, ...saved });
+        return { message: "Compte enregistré. Pour le taux, relance schema.sql dans Supabase." };
+      }
       replace("accounts", { ...a, ...saved });
       return { message: a.id ? "Compte modifié" : "Compte ajouté" };
     },

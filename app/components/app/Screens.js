@@ -56,7 +56,7 @@ export function Accounts({ m, data, connectBank, limits, openPlans, open }) {
 }
 
 /* ---------------- Investissements ---------------- */
-export function Investments({ m, data, limits, openPlans, open, liveInfo, curve }) {
+export function Investments({ m, data, limits, openPlans, open, liveInfo, curve, fetchHistory }) {
   const holdings = [...data.holdings].sort((a, b) => b.value - a.value);
   const gain = m.hValue - m.cost, gainPct = m.cost > 0 ? (gain / m.cost) * 100 : 0;
   const parts = Object.entries(m.allocation).map(([label, value]) => ({ label, value, color: ASSET_COLORS[label] || "#7fa8ff" })).sort((a, b) => b.value - a.value);
@@ -105,7 +105,7 @@ export function Investments({ m, data, limits, openPlans, open, liveInfo, curve 
     </Panel>
     <Panel title="Simulation d’investissement" icon="layers">
       <Locked on={!limits.projection} plan="Pro" title="Simulez vos investissements" text="Apport mensuel, durée, rendement : voyez ce que deviennent vos placements." onUnlock={() => openPlans("pro")}>
-        <InvestProjection holdings={holdings} total={m.hValue} />
+        <InvestProjection holdings={holdings} total={m.hValue} fetchHistory={fetchHistory} />
       </Locked>
     </Panel>
   </>;

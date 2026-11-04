@@ -290,7 +290,7 @@ export default function Overview({ m, data, limits, go, openPlans, list, open, g
     </div>
     <Panel title="Projection du patrimoine" icon="layers" className="fadeIn">
       <Locked on={!limits.projection} plan="Pro" title="Projection jusqu’à 30 ans" text="Voyez où vous mène votre rythme d’épargne actuel." onUnlock={() => openPlans("pro")}>
-        <WealthProjection m={m} data={data} />
+        <WealthProjection m={m} data={data} fetchHistory={fetchHistory} />
       </Locked>
     </Panel>
   </>;

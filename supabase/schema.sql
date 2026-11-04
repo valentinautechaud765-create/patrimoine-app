@@ -64,6 +64,9 @@ create table if not exists public.budgets (
   primary key (user_id, category)
 );
 
+-- Taux annuel d'un livret ou d'un compte de placement (pour le rendement automatique des projections)
+alter table public.accounts add column if not exists rate numeric(5,2);
+
 -- Achats, ventes et dividendes d'une position (amount = montant en euros, frais compris)
 create table if not exists public.trades (
   id uuid primary key default gen_random_uuid(),

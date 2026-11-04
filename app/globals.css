@@ -1006,3 +1006,16 @@ button.budgetRow.tap:hover { background: rgba(255, 255, 255, 0.03); }
   .projY { width: 46px; }
   .projX { margin-right: 46px; }
 }
+.rateBox { display: grid; gap: 6px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line2); }
+.rateHead { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-weight: 600; font-size: 14px; }
+.rateHead span { display: inline-flex; align-items: center; gap: 8px; }
+.rateHead b { font-weight: 600; color: var(--ok); white-space: nowrap; }
+.rateRow { display: grid; grid-template-columns: minmax(0, 1fr) 46px 58px; gap: 8px; align-items: center; padding: 6px 0; border-top: 1px solid var(--line); }
+.rateName { display: grid; min-width: 0; }
+.rateName b { font-weight: 500; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rateName small { font-size: 11.5px; color: var(--muted); line-height: 1.35; }
+.rateW { text-align: right; color: var(--muted); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.rateR { text-align: right; font-size: 13px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.warnText { color: var(--warn) !important; }
+.rateBox > small { font-size: 11.5px; }
+.rateBox .link { justify-self: start; font-size: 12.5px; }
