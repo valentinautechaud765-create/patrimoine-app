@@ -227,9 +227,10 @@ test("connexions en double (« Connecter ma banque » cliqué 5 fois) : 2 compte
   // Powens : 5 connexions BNP de test, chacune avec les 2 mêmes comptes (même numéro) et les mêmes opérations
   const connections = [11, 12, 13, 14, 15].map((id) => ({ id, connector: { name: "BNP Paribas" } }));
   const accounts = connections.flatMap((c, i) => [
-    { id: 100 + i * 2, id_connection: c.id, name: "Compte de chèques", number: "FR001", type: "checking", balance: -90 },
-    { id: 101 + i * 2, id_connection: c.id, name: "Compte de chèques", number: "FR002", type: "checking", balance: -99.01 }]);
-  const transactions = accounts.map((a, i) => ({ id: 1000 + i, id_account: a.id, date: "2026-11-04", value: a.number === "FR001" ? -90 : -99.01, simplified_wording: "PRLV TEST" }));
+    // Comme la banque de test : identifiants Powens différents à chaque connexion, numéro complet absent
+    { id: 100 + i * 2, id_connection: c.id, name: "Compte de chèques ****2229", webid: "w" + (100 + i * 2), type: "checking", balance: -90 },
+    { id: 101 + i * 2, id_connection: c.id, name: "Compte de chèques ****8992", webid: "w" + (101 + i * 2), type: "checking", balance: -99.01 }]);
+  const transactions = accounts.map((a, i) => ({ id: 1000 + i, id_account: a.id, date: "2026-11-04", value: a.balance, simplified_wording: "PRLV TEST" }));
   BANK = { connections, accounts, transactions };
   const db = fakeDb();
   // Dans Patrimo : les 10 copies déjà créées ce matin, chacune avec son opération, + une opération bancaire orpheline
