@@ -8,6 +8,23 @@ import { demoData } from "../../lib/demo.js";
 import { OWNER_EMAILS } from "../../lib/config.js";
 import { computeModel, positionFromTrades, advanceDate, firstDate } from "../../lib/model.js";
 
+// Jeton de connexion toujours à jour : Supabase le renouvelle (il expire au bout d'une heure).
+// Sans ça, un onglet resté ouvert longtemps affichait « Session expirée » alors qu'on est connecté.
+async function freshToken(fallback) {
+  try {
+    const sb = supabaseBrowser();
+    if (!sb) return fallback || null;
+    let { data: { session } } = await sb.auth.getSession();
+    if (session?.expires_at && session.expires_at * 1000 < Date.now() + 60e3) {
+      const r = await sb.auth.refreshSession();
+      session = r.data?.session || session;
+    }
+    return session?.access_token || fallback || null;
+  } catch {
+    return fallback || null;
+  }
+}
+
 const NUM = ["amount", "quantity", "cost_basis", "value", "balance", "monthly_limit", "total"];
 const clean = (r) => { const o = { ...r }; NUM.forEach((k) => { if (k in o) o[k] = Number(o[k]) || 0; }); return o; };
 const todayStr = () => new Date().toISOString().slice(0, 10);
@@ -85,7 +102,13 @@ function App() {
 
   // Appel d'une route serveur avec le jeton de session
   const api = useCallback(async (path, body) => {
-    const r = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json", ...(data?.session ? { Authorization: "Bearer " + data.session.access_token } : {}) }, body: JSON.stringify(body || {}) });
+    const call = async (token) => fetch(path, { method: "POST", headers: { "Content-Type": "application/json", ...(token ? { Authorization: "Bearer " + token } : {}) }, body: JSON.stringify(body || {}) });
+    let r = await call(data?.session ? await freshToken(data.session.access_token) : null);
+    // Jeton refusé : on force un renouvellement et on réessaie une fois
+    if (r.status === 401 && data?.session) {
+      const again = await supabaseBrowser()?.auth.refreshSession().then((x) => x.data?.session?.access_token).catch(() => null);
+      if (again) r = await call(again);
+    }
     const j = await r.json().catch(() => ({}));
     if (!r.ok) {
       if (/n’est pas encore configur|manquant/i.test(j.error || "") && !/POWENS_|STRIPE_/.test(j.error || "")) throw new Error(path.includes("powens") ? "La connexion bancaire n’est pas encore activée. Elle arrive très bientôt." : "Le paiement en ligne n’est pas encore activé. Il arrive très bientôt.");
@@ -181,7 +204,7 @@ function App() {
   useEffect(() => {
     if (demo || !data?.session || autoSynced.current || !data.accounts.some((a) => a.powens_account_id)) return;
     autoSynced.current = true;
-    fetch("/api/powens/sync", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + data.session.access_token }, body: "{}" })
+    freshToken(data.session.access_token).then((token) => fetch("/api/powens/sync", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + token }, body: "{}" }))
       .then((r) => r.json()).then(async (r) => {
         if (r.linked && !r.skipped) { await load(); setData((d) => d && ({ ...d, bankErrors: r.errors || [], lastSync: r.at })); }
         else if (r.at) setData((d) => d && ({ ...d, lastSync: r.at }));
@@ -397,7 +420,7 @@ function App() {
     },
     // Cours de bourse en direct (serveur Patrimo → Tradegate / Yahoo / Twelve Data)
     async fetchQuotes(symbols, withDay) {
-      const token = live.current?.session?.access_token;
+      const token = live.current?.session ? await freshToken(live.current.session.access_token) : null;
       const r = await fetch(`/api/cours?symbols=${encodeURIComponent(symbols.join(","))}${withDay ? "&jour=1" : ""}`, { headers: token ? { Authorization: "Bearer " + token } : {} });
       if (!r.ok) throw new Error("Cours indisponibles");
       return r.json();
@@ -433,7 +456,7 @@ function App() {
       return { message: "Transaction supprimée" };
     },
     async fetchHistory(symbols, period) {
-      const token = live.current?.session?.access_token;
+      const token = live.current?.session ? await freshToken(live.current.session.access_token) : null;
       const r = await fetch(`/api/cours?historique=${encodeURIComponent(symbols.join(","))}&periode=${period}`, { headers: token ? { Authorization: "Bearer " + token } : {} });
       if (!r.ok) throw new Error("Courbe indisponible");
       return r.json();
