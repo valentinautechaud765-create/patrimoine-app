@@ -3,19 +3,11 @@
 import { useMemo, useRef, useState } from "react";
 import Icon from "../Icon.js";
 import { money, money0 } from "../../../lib/format.js";
-import { perMonth, cagr, rateBreakdown } from "../../../lib/model.js";
+import { perMonth, cagr, rateBreakdown, simulate, monthlyNetMedian } from "../../../lib/model.js";
 import { useHistory } from "./Holding.js";
 import { TickerIcon, Empty } from "./ui.js";
 
 const fmtK = (v) => Math.abs(v) >= 1e6 ? (v / 1e6).toLocaleString("fr-FR", { maximumFractionDigits: 1 }) + " M€" : Math.abs(v) >= 1e4 ? Math.round(v / 1e3) + "k €" : Math.abs(v) >= 1e3 ? (v / 1e3).toLocaleString("fr-FR", { maximumFractionDigits: 1 }) + "k €" : Math.round(v) + " €";
-
-// Simulation mois par mois : capital × (1 + r/12) + apport. La fourchette = rendement ± écart.
-export function simulate({ start, monthly, rate, years, spread = 2 }) {
-  const n = years * 12, run = (r) => { const i = r / 100 / 12, out = [start]; let v = start; for (let k = 1; k <= n; k++) { v = v * (1 + i) + monthly; out.push(v); } return out; };
-  const mid = run(rate), low = run(Math.max(-5, rate - spread)), high = run(rate + spread);
-  const contrib = Array.from({ length: n + 1 }, (_, k) => start + monthly * k);
-  return { mid, low, high, contrib, n };
-}
 
 export function ProjectionChart({ sim, years, startYear = new Date().getFullYear() }) {
   const [hover, setHover] = useState(null);
@@ -89,12 +81,8 @@ export function WealthProjection({ m, data, fetchHistory }) {
   const calc = useMemo(() => {
     const recs = (data.recurrences || []).filter((r) => r.active && r.category !== "Épargne");
     const recIn = recs.filter((r) => r.amount > 0).reduce((n, r) => n + perMonth(r), 0), recOut = -recs.filter((r) => r.amount < 0).reduce((n, r) => n + perMonth(r), 0);
-    const now = new Date(), months = [1, 2, 3].map((k) => new Date(now.getFullYear(), now.getMonth() - k, 15).toISOString().slice(0, 7));
-    const active = months.filter((mo) => data.transactions.some((t) => String(t.date).startsWith(mo)));
-    const others = data.transactions.filter((t) => !t.recurrence_id && t.category !== "Épargne" && active.some((mo) => String(t.date).startsWith(mo)));
-    const otherIn = active.length ? others.filter((t) => t.amount > 0).reduce((n, t) => n + Number(t.amount), 0) / active.length : 0;
-    const otherOut = active.length ? -others.filter((t) => t.amount < 0).reduce((n, t) => n + Number(t.amount), 0) / active.length : 0;
-    return { recIn, recOut, otherIn, otherOut, months: active.length, total: recIn - recOut + otherIn - otherOut };
+    const med = monthlyNetMedian(data.transactions, 6);
+    return { recIn, recOut, otherIn: med.inc, otherOut: med.out, months: med.months, total: recIn - recOut + med.inc - med.out };
   }, [data.transactions, data.recurrences]);
   const suggested = Math.max(0, Math.round(calc.total / 10) * 10);
   const { cagrs, loading } = useLongTermRates(fetchHistory, data.holdings);
@@ -102,13 +90,14 @@ export function WealthProjection({ m, data, fetchHistory }) {
   const [monthly, setMonthly] = useState(null), [years, setYears] = useState(10), [rateOverride, setRate] = useState(null);
   const rate = rateOverride ?? bd.rate;
   const mth = monthly ?? suggested;
-  const sim = useMemo(() => simulate({ start: m.total, monthly: mth, rate, years }), [m.total, mth, rate, years]);
+  const [infl, setInfl] = useState(false);
+  const sim = useMemo(() => simulate({ start: m.total, monthly: mth, rate, years, inflation: infl ? 2 : 0 }), [m.total, mth, rate, years, infl]);
   const gain = sim.mid[sim.n] - sim.contrib[sim.n];
   const rows = [
     ["repeat", "Revenus automatiques", calc.recIn, "ok", "salaire, APL… (opérations automatiques)"],
     ["repeat", "Dépenses automatiques", -calc.recOut, "", "loyer, abonnements…"],
-    ["list", "Autres revenus (moyenne)", calc.otherIn, "ok", calc.months ? `moyenne de vos ${calc.months} dernier${calc.months > 1 ? "s" : ""} mois` : "pas encore d’historique"],
-    ["list", "Autres dépenses (moyenne)", -calc.otherOut, "", calc.months ? `courses, sorties… sur ${calc.months} mois` : "pas encore d’historique"],
+    ["list", "Autres revenus (mois habituel)", calc.otherIn, "ok", calc.months ? `médiane de vos ${calc.months} dernier${calc.months > 1 ? "s" : ""} mois complet${calc.months > 1 ? "s" : ""} : un mois exceptionnel ne fausse pas le calcul` : "pas encore de mois complet"],
+    ["list", "Autres dépenses (mois habituel)", -calc.otherOut, "", calc.months ? `courses, sorties… médiane sur ${calc.months} mois` : "pas encore de mois complet"],
   ];
   return <div className="projGrid">
     <div>
@@ -118,6 +107,7 @@ export function WealthProjection({ m, data, fetchHistory }) {
         <Slider label="Épargne par mois" value={mth} display={money0(mth)} min={0} max={Math.max(2000, suggested * 2)} step={10} onChange={setMonthly} />
         <Slider label="Durée" value={years} display={`${years} an${years > 1 ? "s" : ""}`} min={1} max={30} onChange={setYears} />
         <Slider label="Rendement annuel" value={rate} display={`${rate.toLocaleString("fr-FR")} %`} min={0} max={10} step={0.5} onChange={setRate} />
+        <label className="item switchRow inflRow"><div className="itemMain"><b>En euros d’aujourd’hui</b><small>Retire l’inflation (2 % par an, objectif de la BCE) : ce que la somme vaudra vraiment en pouvoir d’achat.</small></div><input type="checkbox" className="switch" checked={infl} onChange={(e) => setInfl(e.target.checked)} /></label>
       </div>
     </div>
     <div className="projExplain">
@@ -128,7 +118,7 @@ export function WealthProjection({ m, data, fetchHistory }) {
       {monthly != null && monthly !== suggested && <button className="link" onClick={() => setMonthly(null)}>Revenir à l’estimation ({money0(suggested)})</button>}
       <RateBreakdown bd={bd} auto={rateOverride == null} loading={loading} overridden={rateOverride != null} onReset={() => setRate(null)} />
       <p>Chaque mois, l’épargne s’ajoute au patrimoine, et l’ensemble rapporte {rate.toLocaleString("fr-FR")} % par an. La fourchette montre le résultat avec 2 points de rendement en moins ou en plus. Au bout de {years} an{years > 1 ? "s" : ""}, les intérêts représentent <b className="ok">{money0(Math.max(0, gain))}</b>.</p>
-      <p className="faint">Estimation indicative, pas une promesse ni un conseil en investissement.</p>
+      <p className="faint">{infl ? "Montants en euros d’aujourd’hui (inflation de 2 % par an retirée)." : "Montants en euros de l’époque, sans retirer l’inflation."} Estimation indicative, pas une promesse ni un conseil en investissement.</p>
     </div>
   </div>;
 }
@@ -144,7 +134,8 @@ export function InvestProjection({ holdings, total, fetchHistory }) {
   const [monthly, setMonthly] = useState(150), [years, setYears] = useState(20), [rateOverride, setRate] = useState(null);
   const rate = rateOverride ?? baseRate;
   const start = sel ? Number(sel.value) : total;
-  const sim = useMemo(() => simulate({ start, monthly, rate, years, spread: sel?.asset_class === "Crypto" ? 6 : 3 }), [start, monthly, rate, years, sel]);
+  const [infl, setInfl] = useState(false);
+  const sim = useMemo(() => simulate({ start, monthly, rate, years, spread: sel?.asset_class === "Crypto" ? 6 : 3, inflation: infl ? 2 : 0 }), [start, monthly, rate, years, sel, infl]);
   if (!lines.length) return <Empty icon="trending" title="Ajoutez un placement" text="La simulation part de vos positions actuelles." />;
   return <div className="projGrid">
     <div>
@@ -158,6 +149,7 @@ export function InvestProjection({ holdings, total, fetchHistory }) {
         <Slider label="Apport mensuel" value={monthly} display={money0(monthly)} min={0} max={2000} step={10} onChange={setMonthly} />
         <Slider label="Durée" value={years} display={`${years} ans`} min={1} max={40} onChange={setYears} />
         <Slider label="Rendement annuel" value={rate} display={`${rate.toLocaleString("fr-FR")} %`} min={0} max={sel?.asset_class === "Crypto" ? 30 : 15} step={0.5} onChange={setRate} />
+        <label className="item switchRow inflRow"><div className="itemMain"><b>En euros d’aujourd’hui</b><small>Retire l’inflation (2 % par an, objectif de la BCE) : ce que la somme vaudra vraiment en pouvoir d’achat.</small></div><input type="checkbox" className="switch" checked={infl} onChange={(e) => setInfl(e.target.checked)} /></label>
       </div>
     </div>
     <div className="projExplain">
@@ -168,7 +160,7 @@ export function InvestProjection({ holdings, total, fetchHistory }) {
       <div className="calcRow total"><span>Total versé en {years} ans</span><b className="money">{money0(sim.contrib[sim.n])}</b></div>
       <div className="calcRow total"><span>Gains estimés</span><b className="ok">+{money0(Math.max(0, sim.mid[sim.n] - sim.contrib[sim.n]))}</b></div>
       <p>Les gains sont réinvestis chaque mois (intérêts composés). La fourchette montre le résultat avec {sel?.asset_class === "Crypto" ? 6 : 3} points de rendement en moins ou en plus : les marchés ne montent pas en ligne droite.</p>
-      <p className="faint">Les performances passées ne préjugent pas des performances futures. Simulation indicative, pas un conseil en investissement.</p>
+      <p className="faint">{infl ? "Montants en euros d’aujourd’hui (inflation de 2 % par an retirée). " : "Montants sans retirer l’inflation. "}Les performances passées ne préjugent pas des performances futures. Simulation indicative, pas un conseil en investissement.</p>
     </div>
   </div>;
 }
