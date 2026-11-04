@@ -1035,3 +1035,31 @@ button.budgetRow.tap:hover { background: rgba(255, 255, 255, 0.03); }
   .ringCenter b, .grid.g4 .kpi:nth-child(3) > b, .rateRow, .rateHead b,
   .projLegend > div:nth-child(1) small
 ) { filter: none; user-select: auto; }
+
+/* Comptes affichés */
+.scopeBar { position: relative; display: flex; align-items: center; gap: 12px; justify-content: center; }
+.scopeBtn { display: inline-flex; align-items: center; gap: 7px; height: 34px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--line2); background: rgba(255, 255, 255, 0.03); color: var(--fg2); font-size: 13px; }
+.scopeBtn b { font-weight: 600; color: var(--fg); }
+.scopeBtn.on { border-color: var(--blue); background: var(--blueSoft); }
+.scopeBackdrop { position: fixed; inset: 0; z-index: 70; }
+.scopeMenu { position: absolute; top: 42px; left: 50%; transform: translateX(-50%); z-index: 71; width: min(340px, calc(100vw - 32px)); max-height: 60vh; overflow: auto; padding: 6px; border-radius: 16px; background: var(--surface2); border: 1px solid var(--line2); box-shadow: 0 30px 80px -20px rgba(0, 0, 0, 0.8); animation: rise 0.2s var(--ease) both; }
+.scopeItem { display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 10px; border-radius: 11px; border: 0; background: none; color: inherit; text-align: left; }
+.scopeItem:hover { background: rgba(255, 255, 255, 0.05); }
+.scopeItem b { font-weight: 500; font-size: 14px; }
+.scopeCheck { width: 20px; height: 20px; flex: none; border-radius: 6px; border: 1.5px solid var(--line2); display: grid; place-items: center; color: #fff; }
+.scopeItem.on .scopeCheck { background: var(--blue); border-color: var(--blue); }
+
+/* Dettes */
+.debtList { display: grid; }
+.debtRow { display: flex; gap: 12px; align-items: flex-start; width: 100%; padding: 12px 0; border: 0; border-top: 1px solid var(--line); background: none; color: inherit; text-align: left; }
+.debtRow:first-child { border-top: 0; }
+.debtRow.done { opacity: 0.6; }
+.debtIco { width: 38px; height: 38px; flex: none; border-radius: 12px; display: grid; place-items: center; }
+.debtIco.lg { width: 48px; height: 48px; border-radius: 14px; }
+.debtMain { flex: 1; min-width: 0; display: grid; gap: 6px; }
+.debtTop { display: flex; justify-content: space-between; gap: 10px; }
+.debtTop b { font-weight: 500; font-size: 14.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.debtTop span { font-weight: 500; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.debtMain .bar { margin-top: 0; }
+.debtMain small { font-size: 12.5px; }
+.privacy :is(.debtTop span, .debtMain small) { filter: blur(7px); }

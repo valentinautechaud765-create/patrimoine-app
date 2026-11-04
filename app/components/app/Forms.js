@@ -79,11 +79,12 @@ export function AccountForm({ account, onClose, onSave, onDelete }) {
   const [name, setName] = useState(account?.name || ""), [institution, setInstitution] = useState(account?.institution || "");
   const [kind, setKind] = useState(account?.kind || "courant"), [balance, setBalance] = useState(account ? str(account.balance) : ""), [busy, setBusy] = useState(false);
   const [rate, setRate] = useState(account?.rate != null ? str(account.rate) : "");
+  const [counted, setCounted] = useState(!account?.hidden);
   const value = num(balance), ok = name.trim() && balance !== "" && Number.isFinite(value);
   return <Modal onClose={onClose}>
     <form className="modalForm" onSubmit={async (e) => {
       e.preventDefault(); if (!ok) return; setBusy(true);
-      const done = await onSave({ ...(editing ? { id: account.id } : {}), name: name.trim(), institution: institution.trim() || null, kind, ...(synced ? {} : { balance: Math.round(value * 100) / 100 }), currency: "EUR", ...(kind !== "courant" ? { rate: rate === "" ? null : Math.round(num(rate) * 100) / 100 } : { rate: null }) });
+      const done = await onSave({ ...(editing ? { id: account.id } : {}), name: name.trim(), institution: institution.trim() || null, kind, ...(synced ? {} : { balance: Math.round(value * 100) / 100 }), currency: "EUR", ...(kind !== "courant" ? { rate: rate === "" ? null : Math.round(num(rate) * 100) / 100 } : { rate: null }), ...(editing ? { hidden: !counted } : {}) });
       setBusy(false); if (done !== false) onClose();
     }}>
       <Head title={editing ? "Modifier le compte" : "Ajouter un compte"} sub={editing ? null : "Saisi à la main. Vous pourrez aussi connecter votre banque."} onClose={onClose} />
@@ -96,6 +97,7 @@ export function AccountForm({ account, onClose, onSave, onDelete }) {
       {synced && <p className="formHint"><Icon name="info" size={14} />Compte synchronisé : le solde vient directement de votre banque.</p>}
       {kind !== "courant" && <label className="label">Taux annuel (%){kind === "epargne" ? " · indiqué par votre banque" : " · facultatif"}<input className="input" inputMode="decimal" placeholder={kind === "epargne" ? "Ex. taux actuel de votre livret" : "Ex. 4"} value={rate} onChange={(e) => setRate(e.target.value.replace(/[^\d.,]/g, ""))} /></label>}
       {kind === "epargne" && <p className="formHint" style={{ marginTop: -8 }}><Icon name="info" size={14} />Sert à calculer automatiquement le rendement de vos projections.</p>}
+      {editing && <label className="item switchRow" style={{ borderTop: 0, padding: 0 }}><span className="kindIco"><Icon name={counted ? "eye" : "eyeOff"} size={17} /></span><div className="itemMain"><b>Compter dans mon patrimoine</b><small>Désactivez pour un compte en double, le compte d’un proche ou un compte que vous ne voulez pas suivre.</small></div><input type="checkbox" className="switch" checked={counted} onChange={(e) => setCounted(e.target.checked)} /></label>}
       <button className="btn primary lg block" disabled={busy || !ok}>{busy ? "Enregistrement…" : editing ? "Enregistrer" : "Ajouter le compte"}</button>
       {editing && <DeleteButton onConfirm={async () => { if (await onDelete(account) !== false) onClose(); }} label="Supprimer le compte" />}
     </form>

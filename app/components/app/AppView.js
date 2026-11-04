@@ -8,6 +8,7 @@ import Overview from "./Overview.js";
 import { Accounts, Investments, Budget, Operations, Settings } from "./Screens.js";
 import { InsightList } from "./Overview.js";
 import { HoldingSheet, TradeForm, PortfolioCurve } from "./Holding.js";
+import { Debts, DebtForm, DebtSheet, PaymentForm } from "./Debts.js";
 import { RecurrenceForm } from "./Forms.js";
 import { Modal, Head, TxForm, AccountForm, AccountSheet, BudgetForm, HoldingForm, DeleteMeModal, ImportModal } from "./Forms.js";
 
@@ -17,8 +18,31 @@ export const NAV = [
   { id: "invest", label: "Investissements", short: "Placements", icon: "trending" },
   { id: "budget", label: "Budget", short: "Budget", icon: "target" },
   { id: "ops", label: "Opérations", short: "Opérations", icon: "list" },
+  { id: "debts", label: "Dettes", short: "Dettes", icon: "coins" },
   { id: "settings", label: "Réglages", short: "Réglages", icon: "settings" },
 ];
+
+/* ---------------- Comptes affichés ---------------- */
+function ScopePicker({ accounts, scope, setScope }) {
+  const [openP, setOpen] = useState(false);
+  const label = !scope.length ? "Tous les comptes" : scope.length === 1 ? accounts.find((a) => a.id === scope[0])?.name : `${scope.length} comptes`;
+  const toggle = (id) => setScope(scope.includes(id) ? scope.filter((x) => x !== id) : [...scope, id]);
+  return <div className="scopeBar">
+    <button className={"scopeBtn" + (scope.length ? " on" : "")} onClick={() => setOpen(!openP)}><Icon name="wallet" size={15} />Affichés : <b>{label}</b><Icon name="chevronDown" size={14} /></button>
+    {scope.length > 0 && <button className="link" onClick={() => setScope([])}>Tout afficher</button>}
+    {openP && <>
+      <div className="scopeBackdrop" onClick={() => setOpen(false)} />
+      <div className="scopeMenu">
+        <button className={"scopeItem" + (!scope.length ? " on" : "")} onClick={() => { setScope([]); setOpen(false); }}><span className="scopeCheck">{!scope.length && <Icon name="check" size={13} stroke={2.6} />}</span><b>Tous les comptes</b></button>
+        {accounts.map((a) => <button key={a.id} className={"scopeItem" + (scope.includes(a.id) ? " on" : "")} onClick={() => toggle(a.id)}>
+          <span className="scopeCheck">{scope.includes(a.id) && <Icon name="check" size={13} stroke={2.6} />}</span>
+          <span className="itemMain"><b>{a.name}</b><small>{a.institution || "Saisi à la main"}</small></span>
+        </button>)}
+        <small className="muted" style={{ padding: "6px 10px 2px", display: "block" }}>Le patrimoine, les courbes, le budget et les opérations ne tiennent compte que des comptes cochés.</small>
+      </div>
+    </>}
+  </div>;
+}
 
 /* ---------------- Formules ---------------- */
 function PlansModal({ current, initial, trialUsed, onClose, onChoose }) {
@@ -79,17 +103,36 @@ export default function AppView({ data, demo, embedded, initialTab = "overview",
     return () => { stop = true; clearTimeout(timer); document.removeEventListener("visibilitychange", vis); };
   }, [symKey, embedded, limits0.investments]); // eslint-disable-line
   const toEur = (price, cur) => cur === "EUR" ? price : cur === "USD" && market.eurPerUsd ? price * market.eurPerUsd : null;
+  // Comptes affichés : les comptes masqués sont exclus partout ; on peut aussi n'afficher que certains comptes.
+  const [scope, setScopeState] = useState([]);
+  useEffect(() => { if (embedded) return; try { setScopeState(JSON.parse(localStorage.getItem("patrimo.scope") || "[]")); } catch {} }, [embedded]);
+  const setScope = (ids) => { setScopeState(ids); try { localStorage.setItem("patrimo.scope", JSON.stringify(ids)); } catch {} };
+  const shown = useMemo(() => {
+    const hidden = new Set(data.accounts.filter((a) => a.hidden).map((a) => a.id));
+    const valid = scope.filter((id) => data.accounts.some((a) => a.id === id && !a.hidden));
+    if (!hidden.size && !valid.length) return data;
+    const keep = new Set(data.accounts.filter((a) => !a.hidden && (!valid.length || valid.includes(a.id))).map((a) => a.id));
+    const scoped = valid.length > 0, inScope = (id) => (scoped ? keep.has(id) : !hidden.has(id));
+    return {
+      ...data, scoped, scopeIds: valid,
+      accounts: data.accounts.filter((a) => keep.has(a.id)),
+      transactions: data.transactions.filter((t) => (t.account_id ? inScope(t.account_id) : !scoped)),
+      holdings: data.holdings.filter((h) => (h.account_id ? inScope(h.account_id) : !scoped)),
+      recurrences: (data.recurrences || []).filter((r) => (r.account_id ? inScope(r.account_id) : !scoped)),
+      debts: scoped ? [] : data.debts, snapshots: scoped ? [] : data.snapshots,
+    };
+  }, [data, scope]);
   const liveData = useMemo(() => {
-    if (!Object.keys(market.quotes).length) return data;
-    const holdings = data.holdings.map((h) => {
+    if (!Object.keys(market.quotes).length) return shown;
+    const holdings = shown.holdings.map((h) => {
       const q = market.quotes[String(h.ticker || "").toUpperCase()], qty = Number(h.quantity) || 0;
       const eur = q && qty > 0 ? toEur(q.price, q.currency) : null;
       if (!(eur > 0)) return h;
       const value = Math.round(qty * eur * 100) / 100;
       return { ...h, value, live: { price: q.price, currency: q.currency, priceEur: eur, changePct: q.changePct, source: q.source, dayGain: q.changePct != null ? value - value / (1 + q.changePct / 100) : null } };
     });
-    return { ...data, holdings };
-  }, [data, market]); // eslint-disable-line
+    return { ...shown, holdings };
+  }, [shown, market]); // eslint-disable-line
   // Valeur au dernier cours enregistrée au plus toutes les 15 minutes
   const lastSync = useRef(0);
   useEffect(() => {
@@ -156,14 +199,16 @@ export default function AppView({ data, demo, embedded, initialTab = "overview",
   const trialing = p.plan_status === "trialing", trialLeft = p.trial_days_left ?? TRIAL_DAYS;
 
   const screen = {
-    overview: <Overview m={m} data={liveData} dayCurve={dayCurve} liveInfo={liveInfo} showChart={charts} fetchHistory={limits.investments ? actions.fetchHistory : null} eurPerUsd={market.eurPerUsd} limits={limits} go={go} openPlans={openPlans} list={list} open={open} goOps={goOps} />,
-    accounts: <Accounts m={m} data={data} limits={limits} openPlans={openPlans} open={open} connectBank={() => run(actions.connectBank)} syncBank={() => run(actions.syncBank, true)} />,
+    overview: <Overview m={m} data={liveData} dayCurve={liveData.scoped ? null : dayCurve} liveInfo={liveInfo} showChart={charts} fetchHistory={limits.investments ? actions.fetchHistory : null} eurPerUsd={market.eurPerUsd} limits={limits} go={go} openPlans={openPlans} list={list} open={open} goOps={goOps} />,
+    accounts: <Accounts m={m} data={data} go={go} limits={limits} openPlans={openPlans} open={open} connectBank={() => run(actions.connectBank)} syncBank={() => run(actions.syncBank, true)} />,
     invest: <Investments m={m} data={liveData} liveInfo={liveInfo} fetchHistory={limits.investments ? actions.fetchHistory : null} curve={charts && limits.investments ? <PortfolioCurve holdings={liveData.holdings} intraday={market.intraday} eurPerUsd={market.eurPerUsd} fetchHistory={actions.fetchHistory} /> : null} limits={limits} openPlans={openPlans} open={open} />,
     budget: <Budget m={m} data={data} limits={limits} openPlans={openPlans} open={open} />,
     ops: <Operations key={opsCat} data={data} query={query} setQuery={setQuery} limits={limits} openPlans={openPlans} open={open} flash={flash} initialCategory={opsCat} />,
+    debts: <Debts data={data} open={open} />,
     settings: <Settings data={data} demo={demo} openPlans={openPlans} managePlan={() => run(actions.managePlan)} logout={() => run(actions.logout)} resetPassword={() => run(actions.resetPassword)} saveName={(n) => run(actions.saveName, n)} importData={() => open("import")} privacy={privacy} setPrivacy={setPrivacy} deleteMe={() => open("deleteMe")} />,
   }[tab];
   const viewed = modal?.type === "accountView" ? data.accounts.find((a) => a.id === modal.id) : null;
+  const viewedDebt = modal?.type === "debtView" || modal?.type === "debtPay" ? (data.debts || []).find((d) => d.id === modal.id) : null;
   const holdingOf = (id) => liveData.holdings.find((h) => h.id === id);
   const viewedH = modal?.type === "holdingView" || modal?.type === "trade" ? holdingOf(modal.id) : null;
   const tradesOf = (id) => (data.trades || []).filter((t) => t.holding_id === id);
@@ -218,6 +263,7 @@ export default function AppView({ data, demo, embedded, initialTab = "overview",
 
           <div className="content" key={tab}>
             {demo && !embedded && <div className="demoBanner"><Icon name="info" size={16} /><span><b>Démonstration</b> · tous les montants affichés sont fictifs.</span><a className="btn sm light" href="/connexion?mode=inscription">Créer mon compte</a></div>}
+            {["overview", "invest", "budget", "ops"].includes(tab) && data.accounts.filter((a) => !a.hidden).length > 1 && <ScopePicker accounts={data.accounts.filter((a) => !a.hidden)} scope={liveData.scopeIds || []} setScope={setScope} />}
             {screen}
           </div>
         </div>
@@ -237,6 +283,9 @@ export default function AppView({ data, demo, embedded, initialTab = "overview",
       {modal?.type === "holdingView" && viewedH && <HoldingSheet holding={viewedH} trades={tradesOf(viewedH.id)} tradesMissing={data.tradesMissing} fetchHistory={actions.fetchHistory} onClose={close} onEdit={() => open("holding", { holding: data.holdings.find((h) => h.id === viewedH.id) })} onTrade={(type) => open("trade", { id: viewedH.id, tradeType: type })} onOpenTrade={(t) => open("trade", { id: viewedH.id, trade: t })} />}
       {modal?.type === "trade" && viewedH && <TradeForm holding={viewedH} trade={modal.trade} initialType={modal.tradeType} eurPerUsd={market.eurPerUsd} onClose={() => open("holdingView", { id: viewedH.id })} onSave={(t) => run(actions.saveTrade, t)} onDelete={(t) => run(actions.deleteTrade, t)} />}
       {modal?.type === "recurrence" && <RecurrenceForm rec={modal.rec} accounts={data.accounts} missing={data.recurrencesMissing} onClose={close} onSave={(r) => run(actions.saveRecurrence, r)} onDelete={(r) => run(actions.deleteRecurrence, r)} />}
+      {modal?.type === "debt" && <DebtForm debt={modal.debt} onClose={close} onSave={(d) => run(actions.saveDebt, d)} onDelete={(d) => run(actions.deleteDebt, d)} />}
+      {modal?.type === "debtView" && viewedDebt && <DebtSheet debt={viewedDebt} payments={(data.debtPayments || []).filter((p) => p.debt_id === viewedDebt.id)} onClose={close} onEdit={() => open("debt", { debt: viewedDebt })} onPay={() => open("debtPay", { id: viewedDebt.id })} onDeletePayment={(p) => run(actions.deleteDebtPayment, p)} />}
+      {modal?.type === "debtPay" && viewedDebt && <PaymentForm debt={viewedDebt} accounts={data.accounts} onClose={() => open("debtView", { id: viewedDebt.id })} onSave={(x) => run(actions.addDebtPayment, x)} />}
       {modal?.type === "deleteMe" && <DeleteMeModal onClose={close} onConfirm={() => run(actions.deleteAccountForever)} />}
       {toast && <div className={"toast " + toast.tone}><Icon name={toast.tone === "bad" ? "info" : "check"} size={16} />{toast.text}</div>}
     </div>

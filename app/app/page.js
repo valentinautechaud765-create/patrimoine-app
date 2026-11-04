@@ -29,12 +29,12 @@ function App() {
   const demo = !supabaseConfigured;
 
   const load = useCallback(async () => {
-    if (demo) { setData({ ...demoData(), trades: [], recurrences: [], session: null }); return; }
+    if (demo) { setData({ ...demoData(), trades: [], recurrences: [], debts: [], debtPayments: [], session: null }); return; }
     const sb = supabaseBrowser();
     const { data: s } = await sb.auth.getSession();
     if (!s.session) { router.replace("/connexion"); return; }
     // Chaque requête ne renvoie que les lignes de l'utilisateur connecté (règles RLS côté base).
-    const [profile, accounts, holdings, transactions, budgets, snapshots, trades, recurrences] = await Promise.all([
+    const [profile, accounts, holdings, transactions, budgets, snapshots, trades, recurrences, debts, debtPayments] = await Promise.all([
       sb.from("profiles").select("*").eq("id", s.session.user.id).maybeSingle(),
       sb.from("accounts").select("*").order("created_at"),
       sb.from("holdings").select("*").order("value", { ascending: false }),
@@ -43,6 +43,8 @@ function App() {
       sb.from("net_worth_snapshots").select("date,total").order("date"),
       sb.from("trades").select("*").order("date"),
       sb.from("recurrences").select("*").order("next_date"),
+      sb.from("debts").select("*").order("created_at"),
+      sb.from("debt_payments").select("*").order("date", { ascending: false }),
     ]);
     const pr = profile.data || { plan: "free" };
     // Propriétaire : accès complet. Le serveur l'enregistre dans la base ; l'affichage est débloqué
@@ -67,6 +69,9 @@ function App() {
       tradesMissing: Boolean(trades.error),
       recurrences: num(recurrences.data, ["amount"]),
       recurrencesMissing: Boolean(recurrences.error),
+      debts: num(debts.data, ["initial_amount", "remaining"]),
+      debtPayments: num(debtPayments.data, ["amount"]),
+      debtsMissing: Boolean(debts.error),
       session: s.session,
     });
   }, [demo, router]);
@@ -230,10 +235,10 @@ function App() {
       try { saved = await write("accounts", { ...a, updated_at: new Date().toISOString() }); }
       catch (e) {
         // Base pas encore mise à jour (colonne « rate ») : on enregistre le reste et on prévient.
-        if (!/rate/i.test(e.message) || !("rate" in a)) throw e;
-        const { rate, ...rest } = a; saved = await write("accounts", { ...rest, updated_at: new Date().toISOString() });
+        if (!/rate|hidden/i.test(e.message)) throw e;
+        const { rate, hidden, ...rest } = a; saved = await write("accounts", { ...rest, updated_at: new Date().toISOString() });
         replace("accounts", { ...rest, ...saved });
-        return { message: "Compte enregistré. Pour le taux, relance schema.sql dans Supabase." };
+        return { message: "Compte enregistré. Pour le taux et le masquage, relance schema.sql dans Supabase." };
       }
       replace("accounts", { ...a, ...saved });
       return { message: a.id ? "Compte modifié" : "Compte ajouté" };
@@ -366,6 +371,16 @@ function App() {
         recCount = createdR.length;
         if (createdR.length) setData((x) => ({ ...x, recurrences: [...(x.recurrences || []), ...createdR] }));
       }
+      // 3 ter. Remboursements de Mon Patrimoine → dettes « Je dois »
+      let debtCount = 0;
+      if (!d.debtsMissing && Array.isArray(file.remboursements) && file.remboursements.length) {
+        const have = new Set((d.debts || []).map((x) => (String(x.person || "") + "|" + x.label + "|" + Number(x.initial_amount).toFixed(2)).toLowerCase()));
+        const debtRows = file.remboursements.filter((r) => Number(r.montantInitial) > 0).map((r) => ({ kind: "je_dois", person: String(r.personne || "").slice(0, 80) || null, label: String(r.motif || "Avance").slice(0, 120), initial_amount: Math.round(Number(r.montantInitial) * 100) / 100, remaining: Math.max(0, Math.round(Number(r.restant) * 100) / 100), start_date: /^\d{4}-\d{2}-\d{2}$/.test(r.date) ? r.date : today }))
+          .filter((r) => !have.has((String(r.person || "") + "|" + r.label + "|" + r.initial_amount.toFixed(2)).toLowerCase()));
+        const createdD = await insertMany("debts", debtRows);
+        debtCount = createdD.length;
+        if (createdD.length) setData((x) => ({ ...x, debts: [...(x.debts || []), ...createdD] }));
+      }
       // 4. Budgets
       const budgets = Object.entries(file.budgets || {}).filter(([, v]) => Number(v) > 0).map(([category, v]) => ({ category: String(category).slice(0, 40), monthly_limit: Math.round(Number(v) * 100) / 100 }));
       if (!demo && budgets.length) { const { error } = await sb.from("budgets").upsert(budgets.map((b) => ({ ...b, user_id: user }))); if (error) throw new Error("Import impossible (budgets) : " + error.message); }
@@ -378,7 +393,7 @@ function App() {
         const snaps = Object.fromEntries(x.snapshots.map((sn) => [sn.date, sn])); hist.forEach((h) => { snaps[h.date] = h; });
         return { ...x, accounts, holdings, transactions: byDate([...x.transactions, ...createdTx]), budgets: [...x.budgets.filter((b) => !budgets.some((n) => n.category === b.category)), ...budgets], snapshots: Object.values(snaps).sort((a, b) => a.date.localeCompare(b.date)) };
       });
-      return { message: "Import terminé", ok: true, summary: { comptes: createdAcc.length + updated.length, operations: createdTx.length, ignorees: (file.operations || []).length - createdTx.length, placements: createdH.length + updH.length, transactionsBourse: tradeCount, automatiques: recCount, budgets: budgets.length, jours: hist.length } };
+      return { message: "Import terminé", ok: true, summary: { comptes: createdAcc.length + updated.length, operations: createdTx.length, ignorees: (file.operations || []).length - createdTx.length, placements: createdH.length + updH.length, transactionsBourse: tradeCount, automatiques: recCount, dettes: debtCount, budgets: budgets.length, jours: hist.length } };
     },
     // Cours de bourse en direct (serveur Patrimo → Tradegate / Yahoo / Twelve Data)
     async fetchQuotes(symbols, withDay) {
@@ -445,6 +460,41 @@ function App() {
       setData((d) => d && ({ ...d, bankErrors: r.errors || [], lastSync: r.at }));
       if (r.errors?.length) return { ok: true, message: `${r.errors[0].bank} demande une nouvelle connexion (sécurité de votre banque).` };
       return { message: r.transactions ? `${r.transactions} nouvelle${r.transactions > 1 ? "s" : ""} opération${r.transactions > 1 ? "s" : ""} importée${r.transactions > 1 ? "s" : ""}` : "Comptes à jour" };
+    },
+    // ---------- Dettes ----------
+    async saveDebt(d) {
+      if (live.current.debtsMissing) throw new Error("Mise à jour de la base nécessaire : relance supabase/schema.sql dans Supabase (SQL Editor → Run).");
+      const saved = await write("debts", d);
+      replace("debts", { ...d, ...saved });
+      return { message: d.id ? "Dette modifiée" : "Dette ajoutée" };
+    },
+    async deleteDebt(d) {
+      await erase("debts", { id: d.id });
+      setData((x) => ({ ...x, debts: x.debts.filter((y) => y.id !== d.id), debtPayments: x.debtPayments.filter((p) => p.debt_id !== d.id) }));
+      return { message: "Dette supprimée (les opérations déjà enregistrées sont conservées)" };
+    },
+    // Remboursement : diminue le reste dû et, si un compte est choisi, crée l'opération correspondante
+    async addDebtPayment({ debt, amount, date, account_id }) {
+      let txId = null;
+      if (account_id) {
+        const t = { date, label: (debt.kind === "on_me_doit" ? "Remboursement reçu · " : "Remboursement · ") + (debt.person || debt.label), amount: debt.kind === "on_me_doit" ? amount : -amount, category: debt.kind === "on_me_doit" ? "Remboursement" : "Dette", account_id };
+        const saved = await write("transactions", t);
+        replace("transactions", { ...t, ...saved }, byDate);
+        await shiftBalance(account_id, Number(t.amount));
+        txId = saved.id;
+      }
+      const p = await write("debt_payments", { debt_id: debt.id, amount, date, transaction_id: txId });
+      const remaining = Math.max(0, Math.round((Number(debt.remaining) - amount) * 100) / 100);
+      const d = await write("debts", { id: debt.id, remaining });
+      setData((x) => ({ ...x, debtPayments: [{ debt_id: debt.id, amount, date, transaction_id: txId, ...p }, ...x.debtPayments], debts: x.debts.map((y) => y.id === debt.id ? { ...y, ...d, remaining } : y) }));
+      return { message: remaining === 0 ? "Dette entièrement remboursée 🎉" : "Remboursement enregistré" };
+    },
+    async deleteDebtPayment(pay) {
+      await erase("debt_payments", { id: pay.id });
+      const debt = live.current.debts.find((d) => d.id === pay.debt_id);
+      if (debt) { const remaining = Math.min(Number(debt.initial_amount), Math.round((Number(debt.remaining) + Number(pay.amount)) * 100) / 100); await write("debts", { id: debt.id, remaining }); setData((x) => ({ ...x, debts: x.debts.map((y) => y.id === debt.id ? { ...y, remaining } : y) })); }
+      setData((x) => ({ ...x, debtPayments: x.debtPayments.filter((p) => p.id !== pay.id) }));
+      return { message: "Remboursement annulé (l’opération sur le compte, s’il y en a une, reste à supprimer dans Opérations)" };
     },
     async deleteAccountForever() {
       if (demo) return { message: "Démonstration : rien n’est supprimé." };

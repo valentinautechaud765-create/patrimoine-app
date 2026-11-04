@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import Icon from "../Icon.js";
 import { AreaChart, Donut, FlowBars } from "../Charts.js";
 import { money, money0, signed, pct, todayISO, dayLabel, monthLabel } from "../../../lib/format.js";
-import { monthlySeries, recurring, advanceDate, buildWealthCurve } from "../../../lib/model.js";
+import { monthlySeries, recurring, advanceDate, buildWealthCurve, balanceHistory } from "../../../lib/model.js";
 import { useHistory } from "./Holding.js";
 import { WealthProjection } from "./Projection.js";
 import { cat } from "../../../lib/categories.js";
@@ -38,7 +38,9 @@ function NetWorth({ m, data, limits, openPlans, dayCurve, liveInfo, showChart = 
     }
     return buildWealthCurve({ series: hist.data.series, holdings: data.holdings, trades: data.trades || [], transactions: data.transactions, eurPerUsd: eurPerUsd || hist.data.eurPerUsd, totalNow: m.total, sinceISO: since });
   }, [hist.data, data.holdings, data.trades, data.transactions, data.snapshots, m.total, eurPerUsd, apiPeriod]); // eslint-disable-line
-  const points = useMemo(() => current[0] === "1J" ? dayCurve : detailed && detailed.length > 2 ? detailed : historyPoints(data.snapshots, m.total, days), [data.snapshots, m.total, days, current, dayCurve, detailed]);
+  const points = useMemo(() => current[0] === "1J" ? dayCurve
+    : data.scoped && !data.holdings.some((h) => h.ticker) ? balanceHistory(data.accounts, data.transactions, days)
+    : detailed && detailed.length > 2 ? detailed : historyPoints(data.snapshots, m.total, days), [data.snapshots, data.scoped, data.accounts, data.transactions, data.holdings, m.total, days, current, dayCurve, detailed]);
   const intraday = current[0] === "1J" || ((current[0] === "1S" || current[0] === "1M") && detailed);
   const when = (iso) => current[0] === "1J" ? new Date(iso).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : intraday ? new Date(iso).toLocaleString("fr-FR", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : dayLabel(String(iso).slice(0, 10));
   const parts = [
@@ -54,7 +56,7 @@ function NetWorth({ m, data, limits, openPlans, dayCurve, liveInfo, showChart = 
           const delta = pt.value - first.value, rel = first.value ? (delta / Math.abs(first.value)) * 100 : 0;
           return <div className="nwTop">
             <div>
-              <div className="eyebrow">Patrimoine net</div>
+              <div className="eyebrow">{data.scoped ? (data.accounts.length === 1 ? data.accounts[0].name : `${data.accounts.length} comptes`) : "Patrimoine net"}</div>
               <div className="nwAmount"><Amount value={pt.value} /></div>
               <div className="nwDelta">
                 {points.length > 1 ? <>
@@ -76,7 +78,7 @@ function NetWorth({ m, data, limits, openPlans, dayCurve, liveInfo, showChart = 
       </div>
       {parts.length > 0 && <div className="mix">
         <div className="mixBar">{parts.map((p) => <i key={p.label} style={{ width: (p.value / sumParts) * 100 + "%", background: p.color }} />)}</div>
-        <div className="mixLegend">{parts.map((p) => <span key={p.label}><i className="dot" style={{ background: p.color }} />{p.label}<b>{money0(p.value)}</b></span>)}</div>
+        <div className="mixLegend">{parts.map((p) => <span key={p.label}><i className="dot" style={{ background: p.color }} />{p.label}<b>{money0(p.value)}</b></span>)}{m.owed > 0 && <span><i className="dot" style={{ background: "var(--bad)" }} />Dettes<b>−{money0(m.owed)}</b></span>}{m.due > 0 && <span><i className="dot" style={{ background: "var(--ok)" }} />On me doit<b>{money0(m.due)}</b></span>}</div>
       </div>}
     </section>
   );
@@ -251,7 +253,7 @@ export default function Overview({ m, data, limits, go, openPlans, list, open, g
   }, [data.transactions]);
   return <>
     <NetWorth m={m} data={data} limits={limits} openPlans={openPlans} dayCurve={dayCurve} liveInfo={liveInfo} showChart={showChart} fetchHistory={fetchHistory} eurPerUsd={eurPerUsd} />
-    <GettingStarted data={data} open={open} go={go} />
+    {!data.scoped && <GettingStarted data={data} open={open} go={go} />}
     <Kpis m={m} />
     <div className="grid g3">
       <Panel title="Comptes" action={accounts.length ? "Tout voir" : null} onAction={() => go("accounts")} className="span2 fadeIn">

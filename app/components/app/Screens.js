@@ -11,7 +11,7 @@ import { BudgetRow, TxRow, Upcoming } from "./Overview.js";
 import { InvestProjection } from "./Projection.js";
 
 /* ---------------- Comptes ---------------- */
-export function Accounts({ m, data, connectBank, syncBank, limits, openPlans, open }) {
+export function Accounts({ m, data, connectBank, syncBank, limits, openPlans, open, go }) {
   const [syncing, setSyncing] = useState(false);
   const synced = data.accounts.filter((a) => a.powens_account_id);
   const groups = useMemo(() => {
@@ -46,6 +46,11 @@ export function Accounts({ m, data, connectBank, syncBank, limits, openPlans, op
       <span className="muted">{synced.length} compte{synced.length > 1 ? "s" : ""} bancaire{synced.length > 1 ? "s" : ""} · mis à jour {ago(data.lastSync || synced.map((a) => a.updated_at).sort().pop())}</span>
       <button className="btn sm" disabled={syncing} onClick={async () => { setSyncing(true); await syncBank(); setSyncing(false); }}><Icon name="refresh" size={14} className={syncing ? "spin" : ""} />{syncing ? "Synchronisation…" : "Synchroniser"}</button>
     </section>}
+    <button className="card actionCard fadeIn" onClick={() => go("debts")}>
+      <span className="actionIco" style={{ color: "var(--warn)" }}><Icon name="coins" size={20} /></span>
+      <div><b>Dettes</b><small>{(data.debts || []).some((d) => Number(d.remaining) > 0) ? <span className="money">{money((data.debts || []).filter((d) => d.kind !== "on_me_doit").reduce((n, d) => n + Number(d.remaining), 0))} à rembourser · {money((data.debts || []).filter((d) => d.kind === "on_me_doit").reduce((n, d) => n + Number(d.remaining), 0))} qu’on vous doit</span> : "Ce que vous devez, ce qu’on vous doit, vos crédits."}</small></div>
+      <Icon name="chevronRight" size={18} className="faint" />
+    </button>
     {(data.bankErrors || []).map((e) => <div className="msg info" key={e.bank}><b>{e.bank}</b> demande de confirmer votre identité (sécurité de la banque, environ tous les 180 jours). <button className="link" onClick={connectBank}>Reconnecter</button></div>)}
     {groups.length ? groups.map((g, i) => <section key={g.name} className="card panel fadeIn" style={{ animationDelay: 80 + i * 40 + "ms" }}>
       <div className="instHead">
@@ -53,9 +58,9 @@ export function Accounts({ m, data, connectBank, syncBank, limits, openPlans, op
         <div className="itemMain"><b style={{ fontSize: 16 }}>{g.name}</b><small>{g.list.length} compte{g.list.length > 1 ? "s" : ""}</small></div>
         <b className="num money" style={{ fontSize: 17, fontWeight: 500 }}>{money(g.total)}</b>
       </div>
-      <div className="list">{g.list.map((a) => <button className="item hover tap" key={a.id} onClick={() => open("accountView", { id: a.id })}>
+      <div className="list">{g.list.map((a) => <button className={"item hover tap" + (a.hidden ? " paused" : "")} key={a.id} onClick={() => open("accountView", { id: a.id })}>
         <span className="kindIco"><Icon name={a.kind === "epargne" ? "piggy" : a.kind === "investissement" ? "trending" : "card"} size={17} /></span>
-        <div className="itemMain"><b>{a.name}</b><small>{KIND_LABEL[a.kind]}{a.powens_account_id ? " · synchronisé" : " · manuel"}</small></div>
+        <div className="itemMain"><b>{a.name}{a.hidden && <span className="chip" style={{ height: 20, marginLeft: 8, fontSize: 11 }}>Masqué</span>}</b><small>{KIND_LABEL[a.kind]}{a.powens_account_id ? " · synchronisé" : " · manuel"}{a.hidden ? " · non compté dans le patrimoine" : ""}</small></div>
         <div className="itemSide"><b>{money(a.balance, a.currency)}</b><small className="faint">{a.updated_at ? "Mis à jour " + ago(a.updated_at) : ""}</small></div>
         <Icon name="chevronRight" size={16} className="faint" />
       </button>)}</div>

@@ -125,6 +125,38 @@ alter table public.transactions add column if not exists external_id text;
 create unique index if not exists transactions_user_external on public.transactions (user_id, external_id);
 alter table public.powens_links add column if not exists last_sync timestamptz;
 
+-- Compte masqué : exclu du patrimoine et des analyses (ex. compte en double, compte d'un proche)
+alter table public.accounts add column if not exists hidden boolean not null default false;
+
+-- Dettes : ce que je dois, ce qu'on me doit, crédits (dont ceux importés de la banque)
+create table if not exists public.debts (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users on delete cascade,
+  kind text not null default 'je_dois' check (kind in ('je_dois','on_me_doit','credit')),
+  person text,
+  label text not null,
+  initial_amount numeric(14,2) not null check (initial_amount >= 0),
+  remaining numeric(14,2) not null check (remaining >= 0),
+  monthly_payment numeric(14,2),
+  rate numeric(5,2),
+  start_date date not null default current_date,
+  end_date date,
+  powens_account_id text,
+  note text,
+  created_at timestamptz not null default now(),
+  unique (user_id, powens_account_id)
+);
+create table if not exists public.debt_payments (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users on delete cascade,
+  debt_id uuid not null references public.debts on delete cascade,
+  amount numeric(14,2) not null check (amount > 0),
+  date date not null default current_date,
+  transaction_id uuid references public.transactions on delete set null,
+  created_at timestamptz not null default now()
+);
+create index if not exists debt_payments_debt on public.debt_payments (debt_id, date);
+
 -- ---------- Sécurité (RLS) ----------
 alter table public.profiles enable row level security;
 alter table public.accounts enable row level security;
@@ -135,6 +167,8 @@ alter table public.net_worth_snapshots enable row level security;
 alter table public.powens_links enable row level security;
 alter table public.trades enable row level security;
 alter table public.recurrences enable row level security;
+alter table public.debts enable row level security;
+alter table public.debt_payments enable row level security;
 
 -- Le profil se lit mais ne se modifie pas depuis le navigateur (la formule est gérée par Stripe).
 drop policy if exists "profil: lecture" on public.profiles;
@@ -145,7 +179,7 @@ revoke update on public.profiles from authenticated;
 grant update (full_name) on public.profiles to authenticated;
 
 do $$ declare t text; begin
-  foreach t in array array['accounts','holdings','transactions','budgets','net_worth_snapshots','trades','recurrences'] loop
+  foreach t in array array['accounts','holdings','transactions','budgets','net_worth_snapshots','trades','recurrences','debts','debt_payments'] loop
     execute format('drop policy if exists "%1$s: propriétaire" on public.%1$s', t);
     execute format('create policy "%1$s: propriétaire" on public.%1$s for all using (auth.uid() = user_id) with check (auth.uid() = user_id)', t);
   end loop;
@@ -164,11 +198,14 @@ create trigger on_auth_user_created after insert on auth.users for each row exec
 create or replace function public.take_net_worth_snapshots() returns void language sql security definer set search_path = public as $$
   insert into public.net_worth_snapshots (user_id, date, total)
   select u.id, current_date,
-    coalesce((select sum(balance) from public.accounts a where a.user_id = u.id and a.kind <> 'investissement'), 0)
+    coalesce((select sum(balance) from public.accounts a where a.user_id = u.id and a.kind <> 'investissement' and not a.hidden), 0)
     + coalesce((select sum(value) from public.holdings h where h.user_id = u.id), 0)
     -- comptes-titres synchronisés sans positions détaillées (même calcul que l'appli)
-    + coalesce((select sum(balance) from public.accounts a where a.user_id = u.id and a.kind = 'investissement'
+    + coalesce((select sum(balance) from public.accounts a where a.user_id = u.id and a.kind = 'investissement' and not a.hidden
         and not exists (select 1 from public.holdings h where h.account_id = a.id)), 0)
+    -- dettes : ce que je dois (et crédits) est retiré, ce qu'on me doit est ajouté
+    - coalesce((select sum(remaining) from public.debts d where d.user_id = u.id and d.kind in ('je_dois','credit')), 0)
+    + coalesce((select sum(remaining) from public.debts d where d.user_id = u.id and d.kind = 'on_me_doit'), 0)
   from auth.users u
   on conflict (user_id, date) do update set total = excluded.total;
 $$;
