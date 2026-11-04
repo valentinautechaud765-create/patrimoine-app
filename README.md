@@ -52,3 +52,15 @@ npm install
 cp .env.example .env.local   # facultatif : sans ça, mode démo
 npm run dev
 ```
+
+## Nouveautés (novembre 2026)
+
+- **Banque** : connexion Powens, import des comptes et de 6 mois d'opérations, synchro automatique, aucun doublon
+  (banque reconnectée, virements entre ses propres comptes classés « Virement interne »).
+- **Comptes affichés** : masquer un compte ou n'afficher que certains comptes.
+- **Dettes** : je dois / on me doit / crédits, remboursements, reste dû déduit du patrimoine net.
+- **Placements** : cours en direct (10 s), fiche par ligne avec courbe, achats / ventes / dividendes.
+- **Projections** : rendement automatique pondéré, simulation d'investissement.
+- **Mise à jour de la base** : après chaque évolution, coller `supabase/schema.sql` dans Supabase → SQL Editor → Run
+  (relançable sans risque, aucune donnée effacée).
+- **Tests** : `npm test` (calculs financiers et synchronisation bancaire).
