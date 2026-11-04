@@ -52,7 +52,7 @@ export default function AppView({ data, demo, embedded, initialTab = "overview",
   const setPrivacy = (v) => { setPrivacyState(v); try { localStorage.setItem("patrimo.privacy", v ? "1" : "0"); } catch {} };
   const toastTimer = useRef(0), searchRef = useRef(null), scroller = useRef(null);
   const p0 = data.profile || { plan: "free" }, limits0 = limitsFor(p0.plan || "free");
-  // ---------- Cours en direct : rafraîchis toutes les 30 s, courbe du jour toutes les 5 min ----------
+  // ---------- Cours en direct : rafraîchis toutes les 10 s, courbe du jour toutes les 5 min ----------
   const [market, setMarket] = useState({ quotes: {}, eurPerUsd: null, intraday: {}, at: null });
   const symbols = useMemo(() => [...new Set(data.holdings.filter((h) => h.ticker && Number(h.quantity) > 0).map((h) => String(h.ticker).toUpperCase()))].sort(), [data.holdings]);
   const symKey = symbols.join(",");
@@ -67,7 +67,8 @@ export default function AppView({ data, demo, embedded, initialTab = "overview",
         if (withDay) lastDay = Date.now();
         setMarket((m0) => ({ quotes: { ...m0.quotes, ...r.quotes }, eurPerUsd: r.eurPerUsd || m0.eurPerUsd, intraday: withDay ? r.intraday : m0.intraday, at: r.at }));
       } catch {}
-      if (!stop) timer = setTimeout(tick, document.hidden ? 120e3 : 30e3);
+      // Toutes les 10 s, calé sur l'horloge (:00, :10, :20…) comme Mon Patrimoine
+      if (!stop) timer = setTimeout(tick, document.hidden ? 120e3 : 10e3 - (Date.now() % 10e3));
     };
     tick();
     const vis = () => { if (!document.hidden) { clearTimeout(timer); tick(); } };
