@@ -228,8 +228,8 @@ test("connexions en double (« Connecter ma banque » cliqué 5 fois) : 2 compte
   const connections = [11, 12, 13, 14, 15].map((id) => ({ id, connector: { name: "BNP Paribas" } }));
   const accounts = connections.flatMap((c, i) => [
     // Comme la banque de test : identifiants Powens différents à chaque connexion, numéro complet absent
-    { id: 100 + i * 2, id_connection: c.id, name: "Compte de chèques ****2229", webid: "w" + (100 + i * 2), type: "checking", balance: -90 },
-    { id: 101 + i * 2, id_connection: c.id, name: "Compte de chèques ****8992", webid: "w" + (101 + i * 2), type: "checking", balance: -99.01 }]);
+    { id: 100 + i * 2, id_connection: c.id, name: "Compte de chèques ****2229", webid: "w" + (100 + i * 2), iban: "FR7630004000031234567" + (8000 + i), type: "checking", balance: -90 },
+    { id: 101 + i * 2, id_connection: c.id, name: "Compte de chèques ****8992", webid: "w" + (101 + i * 2), iban: "FR7630004000039876543" + (7000 + i), type: "checking", balance: -99.01 }]);
   const transactions = accounts.map((a, i) => ({ id: 1000 + i, id_account: a.id, date: "2026-11-04", value: a.balance, simplified_wording: "PRLV TEST" }));
   BANK = { connections, accounts, transactions };
   const db = fakeDb();

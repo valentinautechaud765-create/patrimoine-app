@@ -568,6 +568,13 @@ function App() {
       const mir = r.mirroredTransfers ? ` · ${r.mirroredTransfers} virement${r.mirroredTransfers > 1 ? "s" : ""} reporté${r.mirroredTransfers > 1 ? "s" : ""} sur vos comptes saisis à la main` : "";
       return { message: (r.transactions ? `${r.transactions} nouvelle${r.transactions > 1 ? "s" : ""} opération${r.transactions > 1 ? "s" : ""} importée${r.transactions > 1 ? "s" : ""}` : "Comptes à jour") + mir };
     },
+    async disconnectBank() {
+      if (demo) return { message: "Démonstration : rien n’est supprimé." };
+      const r = await api("/api/powens/deconnecter");
+      try { localStorage.removeItem("patrimo.bankPending"); } catch {}
+      await load();
+      return { message: `Banque déconnectée : ${r.comptes} compte${r.comptes > 1 ? "s" : ""} synchronisé${r.comptes > 1 ? "s" : ""} supprimé${r.comptes > 1 ? "s" : ""}. Vous pouvez la reconnecter.` };
+    },
     // ---------- Dettes ----------
     async saveDebt(d) {
       if (live.current.debtsMissing) throw new Error("Mise à jour de la base nécessaire : relance supabase/schema.sql dans Supabase (SQL Editor → Run).");

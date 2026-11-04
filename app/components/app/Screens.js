@@ -11,7 +11,7 @@ import { BudgetRow, TxRow, Upcoming } from "./Overview.js";
 import { InvestProjection } from "./Projection.js";
 
 /* ---------------- Comptes ---------------- */
-export function Accounts({ m, data, connectBank, syncBank, limits, openPlans, open, go }) {
+export function Accounts({ m, data, connectBank, syncBank, limits, openPlans, open, go, disconnectBank }) {
   const [syncing, setSyncing] = useState(false);
   const synced = data.accounts.filter((a) => a.powens_account_id);
   const groups = useMemo(() => {
@@ -45,6 +45,7 @@ export function Accounts({ m, data, connectBank, syncBank, limits, openPlans, op
       <span className="syncDot"><i />Synchronisé</span>
       <span className="muted">{synced.length} compte{synced.length > 1 ? "s" : ""} bancaire{synced.length > 1 ? "s" : ""} · mis à jour {ago(data.lastSync || synced.map((a) => a.updated_at).sort().pop())}</span>
       <button className="btn sm" disabled={syncing} onClick={async () => { setSyncing(true); await syncBank(); setSyncing(false); }}><Icon name="refresh" size={14} className={syncing ? "spin" : ""} />{syncing ? "Synchronisation…" : "Synchroniser"}</button>
+      <button className="btn sm ghost" disabled={syncing} onClick={async () => { if (!window.confirm("Déconnecter la banque ?\n\nTous les comptes synchronisés et leurs opérations bancaires seront supprimés de Patrimo, et la connexion supprimée chez Powens. Vos comptes et opérations saisis à la main ne sont pas touchés.\n\nVous pourrez reconnecter votre banque ensuite.")) return; setSyncing(true); await disconnectBank(); setSyncing(false); }}>Déconnecter</button>
     </section>}
     <button className="card actionCard fadeIn" onClick={() => go("debts")}>
       <span className="actionIco" style={{ color: "var(--warn)" }}><Icon name="coins" size={20} /></span>
