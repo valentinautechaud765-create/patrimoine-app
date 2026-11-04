@@ -36,6 +36,12 @@ function App() {
       sb.from("net_worth_snapshots").select("date,total").order("date"),
     ]);
     const pr = profile.data || { plan: "free" };
+    // Propriétaire : accès complet accordé par le serveur
+    try {
+      const r = await fetch("/api/compte", { method: "POST", headers: { Authorization: "Bearer " + s.session.access_token } });
+      const j = await r.json();
+      if (j.owner) { pr.plan = j.plan; pr.plan_status = j.plan_status; }
+    } catch {}
     if (pr.plan_status === "trialing" && pr.current_period_end) pr.trial_days_left = Math.max(0, Math.ceil((new Date(pr.current_period_end) - Date.now()) / 864e5));
     const num = (rows, keys) => (rows || []).map((r) => { const o = { ...r }; keys.forEach((k) => { o[k] = Number(o[k]) || 0; }); return o; });
     setData({
