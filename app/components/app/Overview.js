@@ -32,7 +32,7 @@ function NetWorth({ m, data, limits, openPlans, dayCurve, liveInfo, showChart = 
   ].filter((p) => p.value > 0);
   const sumParts = parts.reduce((n, p) => n + p.value, 0) || 1;
   return (
-    <section className="card netWorth fadeIn">
+    <section className="netWorth heroOpen fadeIn">
       <AreaChart points={points} height={showChart ? 200 : 0} fade>
         {(pt, first, hovering) => {
           const delta = pt.value - first.value, rel = first.value ? (delta / Math.abs(first.value)) * 100 : 0;
@@ -49,15 +49,15 @@ function NetWorth({ m, data, limits, openPlans, dayCurve, liveInfo, showChart = 
                 {liveInfo && !hovering && <span className="liveBadge"><i className="liveDot" />Cours en direct · {new Date(liveInfo.at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</span>}
               </div>
             </div>
-            <div className="seg" role="tablist" aria-label="Période">
-              {periods.map(([l, d]) => {
-                const lock = d > limits.historyDays;
-                return <button key={l} className={l === current[0] ? "on" : ""} onClick={() => lock ? openPlans("plus") : setLabel(l)}>{l === "1J" && <i className="liveDot" />}{l}{lock && <Icon name="lock" size={11} style={{ marginLeft: 4, opacity: 0.6 }} />}</button>;
-              })}
-            </div>
           </div>;
         }}
       </AreaChart>
+      <div className="seg heroPeriods" role="tablist" aria-label="Période">
+        {periods.map(([l, d]) => {
+          const lock = d > limits.historyDays;
+          return <button key={l} className={l === current[0] ? "on" : ""} onClick={() => lock ? openPlans("plus") : setLabel(l)}>{l === "1J" && <i className="liveDot" />}{l}{lock && <Icon name="lock" size={11} style={{ marginLeft: 4, opacity: 0.6 }} />}</button>;
+        })}
+      </div>
       {parts.length > 0 && <div className="mix">
         <div className="mixBar">{parts.map((p) => <i key={p.label} style={{ width: (p.value / sumParts) * 100 + "%", background: p.color }} />)}</div>
         <div className="mixLegend">{parts.map((p) => <span key={p.label}><i className="dot" style={{ background: p.color }} />{p.label}<b>{money0(p.value)}</b></span>)}</div>

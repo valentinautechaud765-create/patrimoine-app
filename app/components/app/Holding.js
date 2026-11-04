@@ -175,7 +175,8 @@ export function PortfolioCurve({ holdings, intraday, eurPerUsd, fetchHistory }) 
     return pts;
   }, [source, holdings, fx]); // eslint-disable-line
   if (!symbols.length) return null;
-  return <section className="card panel netWorth portfolioCurve fadeIn">
+  const periodsBar = <div className="seg heroPeriods">{PERIODS.map((p) => <button key={p} className={p === period ? "on" : ""} onClick={() => setPeriod(p)}>{p === "1J" && <i className="liveDot" />}{p}</button>)}</div>;
+  return <section className="netWorth heroOpen portfolioCurve fadeIn">
     {points && points.length > 1 ? <AreaChart points={points} height={180} fade>
       {(pt, first, hovering) => {
         const d = pt.value - first.value, rel = first.value ? (d / first.value) * 100 : 0;
@@ -185,11 +186,11 @@ export function PortfolioCurve({ holdings, intraday, eurPerUsd, fetchHistory }) 
             <div className="projAmount"><Amount value={pt.value} /></div>
             <div className="nwDelta"><span className={"chip " + (d >= 0 ? "up" : "down")}>{pct(rel)}</span><span className={d >= 0 ? "ok" : "bad"}>{signed(d)}</span><span className="nwWhen">{hovering ? fmtWhen(pt.date, period) : LABEL[period]}</span></div>
           </div>
-          <div className="seg">{PERIODS.map((p) => <button key={p} className={p === period ? "on" : ""} onClick={() => setPeriod(p)}>{p === "1J" && <i className="liveDot" />}{p}</button>)}</div>
         </div>;
       }}
     </AreaChart> : <div className="nwTop"><div><div className="eyebrow">Évolution du portefeuille</div><p className="muted" style={{ margin: "8px 0" }}>{period === "1J" || hist.loading ? "Chargement de la courbe…" : "Courbe indisponible pour le moment."}</p></div>
-      <div className="seg">{PERIODS.map((p) => <button key={p} className={p === period ? "on" : ""} onClick={() => setPeriod(p)}>{p}</button>)}</div></div>}
+      </div>}
+    {periodsBar}
     <p className="finePrint" style={{ justifyContent: "flex-start", margin: "10px 0 0" }}><Icon name="info" size={13} />Calculée avec vos quantités actuelles.</p>
   </section>;
 }

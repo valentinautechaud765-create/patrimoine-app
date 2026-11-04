@@ -880,3 +880,38 @@ button.budgetRow.tap:hover { background: rgba(255, 255, 255, 0.03); }
   .holdPeriods { justify-self: stretch; }
   .holdPeriods button { flex: 1; }
 }
+
+/* =====================================================================
+   Courbe principale ouverte, comme Mon Patrimoine : pas de bloc, montant centré,
+   courbe sur toute la largeur fondue dans le fond, périodes centrées dessous.
+   ===================================================================== */
+.netWorth.heroOpen { background: transparent; border: 0; box-shadow: none; border-radius: 0; padding: 8px 0 4px; overflow: visible; }
+.netWorth.heroOpen::before { inset: -40px 10% auto; height: 260px; background: radial-gradient(ellipse 50% 60% at 50% 30%, rgba(61, 124, 255, 0.16), transparent 70%); }
+.heroOpen .nwTop { justify-content: center; text-align: center; }
+.heroOpen .nwTop > div { display: grid; justify-items: center; }
+.heroOpen .nwAmount { font-size: clamp(44px, 6vw, 64px); }
+.heroOpen .nwDelta { justify-content: center; }
+.heroOpen .area { margin: 22px -32px 0; width: auto; }
+.heroOpen .area.fade svg { -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 14%, #000 86%, transparent 100%); mask-image: linear-gradient(90deg, transparent 0, #000 14%, #000 86%, transparent 100%); }
+.heroPeriods { display: flex; width: max-content; margin: 18px auto 0; background: rgba(255, 255, 255, 0.04); }
+.heroOpen .mix { max-width: 760px; margin: 22px auto 0; }
+.heroOpen .mixLegend { justify-content: center; }
+.heroOpen .liveBadge { width: 100%; justify-content: center; margin: 4px 0 0; }
+.portfolioCurve.heroOpen .finePrint { justify-content: center !important; }
+@container app (max-width: 860px) {
+  .heroOpen .area { margin: 18px -16px 0; }
+  .netWorth.heroOpen { padding: 4px 0 0; border-radius: 0; }
+  .heroPeriods { width: 100%; }
+  .heroPeriods button { flex: 1; }
+}
+
+/* Menu : icônes centrées dans la hauteur, fond plus transparent à l'ouverture */
+.side .navItem:first-of-type { margin-top: auto; }
+.side { background: rgba(10, 12, 17, 0.35); }
+.side:hover { background: rgba(14, 17, 25, 0.42); backdrop-filter: blur(10px) saturate(150%); -webkit-backdrop-filter: blur(10px) saturate(150%); box-shadow: 30px 0 80px -30px rgba(0, 0, 0, 0.6); }
+.side:hover .navItem:not(.on):hover { background: rgba(255, 255, 255, 0.07); }
+@container app (min-width: 861px) {
+  .side .planCard { position: absolute; left: 14px; width: 224px; bottom: 84px; margin: 0; }
+  .side .sideUser { margin-top: auto; }
+}
+@media (max-height: 760px) { .side .planCard { display: none; } }
