@@ -156,7 +156,7 @@ export default function AppView({ data, demo, embedded, initialTab = "overview",
   const trialing = p.plan_status === "trialing", trialLeft = p.trial_days_left ?? TRIAL_DAYS;
 
   const screen = {
-    overview: <Overview m={m} data={liveData} dayCurve={dayCurve} liveInfo={liveInfo} showChart={charts} limits={limits} go={go} openPlans={openPlans} list={list} open={open} goOps={goOps} />,
+    overview: <Overview m={m} data={liveData} dayCurve={dayCurve} liveInfo={liveInfo} showChart={charts} fetchHistory={limits.investments ? actions.fetchHistory : null} eurPerUsd={market.eurPerUsd} limits={limits} go={go} openPlans={openPlans} list={list} open={open} goOps={goOps} />,
     accounts: <Accounts m={m} data={data} limits={limits} openPlans={openPlans} open={open} connectBank={() => run(actions.connectBank)} />,
     invest: <Investments m={m} data={liveData} liveInfo={liveInfo} curve={charts && limits.investments ? <PortfolioCurve holdings={liveData.holdings} intraday={market.intraday} eurPerUsd={market.eurPerUsd} fetchHistory={actions.fetchHistory} /> : null} limits={limits} openPlans={openPlans} open={open} />,
     budget: <Budget m={m} data={data} limits={limits} openPlans={openPlans} open={open} />,

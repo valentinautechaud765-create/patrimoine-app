@@ -3,7 +3,8 @@ import { useMemo, useState } from "react";
 import Icon from "../Icon.js";
 import { AreaChart, Donut, FlowBars } from "../Charts.js";
 import { money, money0, signed, pct, todayISO, dayLabel, monthLabel } from "../../../lib/format.js";
-import { monthlySeries, recurring, advanceDate } from "../../../lib/model.js";
+import { monthlySeries, recurring, advanceDate, buildWealthCurve } from "../../../lib/model.js";
+import { useHistory } from "./Holding.js";
 import { cat } from "../../../lib/categories.js";
 import { Amount, CatIcon, InstIcon, Panel, Empty, Locked, ago, KIND_LABEL } from "./ui.js";
 
@@ -18,13 +19,27 @@ export function historyPoints(snapshots, total, days) {
   return pts;
 }
 
-function NetWorth({ m, data, limits, openPlans, dayCurve, liveInfo, showChart = true }) {
+function NetWorth({ m, data, limits, openPlans, dayCurve, liveInfo, showChart = true, fetchHistory, eurPerUsd }) {
   const periods = dayCurve ? [["1J", 0], ...PERIODS] : PERIODS;
   const [label, setLabel] = useState(dayCurve ? "1J" : "1M");
   const current = periods.find((x) => x[0] === label) || periods.find((x) => x[0] === "1M");
   const days = current[1];
-  const points = useMemo(() => current[0] === "1J" ? dayCurve : historyPoints(data.snapshots, m.total, days), [data.snapshots, m.total, days, current, dayCurve]);
-  const when = (iso) => current[0] === "1J" ? new Date(iso).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : dayLabel(String(iso).slice(0, 10));
+  // Courbe détaillée : cours de chaque placement (toutes les 15 min à 1 jour selon la période)
+  const symbols = useMemo(() => [...new Set(data.holdings.filter((h) => h.ticker && (Number(h.quantity) > 0 || (data.trades || []).some((t) => t.holding_id === h.id))).map((h) => String(h.ticker).toUpperCase()))].sort(), [data.holdings, data.trades]);
+  const apiPeriod = { "1S": "1S", "1M": "1M", "3M": "3M", "1A": "1A", Tout: "Max" }[current[0]];
+  const hist = useHistory(fetchHistory, symbols, apiPeriod || "1M", Boolean(apiPeriod && fetchHistory && symbols.length));
+  const detailed = useMemo(() => {
+    if (!apiPeriod || !hist.data?.series) return null;
+    let since = null;
+    if (current[0] === "Tout") {
+      const firsts = [...(data.trades || []).map((t) => String(t.date)), ...data.transactions.map((t) => String(t.date)), ...data.snapshots.map((x) => x.date)].filter(Boolean).sort();
+      since = firsts[0] || null;
+    }
+    return buildWealthCurve({ series: hist.data.series, holdings: data.holdings, trades: data.trades || [], transactions: data.transactions, eurPerUsd: eurPerUsd || hist.data.eurPerUsd, totalNow: m.total, sinceISO: since });
+  }, [hist.data, data.holdings, data.trades, data.transactions, data.snapshots, m.total, eurPerUsd, apiPeriod]); // eslint-disable-line
+  const points = useMemo(() => current[0] === "1J" ? dayCurve : detailed && detailed.length > 2 ? detailed : historyPoints(data.snapshots, m.total, days), [data.snapshots, m.total, days, current, dayCurve, detailed]);
+  const intraday = current[0] === "1J" || ((current[0] === "1S" || current[0] === "1M") && detailed);
+  const when = (iso) => current[0] === "1J" ? new Date(iso).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : intraday ? new Date(iso).toLocaleString("fr-FR", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : dayLabel(String(iso).slice(0, 10));
   const parts = [
     { label: "Comptes courants", value: m.cash, color: "#7fa8ff" },
     { label: "Épargne", value: m.savings, color: "#2ee59d" },
@@ -227,14 +242,14 @@ export function Upcoming({ data, compact }) {
   </>;
 }
 
-export default function Overview({ m, data, limits, go, openPlans, list, open, goOps, dayCurve, liveInfo, showChart }) {
+export default function Overview({ m, data, limits, go, openPlans, list, open, goOps, dayCurve, liveInfo, showChart, fetchHistory, eurPerUsd }) {
   const accounts = [...data.accounts].sort((a, b) => b.balance - a.balance);
   const series = useMemo(() => {
     const s = monthlySeries(data.transactions, 6), first = s.findIndex((x) => x.count > 0);
     return first < 0 ? [] : s.slice(Math.min(first, s.length - 3));
   }, [data.transactions]);
   return <>
-    <NetWorth m={m} data={data} limits={limits} openPlans={openPlans} dayCurve={dayCurve} liveInfo={liveInfo} showChart={showChart} />
+    <NetWorth m={m} data={data} limits={limits} openPlans={openPlans} dayCurve={dayCurve} liveInfo={liveInfo} showChart={showChart} fetchHistory={fetchHistory} eurPerUsd={eurPerUsd} />
     <GettingStarted data={data} open={open} go={go} />
     <Kpis m={m} />
     <div className="grid g3">

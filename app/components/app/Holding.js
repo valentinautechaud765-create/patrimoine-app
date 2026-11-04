@@ -16,7 +16,7 @@ const fmtWhen = (t, period) => period === "1J" || period === "1S" ? new Date(t).
 
 // Charge une courbe (une ou plusieurs valeurs) pour une période, avec un petit cache en mémoire
 const cache = {};
-function useHistory(fetchHistory, symbols, period, enabled = true) {
+export function useHistory(fetchHistory, symbols, period, enabled = true) {
   const key = symbols.join(",") + "|" + period;
   const [state, setState] = useState({ key: "", data: null, loading: false, error: false });
   useEffect(() => {

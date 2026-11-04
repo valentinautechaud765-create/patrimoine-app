@@ -7,7 +7,7 @@ export function AreaChart({ points, height = 200, children, color: forced, fade 
   const gid = "ag" + useId().replace(/:/g, "");
   const box = useRef(null), raf = useRef(0), timer = useRef(0);
   const geo = useMemo(() => {
-    const step = Math.max(1, Math.ceil(points.length / 300));
+    const step = Math.max(1, Math.ceil(points.length / 600));
     const pts = points.filter((_, i) => i % step === 0 || i === points.length - 1);
     // Un seul point (nouveau compte) : ligne plate plutôt qu'un triangle
     if (pts.length === 1) pts.unshift(pts[0]);
