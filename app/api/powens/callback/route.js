@@ -9,20 +9,30 @@ export const maxDuration = 60;
 export async function GET(request) {
   // Retour sur le même site que celui où l'utilisateur est connecté (même adresse que ce lien de retour).
   const url = new URL(request.url), back = new URL("/app", url.origin);
+  let linkedUser = null;
   try {
     const state = url.searchParams.get("state") || "";
-    if (!/^[a-f0-9]{48}$/.test(state)) throw new Error("état invalide");
-    if (url.searchParams.get("error")) throw new Error("refus : " + url.searchParams.get("error"));
+    if (url.searchParams.get("error")) throw new Error("Powens a refusé (" + (url.searchParams.get("error_description") || url.searchParams.get("error")) + ").");
+    if (!/^[a-f0-9]{48}$/.test(state)) throw new Error("retour de Powens sans identifiant de session valide. Relancez « Connecter ma banque ».");
     const db = supabaseAdmin();
     const { data: link } = await db.from("powens_links").select("user_id").eq("pending_state", state).maybeSingle();
-    if (!link) throw new Error("tentative expirée");
+    if (!link) throw new Error("tentative expirée ou déjà utilisée. Relancez « Connecter ma banque ».");
+    linkedUser = link.user_id;
     await db.from("powens_links").update({ pending_state: null }).eq("user_id", link.user_id);
-    const r = await syncUser(db, link.user_id, { days: 180 });
-    back.searchParams.set("banque", "ok");
-    back.searchParams.set("ops", String(r.transactions || 0));
+    try {
+      const r = await syncUser(db, link.user_id, { days: 180 });
+      back.searchParams.set("banque", "ok");
+      back.searchParams.set("ops", String(r.transactions || 0));
+    } catch (e) {
+      // La banque est bien reliée ; seul l'import a échoué (on dit pourquoi).
+      console.error("[powens callback] import :", e.message);
+      back.searchParams.set("banque", "partiel");
+      back.searchParams.set("raison", String(e.message || "erreur inconnue").slice(0, 200));
+    }
   } catch (e) {
-    console.error("[powens callback]", e.message);
+    console.error("[powens callback]", linkedUser || "", e.message);
     back.searchParams.set("banque", "erreur");
+    back.searchParams.set("raison", String(e.message || "erreur inconnue").slice(0, 200));
   }
   return NextResponse.redirect(back);
 }

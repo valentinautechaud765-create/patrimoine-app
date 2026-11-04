@@ -1162,3 +1162,6 @@ button.budgetRow.tap:hover { background: rgba(255, 255, 255, 0.03); }
 }
 .avatarBtn:active .avatar.ring { transform: scale(0.94); }
 
+/* Jamais de défilement horizontal : l'écran ne « glisse » plus sur le côté */
+.appRoot, .appRoot > .shell { overflow-x: hidden; }
+.main, .content { min-width: 0; max-width: 100%; }

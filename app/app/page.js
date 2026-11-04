@@ -108,6 +108,9 @@ function App() {
   }, [demo]); // eslint-disable-line
 
   const notice = useMemo(() => {
+    // Échec de la connexion bancaire : on affiche la vraie raison renvoyée par le serveur
+    if (params.get("banque") === "erreur" && params.get("raison")) return { text: "Connexion bancaire : " + params.get("raison").slice(0, 220), tone: "bad" };
+    if (params.get("banque") === "partiel") return { text: "Banque connectée, mais l’import a échoué : " + String(params.get("raison") || "").slice(0, 200) + " — touchez « Synchroniser » dans Comptes.", tone: "bad" };
     for (const [k, v] of Object.entries(NOTICES)) { const [a, b] = k.split("="); if (params.get(a) === b) return v; }
     return null;
   }, [params]);
