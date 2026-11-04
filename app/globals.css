@@ -1063,3 +1063,88 @@ button.budgetRow.tap:hover { background: rgba(255, 255, 255, 0.03); }
 .debtMain .bar { margin-top: 0; }
 .debtMain small { font-size: 12.5px; }
 .privacy :is(.debtTop span, .debtMain small) { filter: blur(7px); }
+
+/* ======================================================================
+   Finitions iPhone : barre de navigation flottante au-dessus de la barre d'accueil,
+   en-tête allégé, cartes compactes, champs sans zoom automatique, retour tactile.
+   ====================================================================== */
+@container app (max-width: 860px) {
+  /* Barre du bas : flottante, toujours visible au-dessus de la barre d'accueil */
+  .tabbar {
+    left: 12px; right: 12px; bottom: calc(10px + env(safe-area-inset-bottom));
+    padding: 6px 4px; border-radius: 24px; border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(20, 23, 31, 0.82); backdrop-filter: blur(24px) saturate(180%); -webkit-backdrop-filter: blur(24px) saturate(180%);
+    box-shadow: 0 18px 40px -12px rgba(0, 0, 0, 0.85), 0 1px 0 rgba(255, 255, 255, 0.04) inset;
+  }
+  .tab { position: relative; gap: 3px; padding: 7px 0 6px; border-radius: 18px; font-size: 10.5px; letter-spacing: 0.01em; transition: color 0.2s, background 0.2s; }
+  .tab.on { background: rgba(61, 124, 255, 0.14); }
+  .tab:active { transform: scale(0.94); }
+  .main { padding: 0 16px calc(104px + env(safe-area-inset-bottom)); }
+  .toast { bottom: calc(96px + env(safe-area-inset-bottom)); }
+
+  /* En-tête : titre net, boutons discrets */
+  .mobileTop { height: auto; min-height: 56px; padding: calc(8px + env(safe-area-inset-top)) 16px 8px; background: rgba(7, 8, 11, 0.82); border-bottom: 1px solid transparent; }
+  .mobileTop h1 { font-size: 22px; font-weight: 650; letter-spacing: -0.02em; }
+  .mobileTop .topTitle small { font-size: 12.5px; color: var(--muted); }
+  .mobileTop > div:last-child { gap: 2px !important; align-items: center; }
+  .mobileTop .iconBtn { width: 36px; height: 36px; border: 0; background: transparent; border-radius: 50%; color: var(--fg2); }
+  .mobileTop .iconBtn.active { background: transparent; color: var(--blue2); }
+  .mobileTop .iconBtn:active { background: rgba(255, 255, 255, 0.08); }
+  .mobileTop .avatarBtn { margin-left: 6px; }
+  .mobileTop .avatar { width: 32px; height: 32px; font-size: 13px; }
+
+  /* Rythme vertical et cartes */
+  .content { gap: 12px; padding-top: 4px; }
+  .card { border-radius: 20px; }
+  .panel { padding: 16px 16px 8px; }
+  .grid.g4 { gap: 10px; }
+  .kpi { padding: 14px 14px 13px; gap: 6px; border-radius: 18px; }
+  .kpiTop { font-size: 12.5px; gap: 6px; }
+  .kpiTop > span:first-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .kpiIco { width: 28px; height: 28px; border-radius: 9px; flex: none; }
+  .kpiIco svg { width: 14px; height: 14px; }
+  .kpi b { font-size: 21px; }
+  .kpi small { font-size: 12px; line-height: 1.35; }
+
+  /* Comptes : les 3 totaux tiennent sur une ligne */
+  .statsRow { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; gap: 8px; }
+  .statsRow > .kpi { padding: 12px 11px; }
+  .statsRow > .kpi .kpiIco { display: none; }
+  .statsRow > .kpi .kpiTop { font-size: 11.5px; }
+  .statsRow > .kpi .kpiTop { min-height: 28px; align-items: flex-start; }
+  .statsRow > .kpi .kpiTop > span:first-child { white-space: normal; line-height: 1.2; }
+  .statsRow > .kpi b { font-size: 15.5px; letter-spacing: -0.02em; white-space: nowrap; }
+  .statsRow > .kpi small { font-size: 11px; }
+  .actionCard { padding: 14px; gap: 12px; border-radius: 18px; }
+  .actionCard small { font-size: 12.5px; line-height: 1.4; }
+
+  /* Sélecteurs et filtres */
+  .seg button { height: 32px; }
+  .heroPeriods { margin-top: 14px; }
+  .scopeBar { justify-content: flex-start; }
+  .scopeBtn { height: 32px; font-size: 12.5px; }
+  .demoBanner { padding: 10px 12px; font-size: 12.5px; border-radius: 14px; }
+  .demoBanner .btn { height: 32px; padding: 0 12px; font-size: 12.5px; }
+  .opsBar { padding: 12px; gap: 10px; }
+  .opsBar .filters { flex-wrap: nowrap; overflow-x: auto; margin: 0 -12px; padding: 0 12px 2px; scrollbar-width: none; }
+  .opsBar .filters::-webkit-scrollbar { display: none; }
+  .opsBar .filters > * { flex: none; }
+  .opsActions .btn.primary { display: none; }
+  .opsSum { font-size: 12.5px; }
+
+  /* iOS : pas de zoom quand on touche un champ (texte en 16 px minimum) */
+  .input, .search input, select, textarea { font-size: 16px; }
+  .modal { max-height: calc(100dvh - 24px - env(safe-area-inset-top)); }
+
+  /* Retour tactile */
+  .card[role="button"]:active, button.card:active, .actionCard:active { transform: scale(0.985); }
+  .btn:active { transform: scale(0.97); }
+}
+/* Réglages : rien ne dépasse de l'écran (textes longs coupés proprement) */
+.settings { grid-template-columns: minmax(0, 1fr); }
+.settings .itemMain, .profileCard .itemMain, .subRow > div:first-child { min-width: 0; }
+.settings .itemMain small, .profileCard .itemMain small { overflow: hidden; text-overflow: ellipsis; }
+@container app (max-width: 860px) {
+  .subRow { flex-wrap: wrap; }
+  .profileCard { padding: 16px; gap: 12px; }
+}

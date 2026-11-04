@@ -7,7 +7,7 @@ export const metadata = {
   applicationName: BRAND.name,
   appleWebApp: { capable: true, title: BRAND.name, statusBarStyle: "black" },
 };
-export const viewport = { width: "device-width", initialScale: 1, themeColor: "#07080b" };
+export const viewport = { width: "device-width", initialScale: 1, viewportFit: "cover", themeColor: "#07080b" };
 
 export default function RootLayout({ children }) {
   return (

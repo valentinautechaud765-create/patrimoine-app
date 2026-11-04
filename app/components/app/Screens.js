@@ -22,7 +22,7 @@ export function Accounts({ m, data, connectBank, syncBank, limits, openPlans, op
   const canSync = data.accounts.filter((a) => a.powens_account_id).length < limits.accounts;
   const stats = [["Comptes courants", m.cash, "card", "#7fa8ff"], ["Épargne", m.savings, "piggy", "#2ee59d"], ["Placements", m.invest, "trending", "#3d7cff"]];
   return <>
-    <div className="grid g3">
+    <div className="grid g3 statsRow">
       {stats.map(([label, v, icon, c], i) => <div key={label} className="card kpi fadeIn" style={{ animationDelay: i * 40 + "ms" }}>
         <div className="kpiTop"><span>{label}</span><span className="kpiIco" style={{ background: `color-mix(in srgb, ${c} 14%, transparent)`, color: c }}><Icon name={icon} size={16} /></span></div>
         <b className="money">{money(v)}</b>
