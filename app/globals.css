@@ -1254,3 +1254,8 @@ button.budgetRow.tap:hover { background: rgba(255, 255, 255, 0.03); }
 .newCatColors button.on { border-color: var(--fg); }
 .newCatBtns { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
 .newCatBtns .btn.primary { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Dates sous la courbe du patrimoine */
+.nwAxis { display: flex; justify-content: space-between; gap: 8px; margin: 6px 4px 0; font-size: 11.5px; color: var(--faint); font-variant-numeric: tabular-nums; }
+.heroOpen .nwAxis { max-width: none; }
+.mixLegend b.bad { color: var(--bad); }

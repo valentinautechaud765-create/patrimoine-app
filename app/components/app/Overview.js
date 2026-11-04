@@ -47,8 +47,12 @@ function NetWorth({ m, data, limits, openPlans, dayCurve, liveInfo, showChart = 
     { label: "Comptes courants", value: m.cash, color: "#7fa8ff" },
     { label: "Épargne", value: m.savings, color: "#2ee59d" },
     { label: "Placements", value: m.invest, color: "#3d7cff" },
-  ].filter((p) => p.value > 0);
-  const sumParts = parts.reduce((n, p) => n + p.value, 0) || 1;
+  ];
+  // La barre ne montre que les montants positifs ; la légende affiche toujours chaque famille (même à 0 ou à découvert).
+  const barParts = parts.filter((p) => p.value > 0);
+  const sumParts = barParts.reduce((n, p) => n + p.value, 0) || 1;
+  const axisLabel = (iso) => { if (!iso) return ""; const d = new Date(String(iso).length <= 10 ? iso + "T12:00:00" : iso); return isNaN(d) ? "" : current[0] === "1J" ? d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : d.toLocaleDateString("fr-FR", { day: "numeric", month: "short", ...(days > 300 || current[0] === "Tout" ? { year: "numeric" } : {}) }); };
+  const axis = points.length > 1 ? [points[0], points[Math.floor((points.length - 1) / 2)], points[points.length - 1]].map((p) => axisLabel(p.date)) : null;
   return (
     <section className="netWorth heroOpen fadeIn">
       <AreaChart points={points} height={showChart ? 200 : 0} fade>
@@ -70,15 +74,16 @@ function NetWorth({ m, data, limits, openPlans, dayCurve, liveInfo, showChart = 
           </div>;
         }}
       </AreaChart>
+      {showChart && axis && <div className="nwAxis" aria-hidden="true"><span>{axis[0]}</span><span>{axis[1]}</span><span>{current[0] === "1J" ? "Maintenant" : "Aujourd’hui"}</span></div>}
       <div className="seg heroPeriods" role="tablist" aria-label="Période">
         {periods.map(([l, d]) => {
           const lock = d > limits.historyDays;
           return <button key={l} className={l === current[0] ? "on" : ""} onClick={() => lock ? openPlans("plus") : setLabel(l)}>{l === "1J" && <i className="liveDot" />}{l}{lock && <Icon name="lock" size={11} style={{ marginLeft: 4, opacity: 0.6 }} />}</button>;
         })}
       </div>
-      {parts.length > 0 && <div className="mix">
-        <div className="mixBar">{parts.map((p) => <i key={p.label} style={{ width: (p.value / sumParts) * 100 + "%", background: p.color }} />)}</div>
-        <div className="mixLegend">{parts.map((p) => <span key={p.label}><i className="dot" style={{ background: p.color }} />{p.label}<b>{money0(p.value)}</b></span>)}{m.owed > 0 && <span><i className="dot" style={{ background: "var(--bad)" }} />Dettes<b>−{money0(m.owed)}</b></span>}{m.due > 0 && <span><i className="dot" style={{ background: "var(--ok)" }} />On me doit<b>{money0(m.due)}</b></span>}</div>
+      {(barParts.length > 0 || m.owed > 0 || m.due > 0) && <div className="mix">
+        <div className="mixBar">{barParts.map((p) => <i key={p.label} style={{ width: (p.value / sumParts) * 100 + "%", background: p.color }} />)}</div>
+        <div className="mixLegend">{parts.map((p) => <span key={p.label}><i className="dot" style={{ background: p.color }} />{p.label}<b className={p.value < 0 ? "bad" : ""}>{p.value < 0 ? "−" + money0(-p.value) : money0(p.value)}</b></span>)}{m.owed > 0 && <span><i className="dot" style={{ background: "var(--bad)" }} />Dettes<b>−{money0(m.owed)}</b></span>}{m.due > 0 && <span><i className="dot" style={{ background: "var(--ok)" }} />On me doit<b>{money0(m.due)}</b></span>}</div>
       </div>}
     </section>
   );
