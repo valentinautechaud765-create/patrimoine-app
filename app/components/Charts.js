@@ -9,6 +9,8 @@ export function AreaChart({ points, height = 200, children, color: forced }) {
   const geo = useMemo(() => {
     const step = Math.max(1, Math.ceil(points.length / 300));
     const pts = points.filter((_, i) => i % step === 0 || i === points.length - 1);
+    // Un seul point (nouveau compte) : ligne plate plutôt qu'un triangle
+    if (pts.length === 1) pts.unshift(pts[0]);
     const vals = pts.map((p) => p.value);
     if (!vals.length) return { pts, xy: [], line: "", fill: "" };
     const lo = Math.min(...vals), hi = Math.max(...vals), pad = (hi - lo) * 0.14 || Math.max(1, hi * 0.01);

@@ -12,7 +12,7 @@ export async function POST(request) {
     const user = await userFromRequest(request);
     if (!user) return NextResponse.json({ error: "Session expirée." }, { status: 401 });
     const owner = OWNER_EMAILS.includes(String(user.email || "").toLowerCase()) && Boolean(user.email_confirmed_at);
-    if (!owner) return NextResponse.json({ owner: false });
+    if (!owner) return NextResponse.json({ owner: false, reason: user.email_confirmed_at ? "not_owner" : "email_not_confirmed" });
     const db = supabaseAdmin();
     const { data: profile } = await db.from("profiles").select("plan,plan_status").eq("id", user.id).maybeSingle();
     if (profile?.plan !== "pro" || profile?.plan_status !== "active") {
@@ -22,6 +22,6 @@ export async function POST(request) {
     return NextResponse.json({ owner: true, plan: "pro", plan_status: "active" });
   } catch (e) {
     console.error("[compte]", e.message);
-    return NextResponse.json({ error: "Vérification impossible." }, { status: 500 });
+    return NextResponse.json({ error: "Vérification impossible : " + e.message }, { status: 500 });
   }
 }

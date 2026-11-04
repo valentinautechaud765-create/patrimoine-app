@@ -5,6 +5,7 @@ import AppView from "../components/app/AppView.js";
 import { BrandMark } from "../components/Brand.js";
 import { supabaseBrowser, supabaseConfigured } from "../../lib/supabase.js";
 import { demoData } from "../../lib/demo.js";
+import { OWNER_EMAILS } from "../../lib/config.js";
 
 const NOTICES = {
   "paiement=ok": { text: "Abonnement activé. Bienvenue !", tone: "ok" },
@@ -36,12 +37,15 @@ function App() {
       sb.from("net_worth_snapshots").select("date,total").order("date"),
     ]);
     const pr = profile.data || { plan: "free" };
-    // Propriétaire : accès complet accordé par le serveur
-    try {
-      const r = await fetch("/api/compte", { method: "POST", headers: { Authorization: "Bearer " + s.session.access_token } });
-      const j = await r.json();
-      if (j.owner) { pr.plan = j.plan; pr.plan_status = j.plan_status; }
-    } catch {}
+    // Propriétaire : accès complet. Le serveur l'enregistre dans la base ; l'affichage est débloqué
+    // tout de suite pour l'adresse propriétaire confirmée (les routes serveur revérifient de leur côté).
+    const u = s.session.user, isOwner = OWNER_EMAILS.includes(String(u.email || "").toLowerCase()) && Boolean(u.email_confirmed_at || u.confirmed_at);
+    if (isOwner) {
+      pr.plan = "pro"; pr.plan_status = "active";
+      fetch("/api/compte", { method: "POST", headers: { Authorization: "Bearer " + s.session.access_token } })
+        .then((r) => r.json()).then((j) => { if (!j.owner) console.warn("[compte]", j.error || j.reason); })
+        .catch((e) => console.warn("[compte]", e.message));
+    }
     if (pr.plan_status === "trialing" && pr.current_period_end) pr.trial_days_left = Math.max(0, Math.ceil((new Date(pr.current_period_end) - Date.now()) / 864e5));
     const num = (rows, keys) => (rows || []).map((r) => { const o = { ...r }; keys.forEach((k) => { o[k] = Number(o[k]) || 0; }); return o; });
     setData({
