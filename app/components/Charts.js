@@ -36,7 +36,7 @@ export function AreaChart({ points, height = 200, children, color: forced, fade 
     {children && children(geo.pts[i], geo.pts[0], hover != null)}
     <div className={"area" + (fade ? " fade" : "")} ref={box} style={{ height }} onPointerDown={pick} onPointerMove={(e) => (e.pointerType === "mouse" || e.buttons) && pick(e)} onPointerLeave={(e) => e.pointerType === "mouse" && setHover(null)} onPointerUp={(e) => { if (e.pointerType !== "mouse") timer.current = setTimeout(() => setHover(null), 2200); }}>
       <svg viewBox="0 0 1000 104" preserveAspectRatio="none" role="img" aria-label="Évolution">
-        <defs><linearGradient id={gid} x1="0" x2="0" y1="0" y2="1"><stop offset="0" stopColor={color} stopOpacity=".32" /><stop offset=".7" stopColor={color} stopOpacity=".04" /><stop offset="1" stopColor={color} stopOpacity="0" /></linearGradient></defs>
+        <defs><linearGradient id={gid} x1="0" x2="0" y1="0" y2="1"><stop offset="0" stopColor={color} stopOpacity={fade ? ".2" : ".32"} /><stop offset=".75" stopColor={color} stopOpacity={fade ? ".02" : ".04"} /><stop offset="1" stopColor={color} stopOpacity="0" /></linearGradient></defs>
         <path d={geo.fill} fill={`url(#${gid})`} />
         <path d={geo.line} fill="none" stroke={color} strokeWidth="2.2" vectorEffect="non-scaling-stroke" strokeLinecap="round" />
       </svg>
