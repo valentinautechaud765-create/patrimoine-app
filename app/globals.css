@@ -1165,3 +1165,39 @@ button.budgetRow.tap:hover { background: rgba(255, 255, 255, 0.03); }
 /* Jamais de défilement horizontal : l'écran ne « glisse » plus sur le côté */
 .appRoot, .appRoot > .shell { overflow-x: hidden; }
 .main, .content { min-width: 0; max-width: 100%; }
+/* Simulation : la colonne ne s'élargit jamais au-delà de l'écran (la ligne des placements défile, elle) */
+@container app (max-width: 980px) { .projGrid { grid-template-columns: minmax(0, 1fr); } }
+.projGrid > * { min-width: 0; }
+@container app (max-width: 860px) {
+  .projLegend { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 14px; }
+  .projLegend > div:first-child { grid-column: 1 / -1; }
+  .projLegend b { white-space: nowrap; }
+  .assetPick { margin: 0 -16px 4px; padding: 0 16px 12px; scroll-padding: 16px; }
+  .projExplain { padding: 14px; }
+  .calcRow { gap: 10px; }
+  .calcRow span { min-width: 0; }
+}
+/* Fenêtres : le contenu ne dépasse jamais la largeur de l'écran */
+.modal { grid-template-columns: minmax(0, 1fr); overflow-x: hidden; }
+.modal > * { min-width: 0; }
+@container app (max-width: 860px) {
+  .holdStats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .holdPeriods { width: 100%; }
+  .holdPeriods button { padding: 0 6px; min-width: 0; }
+  .sheetHead { min-width: 0; }
+  .sheetHead .itemMain { min-width: 0; }
+}
+.tradeBtns { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.tradeBtns .btn { min-width: 0; padding: 0 8px; gap: 6px; justify-content: center; white-space: nowrap; }
+@container app (max-width: 400px) { .tradeBtns .btn { font-size: 13.5px; } .tradeBtns .btn svg { width: 15px; height: 15px; } }
+/* Grilles et listes : aucun élément ne force la largeur au-delà de l'écran */
+.grid > *, .stack > *, .content > * { min-width: 0; }
+.item .itemMain { min-width: 0; }
+.item .itemMain small, .item .itemMain b { overflow: hidden; text-overflow: ellipsis; }
+@container app (max-width: 860px) {
+  .opsBar { overflow: hidden; }
+}
+@container app (max-width: 360px) {
+  .projLegend b { font-size: 16px; }
+  .projLegend { gap: 8px 10px; }
+}
