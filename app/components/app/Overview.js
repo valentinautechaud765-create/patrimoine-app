@@ -6,7 +6,7 @@ import { money, money0, signed, pct, todayISO, dayLabel, monthLabel } from "../.
 import { monthlySeries, recurring, advanceDate, buildWealthCurve, balanceHistory } from "../../../lib/model.js";
 import { useHistory } from "./Holding.js";
 import { WealthProjection } from "./Projection.js";
-import { cat } from "../../../lib/categories.js";
+import { cat, distinctColors } from "../../../lib/categories.js";
 import { Amount, CatIcon, InstIcon, Panel, Empty, Locked, ago, KIND_LABEL } from "./ui.js";
 
 export const PERIODS = [["1S", 7], ["1M", 30], ["3M", 91], ["1A", 365], ["Tout", Infinity]];
@@ -207,14 +207,15 @@ function GettingStarted({ data, open, go }) {
 }
 
 function CategoryPanel({ m, goOps }) {
-  const parts = Object.entries(m.byCat).map(([label, value]) => ({ label, value, color: cat(label).color })).sort((a, b) => b.value - a.value);
+  const sorted = Object.entries(m.byCat).sort((a, b) => b[1] - a[1]), colors = distinctColors(sorted.map(([l]) => l));
+  const parts = sorted.map(([label, value]) => ({ label, value, color: colors[label] }));
   if (!parts.length) return <Empty icon="pie" title="Aucune dépense ce mois-ci" text="La répartition apparaîtra dès vos premières dépenses." />;
   return <div className="catPanel">
     <Donut parts={parts} size={150} thickness={14} center={<div><small className="muted" style={{ fontSize: 11 }}>Ce mois</small><div className="money" style={{ fontWeight: 500 }}>{money0(m.spent)}</div></div>} />
     <div className="list catList">{parts.slice(0, 6).map((p) => {
       const prev = m.prevByCatToDate[p.label] || 0, diff = prev > 0 ? ((p.value - prev) / prev) * 100 : null;
       return <button key={p.label} className="item hover tap" onClick={() => goOps(p.label)}>
-        <CatIcon category={p.label} size={32} />
+        <CatIcon category={p.label} size={32} color={p.color} />
         <div className="itemMain"><b>{p.label}</b><small>{Math.round((p.value / (m.spent || 1)) * 100)} % des dépenses</small></div>
         <div className="itemSide"><b>{money0(p.value)}</b>{diff !== null && <small className={diff > 0 ? "bad" : "ok"}>{pct(diff, 0)}</small>}</div>
       </button>;

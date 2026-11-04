@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Icon from "../Icon.js";
 import { money, todayISO } from "../../../lib/format.js";
-import { ASSET_COLORS, CUSTOM_COLORS, CUSTOM_ICONS, cat, categoriesFor } from "../../../lib/categories.js";
+import { ASSET_COLORS, CUSTOM_ICONS, cat, categoriesFor, freeCustomColors } from "../../../lib/categories.js";
 import { InstIcon, KIND_LABEL, ago } from "./ui.js";
 import { TxRow } from "./Overview.js";
 
@@ -43,13 +43,14 @@ function CatGrid({ list, value, onChange, type = "out", onAdd }) {
 
 // Petite fenêtre intégrée : créer sa propre catégorie (enregistrée dans le compte)
 function NewCategory({ type, onCancel, onSave }) {
-  const [name, setName] = useState(""), [icon, setIcon] = useState("tag"), [color, setColor] = useState(CUSTOM_COLORS[0]), [busy, setBusy] = useState(false);
+  const [palette] = useState(() => freeCustomColors());
+  const [name, setName] = useState(""), [icon, setIcon] = useState("tag"), [color, setColor] = useState(palette[0] || "#9aa3b2"), [busy, setBusy] = useState(false);
   const ok = name.trim().length > 0;
   const save = async () => { if (!ok || busy) return; setBusy(true); await onSave({ name: name.trim(), type, icon, color }); setBusy(false); };
   return <div className="newCat" style={{ "--c": color }}>
     <div className="newCatHead"><span className="newCatIco"><Icon name={icon} size={18} /></span><input className="input" placeholder={type === "in" ? "Ex. Baby-sitting, Pourboires…" : "Ex. Coiffeur, Tabac, Jardin…"} value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); save(); } }} maxLength={24} autoFocus aria-label="Nom de la catégorie" /></div>
     <div className="newCatIcons">{CUSTOM_ICONS.map((i) => <button type="button" key={i} className={icon === i ? "on" : ""} onClick={() => setIcon(i)} aria-label={i}><Icon name={i} size={17} /></button>)}</div>
-    <div className="newCatColors">{CUSTOM_COLORS.map((c) => <button type="button" key={c} className={color === c ? "on" : ""} style={{ background: c }} onClick={() => setColor(c)} aria-label="Couleur" />)}</div>
+    <div className="newCatColors">{palette.map((c) => <button type="button" key={c} className={color === c ? "on" : ""} style={{ background: c }} onClick={() => setColor(c)} aria-label="Couleur" />)}</div>
     <div className="newCatBtns"><button type="button" className="btn ghost sm" onClick={onCancel}>Annuler</button><button type="button" className="btn primary sm" disabled={!ok || busy} onClick={save}>{busy ? "Ajout…" : `Créer « ${name.trim() || "…"} »`}</button></div>
   </div>;
 }

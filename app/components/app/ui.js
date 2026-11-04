@@ -38,9 +38,9 @@ export function squarePhoto(file, size = 320) {
   });
 }
 
-export function CatIcon({ category, size = 40 }) {
+export function CatIcon({ category, size = 40, color }) {
   const c = cat(category);
-  return <span className="catIco" style={{ "--c": c.color, width: size, height: size, flexBasis: size }}><Icon name={c.icon} size={Math.round(size * 0.45)} /></span>;
+  return <span className="catIco" style={{ "--c": color || c.color, width: size, height: size, flexBasis: size }}><Icon name={c.icon} size={Math.round(size * 0.45)} /></span>;
 }
 
 export function TickerIcon({ holding }) {
