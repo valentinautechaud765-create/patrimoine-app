@@ -161,3 +161,26 @@ test("banques au nom proche : BNP = BNP Paribas, mais Banque Populaire ≠ Banqu
   assert.equal(db2.tables.accounts.find((a) => a.id === "bnp").powens_account_id, "31");
   assert.equal(db2.tables.accounts.length, 1);
 });
+
+test("cas réel : Revolut saisi à la main + BNP synchronisée → les comptes Revolut restent manuels et intacts", async () => {
+  BANK = { connections: [{ id: 5, connector: { name: "BNP Paribas" } }],
+    accounts: [{ id: 70, id_connection: 5, name: "Compte chèques", type: "checking", balance: 312.5 }],
+    transactions: [{ id: 700, id_account: 70, date: "2026-11-02", value: -12, simplified_wording: "BOULANGERIE" },
+      { id: 701, id_account: 70, date: "2026-11-03", value: -50, simplified_wording: "VIR VERS REVOLUT" }] };
+  const db = fakeDb();
+  db.tables.accounts.push({ id: "rev1", user_id: "u1", powens_account_id: null, name: "Compte principal", institution: "Revolut", kind: "courant", balance: 0.83 });
+  db.tables.accounts.push({ id: "rev2", user_id: "u1", powens_account_id: null, name: "appart", institution: "Revolut", kind: "courant", balance: 0 });
+  db.tables.transactions.push({ id: "mt", user_id: "u1", account_id: "rev1", date: "2026-11-02", amount: -12, label: "Kebab", category: "Restaurants", external_id: null });
+  const r = await syncUser(db, "u1");
+  const rev1 = db.tables.accounts.find((a) => a.id === "rev1"), rev2 = db.tables.accounts.find((a) => a.id === "rev2");
+  assert.equal(rev1.powens_account_id, null); assert.equal(rev2.powens_account_id, null);   // toujours manuels
+  assert.equal(rev1.balance, 0.83); assert.equal(rev2.balance, 0);                          // soldes non touchés
+  assert.equal(r.newAccounts, 1); assert.equal(db.tables.accounts.length, 3);               // le compte BNP est ajouté à part
+  // L'opération manuelle Revolut de même montant le même jour n'est PAS confondue avec celle de la BNP
+  assert.equal(db.tables.transactions.find((t) => t.id === "mt").external_id, null);
+  assert.equal(db.tables.transactions.filter((t) => t.amount === -12).length, 2);
+  assert.equal(r.mergedTransactions, 0);
+  // Le virement BNP → Revolut n'est pas une dépense : c'est de l'argent qui change de compte
+  assert.equal(db.tables.transactions.find((t) => t.label === "VIR VERS REVOLUT").category, "Virement interne");
+  assert.equal(db.tables.transactions.find((t) => t.label === "BOULANGERIE").category === "Virement interne", false);
+});
