@@ -14,9 +14,10 @@ export async function POST(request) {
     const db = supabaseAdmin();
     const [{ data: profile }, { count }] = await Promise.all([
       db.from("profiles").select("plan").eq("id", user.id).maybeSingle(),
-      db.from("accounts").select("id", { count: "exact", head: true }).eq("user_id", user.id),
+      db.from("accounts").select("id", { count: "exact", head: true }).eq("user_id", user.id).not("powens_account_id", "is", null),
     ]);
-    if ((profile?.plan || "free") === "free" && (count || 0) >= 1) return NextResponse.json({ error: "La formule gratuite inclut 1 compte. Passe à Plus pour en connecter d’autres." }, { status: 402 });
+    // La formule gratuite inclut 1 compte bancaire synchronisé (les comptes saisis à la main ne comptent pas).
+    if ((profile?.plan || "free") === "free" && (count || 0) >= 1) return NextResponse.json({ error: "La formule gratuite inclut 1 compte bancaire synchronisé. Passez à Plus pour en connecter d’autres." }, { status: 402 });
     const { domain, clientId, secret, api } = powensConfig();
     // Un utilisateur Powens par compte Patrimo, réutilisé pour les connexions suivantes.
     const { data: link } = await db.from("powens_links").select("*").eq("user_id", user.id).maybeSingle();

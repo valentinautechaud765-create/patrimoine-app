@@ -1021,3 +1021,7 @@ button.budgetRow.tap:hover { background: rgba(255, 255, 255, 0.03); }
 .rateBox .link { justify-self: start; font-size: 12.5px; }
 .inflRow { padding: 4px 0 0 !important; border-top: 0 !important; }
 .inflRow .itemMain small { white-space: normal; }
+.syncBar { display: flex; align-items: center; gap: 14px; padding: 12px 16px; flex-wrap: wrap; }
+.syncBar .muted { flex: 1; font-size: 13px; min-width: 160px; }
+.spin { animation: spin 0.9s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }

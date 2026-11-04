@@ -11,7 +11,9 @@ import { BudgetRow, TxRow, Upcoming } from "./Overview.js";
 import { InvestProjection } from "./Projection.js";
 
 /* ---------------- Comptes ---------------- */
-export function Accounts({ m, data, connectBank, limits, openPlans, open }) {
+export function Accounts({ m, data, connectBank, syncBank, limits, openPlans, open }) {
+  const [syncing, setSyncing] = useState(false);
+  const synced = data.accounts.filter((a) => a.powens_account_id);
   const groups = useMemo(() => {
     const g = {};
     data.accounts.forEach((a) => { (g[a.institution || "Saisis à la main"] ||= []).push(a); });
@@ -39,6 +41,12 @@ export function Accounts({ m, data, connectBank, limits, openPlans, open }) {
         <Icon name="chevronRight" size={18} className="faint" />
       </button>
     </div>
+    {synced.length > 0 && <section className="card syncBar fadeIn">
+      <span className="syncDot"><i />Synchronisé</span>
+      <span className="muted">{synced.length} compte{synced.length > 1 ? "s" : ""} bancaire{synced.length > 1 ? "s" : ""} · mis à jour {ago(data.lastSync || synced.map((a) => a.updated_at).sort().pop())}</span>
+      <button className="btn sm" disabled={syncing} onClick={async () => { setSyncing(true); await syncBank(); setSyncing(false); }}><Icon name="refresh" size={14} className={syncing ? "spin" : ""} />{syncing ? "Synchronisation…" : "Synchroniser"}</button>
+    </section>}
+    {(data.bankErrors || []).map((e) => <div className="msg info" key={e.bank}><b>{e.bank}</b> demande de confirmer votre identité (sécurité de la banque, environ tous les 180 jours). <button className="link" onClick={connectBank}>Reconnecter</button></div>)}
     {groups.length ? groups.map((g, i) => <section key={g.name} className="card panel fadeIn" style={{ animationDelay: 80 + i * 40 + "ms" }}>
       <div className="instHead">
         <InstIcon name={g.name} size={44} />

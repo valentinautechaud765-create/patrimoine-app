@@ -120,6 +120,11 @@ create table if not exists public.powens_links (
   created_at timestamptz not null default now()
 );
 
+-- Synchronisation bancaire : identifiant Powens de chaque opération (aucun doublon) et date de dernière synchro
+alter table public.transactions add column if not exists external_id text;
+create unique index if not exists transactions_user_external on public.transactions (user_id, external_id);
+alter table public.powens_links add column if not exists last_sync timestamptz;
+
 -- ---------- Sécurité (RLS) ----------
 alter table public.profiles enable row level security;
 alter table public.accounts enable row level security;

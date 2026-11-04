@@ -157,7 +157,7 @@ export default function AppView({ data, demo, embedded, initialTab = "overview",
 
   const screen = {
     overview: <Overview m={m} data={liveData} dayCurve={dayCurve} liveInfo={liveInfo} showChart={charts} fetchHistory={limits.investments ? actions.fetchHistory : null} eurPerUsd={market.eurPerUsd} limits={limits} go={go} openPlans={openPlans} list={list} open={open} goOps={goOps} />,
-    accounts: <Accounts m={m} data={data} limits={limits} openPlans={openPlans} open={open} connectBank={() => run(actions.connectBank)} />,
+    accounts: <Accounts m={m} data={data} limits={limits} openPlans={openPlans} open={open} connectBank={() => run(actions.connectBank)} syncBank={() => run(actions.syncBank, true)} />,
     invest: <Investments m={m} data={liveData} liveInfo={liveInfo} fetchHistory={limits.investments ? actions.fetchHistory : null} curve={charts && limits.investments ? <PortfolioCurve holdings={liveData.holdings} intraday={market.intraday} eurPerUsd={market.eurPerUsd} fetchHistory={actions.fetchHistory} /> : null} limits={limits} openPlans={openPlans} open={open} />,
     budget: <Budget m={m} data={data} limits={limits} openPlans={openPlans} open={open} />,
     ops: <Operations key={opsCat} data={data} query={query} setQuery={setQuery} limits={limits} openPlans={openPlans} open={open} flash={flash} initialCategory={opsCat} />,

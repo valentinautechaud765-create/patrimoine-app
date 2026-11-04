@@ -15,7 +15,7 @@ const byDate = (l) => l.sort((a, b) => String(b.date).localeCompare(String(a.dat
 
 const NOTICES = {
   "paiement=ok": { text: "Abonnement activé. Bienvenue !", tone: "ok" },
-  "banque=ok": { text: "Banque connectée : vos comptes ont été importés.", tone: "ok" },
+  "banque=ok": { text: "Banque connectée : vos comptes et opérations ont été importés.", tone: "ok" },
   "banque=erreur": { text: "La connexion bancaire n’a pas abouti. Réessayez.", tone: "bad" },
 };
 
@@ -170,6 +170,18 @@ function App() {
       for (const [acc, delta] of Object.entries(deltas)) await shiftBalance(acc, Math.round(delta * 100) / 100);
     })();
   }, [data]); // eslint-disable-line
+
+  // Synchro bancaire automatique et silencieuse à l'ouverture (le serveur limite à une fois toutes les 30 min)
+  const autoSynced = useRef(false);
+  useEffect(() => {
+    if (demo || !data?.session || autoSynced.current || !data.accounts.some((a) => a.powens_account_id)) return;
+    autoSynced.current = true;
+    fetch("/api/powens/sync", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + data.session.access_token }, body: "{}" })
+      .then((r) => r.json()).then(async (r) => {
+        if (r.linked && !r.skipped) { await load(); setData((d) => d && ({ ...d, bankErrors: r.errors || [], lastSync: r.at })); }
+        else if (r.at) setData((d) => d && ({ ...d, lastSync: r.at }));
+      }).catch(() => {});
+  }, [data?.session, data?.accounts]); // eslint-disable-line
 
   const actions = {
     notice,
@@ -422,6 +434,17 @@ function App() {
       await erase("recurrences", { id: r.id });
       drop("recurrences", r.id);
       return { message: "Opération automatique supprimée (les opérations déjà passées sont conservées)" };
+    },
+    // Synchronisation bancaire (Powens) : manuelle (bouton) ou automatique à l'ouverture
+    async syncBank(force = true) {
+      if (demo) return { message: "Démonstration : la synchronisation s’activera avec Powens." };
+      const r = await api("/api/powens/sync", { force });
+      if (!r.linked) return { message: "Aucune banque connectée pour l’instant." };
+      if (r.skipped) return { message: "Déjà à jour." };
+      await load();
+      setData((d) => d && ({ ...d, bankErrors: r.errors || [], lastSync: r.at }));
+      if (r.errors?.length) return { ok: true, message: `${r.errors[0].bank} demande une nouvelle connexion (sécurité de votre banque).` };
+      return { message: r.transactions ? `${r.transactions} nouvelle${r.transactions > 1 ? "s" : ""} opération${r.transactions > 1 ? "s" : ""} importée${r.transactions > 1 ? "s" : ""}` : "Comptes à jour" };
     },
     async deleteAccountForever() {
       if (demo) return { message: "Démonstration : rien n’est supprimé." };
