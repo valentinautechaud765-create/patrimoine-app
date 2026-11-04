@@ -174,7 +174,7 @@ function FlowStats({ series }) {
     <div><small>Revenus moyens</small><b>{money0(inc)}</b></div>
     <div><small>Dépenses moyennes</small><b>{money0(out)}</b></div>
     <div><small>Mis de côté / mois</small><b className={inc - out >= 0 ? "ok" : "bad"}>{inc - out >= 0 ? "+" : "−"}{money0(Math.abs(inc - out))}</b></div>
-    {rate !== null && <div><small>Taux d’épargne moyen</small><b>{Math.round(rate)} %</b></div>}
+    {rate !== null && <div><small>Taux d’épargne moyen</small><b className="pct">{Math.round(rate)} %</b></div>}
   </div>;
 }
 

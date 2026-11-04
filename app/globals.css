@@ -1220,3 +1220,14 @@ button.budgetRow.tap:hover { background: rgba(255, 255, 255, 0.03); }
 .scopeGroup { padding: 10px 10px 4px; font-size: 11.5px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--faint); }
 .scopeItem .itemMain { min-width: 0; }
 .scopeItem .itemMain b, .scopeItem .itemMain small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Mode discret, version réfléchie : on ne floute que ce qui dit combien on a ou combien on gagne
+   (patrimoine, soldes, placements, revenus, dépenses, montants des opérations).
+   Restent visibles : projections et simulations (des estimations), pourcentages, budgets et plafonds,
+   textes d'analyse, suggestions. */
+.privacy :is(.projGrid, .projExplain, .rateBox) *,
+.privacy :is(.flowStats b.pct, .insight small, .suggest .chip, .suggest small, .budgetLine .num, .budgetNote, .kpi small, .recStats b) {
+  filter: none !important; user-select: auto;
+}
+/* …sauf la valeur actuelle réelle en tête du calcul (c'est le patrimoine / les placements d'aujourd'hui) */
+.privacy .projExplain .calcRow.start b { filter: blur(7px) !important; user-select: none; }
