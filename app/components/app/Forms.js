@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Icon from "../Icon.js";
 import { money, todayISO } from "../../../lib/format.js";
-import { EXPENSE_CATEGORIES, ASSET_COLORS, cat } from "../../../lib/categories.js";
+import { ASSET_COLORS, CUSTOM_COLORS, CUSTOM_ICONS, cat, categoriesFor } from "../../../lib/categories.js";
 import { InstIcon, KIND_LABEL, ago } from "./ui.js";
 import { TxRow } from "./Overview.js";
 
@@ -30,19 +30,39 @@ function DeleteButton({ onConfirm, label = "Supprimer" }) {
   </button>;
 }
 
-function CatGrid({ list, value, onChange }) {
-  return <div className="catGrid">{list.map((c) => <button type="button" key={c} className={"catPick" + (value === c ? " on" : "")} style={{ "--c": cat(c).color }} onClick={() => onChange(c)}><Icon name={cat(c).icon} size={18} /><span>{c}</span></button>)}</div>;
+function CatGrid({ list, value, onChange, type = "out", onAdd }) {
+  const [adding, setAdding] = useState(false);
+  return <>
+    <div className="catGrid">
+      {list.map((c) => <button type="button" key={c} className={"catPick" + (value === c ? " on" : "")} style={{ "--c": cat(c).color }} onClick={() => onChange(c)}><Icon name={cat(c).icon} size={18} /><span>{c}</span></button>)}
+      {onAdd && !adding && <button type="button" className="catPick addPick" onClick={() => setAdding(true)}><Icon name="plus" size={18} /><span>Nouvelle</span></button>}
+    </div>
+    {adding && <NewCategory type={type} onCancel={() => setAdding(false)} onSave={async (c) => { const r = await onAdd(c); if (r === false) return; onChange(r?.name || c.name); setAdding(false); }} />}
+  </>;
+}
+
+// Petite fenêtre intégrée : créer sa propre catégorie (enregistrée dans le compte)
+function NewCategory({ type, onCancel, onSave }) {
+  const [name, setName] = useState(""), [icon, setIcon] = useState("tag"), [color, setColor] = useState(CUSTOM_COLORS[0]), [busy, setBusy] = useState(false);
+  const ok = name.trim().length > 0;
+  const save = async () => { if (!ok || busy) return; setBusy(true); await onSave({ name: name.trim(), type, icon, color }); setBusy(false); };
+  return <div className="newCat" style={{ "--c": color }}>
+    <div className="newCatHead"><span className="newCatIco"><Icon name={icon} size={18} /></span><input className="input" placeholder={type === "in" ? "Ex. Baby-sitting, Pourboires…" : "Ex. Coiffeur, Tabac, Jardin…"} value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); save(); } }} maxLength={24} autoFocus aria-label="Nom de la catégorie" /></div>
+    <div className="newCatIcons">{CUSTOM_ICONS.map((i) => <button type="button" key={i} className={icon === i ? "on" : ""} onClick={() => setIcon(i)} aria-label={i}><Icon name={i} size={17} /></button>)}</div>
+    <div className="newCatColors">{CUSTOM_COLORS.map((c) => <button type="button" key={c} className={color === c ? "on" : ""} style={{ background: c }} onClick={() => setColor(c)} aria-label="Couleur" />)}</div>
+    <div className="newCatBtns"><button type="button" className="btn ghost sm" onClick={onCancel}>Annuler</button><button type="button" className="btn primary sm" disabled={!ok || busy} onClick={save}>{busy ? "Ajout…" : `Créer « ${name.trim() || "…"} »`}</button></div>
+  </div>;
 }
 
 /* ---------- Opération ---------- */
-export function TxForm({ tx, accounts, defaultAccount, onClose, onSave, onDelete }) {
+export function TxForm({ tx, accounts, defaultAccount, onClose, onSave, onDelete, onAddCategory }) {
   const editing = Boolean(tx?.id);
   const [type, setType] = useState(tx && tx.amount > 0 ? "in" : "out");
   const [amount, setAmount] = useState(tx ? str(Math.abs(tx.amount)) : ""), [label, setLabel] = useState(tx?.label || "");
   const [category, setCategory] = useState(tx?.category || "Courses"), [date, setDate] = useState(tx?.date || todayISO());
   const [account, setAccount] = useState(tx?.account_id || defaultAccount || ""), [busy, setBusy] = useState(false);
   const [repeat, setRepeat] = useState(false), [repeatFreq, setRepeatFreq] = useState("mensuelle");
-  const base = type === "out" ? EXPENSE_CATEGORIES : ["Salaire", "Remboursement", "Autre"];
+  const base = categoriesFor(type);
   const cats = tx?.category && !base.includes(tx.category) && (tx.amount > 0) === (type === "in") ? [...base, tx.category] : base;
   const value = num(amount), ok = value > 0 && label.trim();
   const manual = accounts.filter((a) => !a.powens_account_id || a.id === account);
@@ -55,10 +75,10 @@ export function TxForm({ tx, accounts, defaultAccount, onClose, onSave, onDelete
   return <Modal onClose={onClose}>
     <form onSubmit={submit} className="modalForm">
       <Head title={editing ? "Modifier l’opération" : "Nouvelle opération"} onClose={onClose} />
-      <div className="seg billingSeg"><button type="button" className={type === "out" ? "on" : ""} onClick={() => { setType("out"); if (!EXPENSE_CATEGORIES.includes(category)) setCategory("Courses"); }}>Dépense</button><button type="button" className={type === "in" ? "on" : ""} onClick={() => { setType("in"); setCategory("Salaire"); }}>Revenu</button></div>
+      <div className="seg billingSeg"><button type="button" className={type === "out" ? "on" : ""} onClick={() => { setType("out"); if (!categoriesFor("out").includes(category)) setCategory("Courses"); }}>Dépense</button><button type="button" className={type === "in" ? "on" : ""} onClick={() => { setType("in"); if (!categoriesFor("in").includes(category) || category === "Autre") setCategory("Salaire"); }}>Revenu</button></div>
       <label className="amountField"><span className={type === "out" ? "" : "ok"}>{type === "out" ? "−" : "+"}</span><input inputMode="decimal" placeholder="0,00" value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^\d.,]/g, ""))} autoFocus={!editing} aria-label="Montant" /><span>€</span></label>
       <label className="label">Libellé<input className="input" placeholder={type === "out" ? "Ex. Carrefour, Uber…" : "Ex. Salaire, remboursement…"} value={label} onChange={(e) => setLabel(e.target.value)} maxLength={80} /></label>
-      <div className="label">Catégorie<CatGrid list={cats} value={category} onChange={setCategory} /></div>
+      <div className="label">Catégorie<CatGrid list={cats} value={category} onChange={setCategory} type={type} onAdd={onAddCategory} /></div>
       <div className="grid g2" style={{ gap: 12 }}>
         <label className="label">Date<input className="input" type="date" value={date} onChange={(e) => setDate(e.target.value)} /></label>
         <label className="label">Compte<select className="input" value={account} onChange={(e) => setAccount(e.target.value)}><option value="">Aucun</option>{manual.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</select></label>
@@ -129,15 +149,15 @@ export function AccountSheet({ account, transactions, onClose, onEdit, onAddTx, 
 }
 
 /* ---------- Budget ---------- */
-export function BudgetForm({ budget, suggested, existing, average, onClose, onSave, onDelete }) {
+export function BudgetForm({ budget, suggested, existing, average, onClose, onSave, onDelete, onAddCategory }) {
   const editing = Boolean(budget);
-  const choices = EXPENSE_CATEGORIES.filter((c) => c !== "Épargne" && (!existing.includes(c) || c === budget?.category));
+  const choices = categoriesFor("out").filter((c) => c !== "Épargne" && (!existing.includes(c) || c === budget?.category));
   const [category, setCategory] = useState(budget?.category || suggested?.category || choices[0] || ""), [limit, setLimit] = useState(budget ? str(budget.monthly_limit) : suggested ? str(suggested.suggested) : ""), [busy, setBusy] = useState(false);
   const value = num(limit), avg = average?.(category);
   return <Modal onClose={onClose}>
     <form className="modalForm" onSubmit={async (e) => { e.preventDefault(); if (!(value > 0) || !category) return; setBusy(true); const ok = await onSave({ category, monthly_limit: value }, budget?.category); setBusy(false); if (ok !== false) onClose(); }}>
       <Head title={editing ? "Modifier le budget" : "Nouveau budget"} sub="Un plafond mensuel pour une catégorie." onClose={onClose} />
-      <div className="label">Catégorie<CatGrid list={choices} value={category} onChange={setCategory} /></div>
+      <div className="label">Catégorie<CatGrid list={choices} value={category} onChange={setCategory} type="out" onAdd={onAddCategory} /></div>
       <label className="amountField"><input inputMode="decimal" placeholder="0" value={limit} onChange={(e) => setLimit(e.target.value.replace(/[^\d.,]/g, ""))} aria-label="Plafond mensuel" /><span>€ / mois</span></label>
       {avg > 0 && <button type="button" className="avgHint" onClick={() => setLimit(String(Math.ceil(avg / 10) * 10))}><Icon name="sparkles" size={14} />Vous dépensez en moyenne <b>{money(avg)}</b> par mois en {category}. Utiliser {Math.ceil(avg / 10) * 10} €</button>}
       <button className="btn primary lg block" disabled={busy || !(value > 0) || !category}>{busy ? "Enregistrement…" : editing ? "Enregistrer" : "Créer le budget"}</button>
@@ -230,7 +250,7 @@ export function ImportModal({ email, onClose, onImport }) {
 
 /* ---------- Opération automatique ---------- */
 const FREQS = [["mensuelle", "Mois"], ["hebdomadaire", "Semaine"], ["trimestrielle", "Trimestre"], ["annuelle", "Année"]];
-export function RecurrenceForm({ rec, accounts, missing, onClose, onSave, onDelete }) {
+export function RecurrenceForm({ rec, accounts, missing, onClose, onSave, onDelete, onAddCategory }) {
   const editing = Boolean(rec?.id);
   const [type, setType] = useState(rec && rec.amount > 0 ? "in" : "out");
   const [amount, setAmount] = useState(rec ? str(Math.abs(rec.amount)) : ""), [label, setLabel] = useState(rec?.label || "");
@@ -239,7 +259,7 @@ export function RecurrenceForm({ rec, accounts, missing, onClose, onSave, onDele
   const [next, setNext] = useState(rec?.next_date || ""), [end, setEnd] = useState(rec?.end_date || ""), [active, setActive] = useState(rec ? rec.active : true), [busy, setBusy] = useState(false);
   const syncedAcc = Boolean(account && accounts.find((a) => a.id === account)?.powens_account_id);
   const day = next ? Number(next.slice(8, 10)) : null;
-  const base = type === "out" ? EXPENSE_CATEGORIES : ["Salaire", "Remboursement", "Autre"];
+  const base = categoriesFor(type);
   const cats = rec?.category && !base.includes(rec.category) ? [...base, rec.category] : base;
   const value = num(amount), ok = value > 0 && label.trim() && /^\d{4}-\d{2}-\d{2}$/.test(next);
   const rule = !day ? "" : frequency === "hebdomadaire" ? `chaque ${new Date(next + "T12:00:00").toLocaleDateString("fr-FR", { weekday: "long" })}` : frequency === "annuelle" ? `chaque année le ${new Date(next + "T12:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "long" })}` : frequency === "trimestrielle" ? `le ${day} tous les 3 mois` : `le ${day} de chaque mois`;
@@ -257,7 +277,7 @@ export function RecurrenceForm({ rec, accounts, missing, onClose, onSave, onDele
     }}>
       <Head title={editing ? "Modifier l’opération automatique" : "Nouvelle opération automatique"} sub="Créée toute seule à chaque échéance : salaire, loyer, abonnement, virement…" onClose={onClose} />
       {missing && <div className="msg info">Mise à jour de la base nécessaire : dans Supabase → SQL Editor, colle à nouveau <b>schema.sql</b> puis clique sur Run (aucune donnée n’est effacée).</div>}
-      <div className="seg billingSeg"><button type="button" className={type === "out" ? "on" : ""} onClick={() => { setType("out"); if (!EXPENSE_CATEGORIES.includes(category)) setCategory("Logement"); }}>Dépense</button><button type="button" className={type === "in" ? "on" : ""} onClick={() => { setType("in"); setCategory("Salaire"); }}>Revenu</button></div>
+      <div className="seg billingSeg"><button type="button" className={type === "out" ? "on" : ""} onClick={() => { setType("out"); if (!categoriesFor("out").includes(category)) setCategory("Logement"); }}>Dépense</button><button type="button" className={type === "in" ? "on" : ""} onClick={() => { setType("in"); if (!categoriesFor("in").includes(category) || category === "Autre") setCategory("Salaire"); }}>Revenu</button></div>
       <label className="amountField"><span className={type === "out" ? "" : "ok"}>{type === "out" ? "−" : "+"}</span><input inputMode="decimal" placeholder="0,00" value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^\d.,]/g, ""))} autoFocus={!editing} aria-label="Montant" /><span>€</span></label>
       <label className="label">Libellé<input className="input" placeholder={type === "out" ? "Ex. Loyer, Netflix, Virement Livret A…" : "Ex. Salaire, APL…"} value={label} onChange={(e) => setLabel(e.target.value)} maxLength={80} /></label>
       <div className="label">Fréquence<div className="seg billingSeg freqSeg">{FREQS.map(([v, l]) => <button type="button" key={v} className={frequency === v ? "on" : ""} onClick={() => setFrequency(v)}>{l}</button>)}</div></div>
@@ -267,7 +287,7 @@ export function RecurrenceForm({ rec, accounts, missing, onClose, onSave, onDele
         <label className="label">Fin (facultatif)<input className="input" type="date" value={end} onChange={(e) => setEnd(e.target.value)} /></label>
       </div>
       {rule && <p className="formHint"><Icon name="repeat" size={14} />{type === "out" ? "Dépense" : "Revenu"} de {value > 0 ? money(value) : "…"} {rule}, à partir du {new Date(next + "T12:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}{end ? ` jusqu’au ${new Date(end + "T12:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}` : ""}.{next < todayISO() && !syncedAcc ? " Les échéances déjà passées seront créées tout de suite." : ""}</p>}
-      <div className="label">Catégorie<CatGrid list={cats} value={category} onChange={setCategory} /></div>
+      <div className="label">Catégorie<CatGrid list={cats} value={category} onChange={setCategory} type={type} onAdd={onAddCategory} /></div>
       <label className="label">Compte<select className="input" value={account} onChange={(e) => setAccount(e.target.value)}><option value="">Aucun</option>{accounts.map((a) => <option key={a.id} value={a.id}>{a.name}{a.institution ? ` · ${a.institution}` : ""}{a.powens_account_id ? " (synchronisé)" : ""}</option>)}</select></label>
       {syncedAcc && <p className="formHint"><Icon name="info" size={14} />Compte relié à la banque : l’opération réelle arrivera avec la synchronisation, elle ne sera pas créée une deuxième fois. Ici, elle sert à prévoir vos charges à venir.</p>}
       {editing && <label className="item switchRow" style={{ borderTop: 0, padding: 0 }}><div className="itemMain"><b>Active</b><small>Désactivez-la pour la mettre en pause sans la supprimer.</small></div><input type="checkbox" className="switch" checked={active} onChange={(e) => setActive(e.target.checked)} /></label>}

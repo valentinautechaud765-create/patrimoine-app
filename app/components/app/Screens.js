@@ -261,7 +261,7 @@ export function Operations({ data, query, setQuery, limits, openPlans, open, fla
 }
 
 /* ---------------- Réglages ---------------- */
-export function Settings({ data, demo, openPlans, managePlan, logout, resetPassword, saveName, saveAvatar, privacy, setPrivacy, deleteMe, importData }) {
+export function Settings({ data, demo, openPlans, managePlan, logout, resetPassword, saveName, saveAvatar, deleteCategory, privacy, setPrivacy, deleteMe, importData }) {
   const p = data.profile, plan = planById(p.plan || "free"), email = data.session?.user?.email;
   const name = p.full_name || (email ? email.split("@")[0] : "Mon compte");
   const [editName, setEditName] = useState(null), [photoBusy, setPhotoBusy] = useState(false);
@@ -297,6 +297,11 @@ export function Settings({ data, demo, openPlans, managePlan, logout, resetPassw
         <button className="item hover tap" onClick={importData}><span className="kindIco"><Icon name="upload" size={17} /></span><div className="itemMain"><b>Importer depuis Mon Patrimoine</b><small>Comptes, opérations, budgets, placements et historique.</small></div><Icon name="chevronRight" size={16} className="faint" /></button>
       </div>
     </Panel>
+    {(p.categories || []).length > 0 && <Panel title="Mes catégories" icon="tag">
+      <div className="list">
+        {p.categories.map((c) => <div className="item" key={c.type + c.name}><CatIcon category={c.name} /><div className="itemMain"><b>{c.name}</b><small>{c.type === "in" ? "Revenu" : "Dépense"}</small></div><button className="iconBtn" onClick={() => window.confirm(`Retirer la catégorie « ${c.name} » ? Les opérations déjà classées la gardent.`) && deleteCategory(c.name)} aria-label={`Retirer ${c.name}`}><Icon name="trash" size={16} /></button></div>)}
+      </div>
+    </Panel>}
     <Panel title="Affichage" icon="eye">
       <div className="list">
         <label className="item switchRow"><span className="kindIco"><Icon name={privacy ? "eyeOff" : "eye"} size={17} /></span><div className="itemMain"><b>Mode discret</b><small>Floute tous les montants, pratique en public.</small></div>

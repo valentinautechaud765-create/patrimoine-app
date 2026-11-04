@@ -1237,3 +1237,20 @@ button.budgetRow.tap:hover { background: rgba(255, 255, 255, 0.03); }
 .avatarEdit { position: relative; cursor: pointer; flex: none; display: inline-flex; }
 .avatarEdit:hover .avatar.ring { filter: brightness(1.08); }
 .avatarCam { position: absolute; right: -2px; bottom: -2px; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: var(--blue); color: #fff; box-shadow: 0 0 0 2.5px var(--surface); }
+
+/* Catégories personnelles */
+.catPick.addPick { border-style: dashed; color: var(--blue, #3d7cff); background: transparent; }
+.catPick.addPick svg { color: var(--blue, #3d7cff); }
+.catPick span { max-width: 100%; text-align: center; line-height: 1.2; font-size: 11.5px; overflow-wrap: anywhere; hyphens: auto; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.newCat { margin-top: 10px; display: grid; gap: 12px; padding: 14px; border-radius: 16px; border: 1px solid color-mix(in srgb, var(--c) 45%, var(--line)); background: color-mix(in srgb, var(--c) 7%, var(--surface2)); min-width: 0; }
+.newCatHead { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.newCatHead .input { flex: 1; min-width: 0; }
+.newCatIco { flex: none; width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; color: var(--c); background: color-mix(in srgb, var(--c) 16%, transparent); }
+.newCatIcons { display: grid; grid-template-columns: repeat(auto-fill, minmax(36px, 1fr)); gap: 6px; }
+.newCatIcons button { height: 36px; border-radius: 10px; display: grid; place-items: center; border: 1px solid var(--line); background: var(--surface); color: var(--muted); }
+.newCatIcons button.on { border-color: var(--c); color: var(--c); background: color-mix(in srgb, var(--c) 14%, transparent); }
+.newCatColors { display: flex; flex-wrap: wrap; gap: 8px; }
+.newCatColors button { width: 26px; height: 26px; border-radius: 50%; border: 2px solid transparent; box-shadow: inset 0 0 0 2px var(--surface2); }
+.newCatColors button.on { border-color: var(--fg); }
+.newCatBtns { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+.newCatBtns .btn.primary { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

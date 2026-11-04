@@ -7,6 +7,7 @@ import { supabaseBrowser, supabaseConfigured } from "../../lib/supabase.js";
 import { demoData } from "../../lib/demo.js";
 import { OWNER_EMAILS } from "../../lib/config.js";
 import { computeModel, positionFromTrades, advanceDate, firstDate } from "../../lib/model.js";
+import { CATEGORIES, customCategories, setCustomCategories } from "../../lib/categories.js";
 
 // Jeton de connexion toujours à jour : Supabase le renouvelle (il expire au bout d'une heure).
 // Sans ça, un onglet resté ouvert longtemps affichait « Session expirée » alors qu'on est connecté.
@@ -65,6 +66,8 @@ function App() {
     ]);
     const pr = profile.data || { plan: "free" };
     pr.avatar_url = s.session.user.user_metadata?.avatar_url || null;
+    pr.categories = Array.isArray(s.session.user.user_metadata?.custom_categories) ? s.session.user.user_metadata.custom_categories : [];
+    setCustomCategories(pr.categories);
     // Propriétaire : accès complet. Le serveur l'enregistre dans la base ; l'affichage est débloqué
     // tout de suite pour l'adresse propriétaire confirmée (les routes serveur revérifient de leur côté).
     const u = s.session.user, isOwner = OWNER_EMAILS.includes(String(u.email || "").toLowerCase()) && Boolean(u.email_confirmed_at || u.confirmed_at);
@@ -356,6 +359,28 @@ function App() {
       await erase("budgets", { category });
       setData((d) => ({ ...d, budgets: d.budgets.filter((x) => x.category !== category) }));
       return { message: "Budget supprimé" };
+    },
+    async saveCategories(list, message) {
+      if (!demo) {
+        const { error } = await supabaseBrowser().auth.updateUser({ data: { custom_categories: list } });
+        if (error) throw new Error("Enregistrement impossible : " + error.message);
+      }
+      setCustomCategories(list);
+      setData((d) => ({ ...d, profile: { ...d.profile, categories: list } }));
+      return { message };
+    },
+    async addCategory(c) {
+      const name = String(c?.name || "").replace(/\s+/g, " ").trim().slice(0, 24);
+      if (!name) throw new Error("Donnez un nom à la catégorie.");
+      const all = customCategories();
+      const same = (x) => x.toLowerCase() === name.toLowerCase();
+      if (Object.keys(CATEGORIES).some(same) || all.some((x) => same(x.name) && x.type === c.type)) return { name: Object.keys(CATEGORIES).find(same) || all.find((x) => same(x.name)).name };
+      if (all.length >= 60) throw new Error("60 catégories personnelles au maximum.");
+      await actions.saveCategories([...all, { name, type: c.type === "in" ? "in" : "out", icon: c.icon || "tag", color: c.color || "#3d7cff" }], `Catégorie « ${name} » ajoutée`);
+      return { name, message: `Catégorie « ${name} » ajoutée` };
+    },
+    async deleteCategory(name) {
+      return actions.saveCategories(customCategories().filter((x) => x.name !== name), `Catégorie « ${name} » retirée (les opérations déjà classées la gardent)`);
     },
     async saveAvatar(image) {
       if (demo) { setData((d) => ({ ...d, profile: { ...d.profile, avatar_url: image } })); return { message: image ? "Photo ajoutée (démonstration)" : "Photo retirée" }; }
