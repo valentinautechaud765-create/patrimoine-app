@@ -65,7 +65,7 @@ export function TxForm({ tx, accounts, defaultAccount, onClose, onSave, onDelete
   const base = categoriesFor(type);
   const cats = tx?.category && !base.includes(tx.category) && (tx.amount > 0) === (type === "in") ? [...base, tx.category] : base;
   const value = num(amount), ok = value > 0 && label.trim();
-  const manual = accounts.filter((a) => !a.powens_account_id || a.id === account);
+  const syncedAcc = Boolean(account && accounts.find((a) => a.id === account)?.powens_account_id);
   async function submit(e) {
     e.preventDefault(); if (!ok) return;
     setBusy(true);
@@ -81,9 +81,10 @@ export function TxForm({ tx, accounts, defaultAccount, onClose, onSave, onDelete
       <div className="label">Catégorie<CatGrid list={cats} value={category} onChange={setCategory} type={type} onAdd={onAddCategory} /></div>
       <div className="grid g2" style={{ gap: 12 }}>
         <label className="label">Date<input className="input" type="date" value={date} onChange={(e) => setDate(e.target.value)} /></label>
-        <label className="label">Compte<select className="input" value={account} onChange={(e) => setAccount(e.target.value)}><option value="">Aucun</option>{manual.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</select></label>
+        <label className="label">Compte<select className="input" value={account} onChange={(e) => setAccount(e.target.value)}><option value="">Aucun</option>{accounts.map((a) => <option key={a.id} value={a.id}>{a.name}{a.institution ? ` · ${a.institution}` : ""}{a.powens_account_id ? " (synchronisé)" : ""}</option>)}</select></label>
       </div>
-      {account && !accounts.find((a) => a.id === account)?.powens_account_id && <p className="formHint"><Icon name="info" size={14} />Le solde de ce compte sera mis à jour automatiquement.</p>}
+      {account && !syncedAcc && <p className="formHint"><Icon name="info" size={14} />Le solde de ce compte sera mis à jour automatiquement.</p>}
+      {syncedAcc && <p className="formHint"><Icon name="info" size={14} />Compte relié à la banque : le solde reste celui de la banque. Quand l’opération réelle arrivera, elle sera fusionnée avec celle-ci (pas de doublon).</p>}
       {!editing && <label className="item switchRow" style={{ borderTop: 0, padding: 0 }}><span className="kindIco"><Icon name="repeat" size={17} /></span><div className="itemMain"><b>Répéter automatiquement</b><small>{repeat ? `${{ mensuelle: "Chaque mois", hebdomadaire: "Chaque semaine", trimestrielle: "Chaque trimestre", annuelle: "Chaque année" }[repeatFreq]}, à partir de cette date` : "Salaire, loyer, abonnement…"}</small></div><input type="checkbox" className="switch" checked={repeat} onChange={(e) => setRepeat(e.target.checked)} /></label>}
       {repeat && !editing && <div className="seg billingSeg freqSeg">{[["mensuelle", "Mois"], ["hebdomadaire", "Semaine"], ["trimestrielle", "Trimestre"], ["annuelle", "Année"]].map(([v, l]) => <button type="button" key={v} className={repeatFreq === v ? "on" : ""} onClick={() => setRepeatFreq(v)}>{l}</button>)}</div>}
       <button className="btn primary lg block" disabled={busy || !ok}>{busy ? "Enregistrement…" : editing ? "Enregistrer" : "Ajouter l’opération"}</button>
