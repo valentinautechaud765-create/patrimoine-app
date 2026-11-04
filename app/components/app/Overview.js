@@ -18,10 +18,13 @@ export function historyPoints(snapshots, total, days) {
   return pts;
 }
 
-function NetWorth({ m, data, limits, openPlans }) {
-  const [period, setPeriod] = useState(1);
-  const days = PERIODS[period][1];
-  const points = useMemo(() => historyPoints(data.snapshots, m.total, days), [data.snapshots, m.total, days]);
+function NetWorth({ m, data, limits, openPlans, dayCurve, liveInfo }) {
+  const periods = dayCurve ? [["1J", 0], ...PERIODS] : PERIODS;
+  const [label, setLabel] = useState(dayCurve ? "1J" : "1M");
+  const current = periods.find((x) => x[0] === label) || periods.find((x) => x[0] === "1M");
+  const days = current[1];
+  const points = useMemo(() => current[0] === "1J" ? dayCurve : historyPoints(data.snapshots, m.total, days), [data.snapshots, m.total, days, current, dayCurve]);
+  const when = (iso) => current[0] === "1J" ? new Date(iso).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : dayLabel(String(iso).slice(0, 10));
   const parts = [
     { label: "Comptes courants", value: m.cash, color: "#7fa8ff" },
     { label: "Épargne", value: m.savings, color: "#2ee59d" },
@@ -30,7 +33,7 @@ function NetWorth({ m, data, limits, openPlans }) {
   const sumParts = parts.reduce((n, p) => n + p.value, 0) || 1;
   return (
     <section className="card netWorth fadeIn">
-      <AreaChart points={points} height={190}>
+      <AreaChart points={points} height={200} fade>
         {(pt, first, hovering) => {
           const delta = pt.value - first.value, rel = first.value ? (delta / Math.abs(first.value)) * 100 : 0;
           return <div className="nwTop">
@@ -41,14 +44,15 @@ function NetWorth({ m, data, limits, openPlans }) {
                 {points.length > 1 ? <>
                   <span className={"chip " + (delta >= 0 ? "up" : "down")}><Icon name={delta >= 0 ? "upRight" : "downLeft"} size={13} stroke={2.2} />{pct(rel)}</span>
                   <span className={delta >= 0 ? "ok" : "bad"}>{signed(delta)}</span>
-                  <span className="nwWhen">{hovering ? dayLabel(pt.date) : PERIODS[period][0] === "Tout" ? "depuis le début" : `sur ${({ "1S": "7 jours", "1M": "1 mois", "3M": "3 mois", "1A": "1 an" })[PERIODS[period][0]]}`}</span>
+                  <span className="nwWhen">{hovering ? when(pt.date) : current[0] === "Tout" ? "depuis le début" : current[0] === "1J" ? "aujourd’hui" : `sur ${({ "1S": "7 jours", "1M": "1 mois", "3M": "3 mois", "1A": "1 an" })[current[0]]}`}</span>
                 </> : <span className="nwWhen">La courbe se construit jour après jour.</span>}
+                {liveInfo && !hovering && <span className="liveBadge"><i className="liveDot" />Cours en direct · {new Date(liveInfo.at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</span>}
               </div>
             </div>
             <div className="seg" role="tablist" aria-label="Période">
-              {PERIODS.map(([label, d], i) => {
+              {periods.map(([l, d]) => {
                 const lock = d > limits.historyDays;
-                return <button key={label} className={i === period ? "on" : ""} onClick={() => lock ? openPlans("plus") : setPeriod(i)}>{label}{lock && <Icon name="lock" size={11} style={{ marginLeft: 4, opacity: 0.6 }} />}</button>;
+                return <button key={l} className={l === current[0] ? "on" : ""} onClick={() => lock ? openPlans("plus") : setLabel(l)}>{l === "1J" && <i className="liveDot" />}{l}{lock && <Icon name="lock" size={11} style={{ marginLeft: 4, opacity: 0.6 }} />}</button>;
               })}
             </div>
           </div>;
@@ -214,14 +218,14 @@ export function Upcoming({ data, compact }) {
   </>;
 }
 
-export default function Overview({ m, data, limits, go, openPlans, list, open, goOps }) {
+export default function Overview({ m, data, limits, go, openPlans, list, open, goOps, dayCurve, liveInfo }) {
   const accounts = [...data.accounts].sort((a, b) => b.balance - a.balance);
   const series = useMemo(() => {
     const s = monthlySeries(data.transactions, 6), first = s.findIndex((x) => x.count > 0);
     return first < 0 ? [] : s.slice(Math.min(first, s.length - 3));
   }, [data.transactions]);
   return <>
-    <NetWorth m={m} data={data} limits={limits} openPlans={openPlans} />
+    <NetWorth m={m} data={data} limits={limits} openPlans={openPlans} dayCurve={dayCurve} liveInfo={liveInfo} />
     <GettingStarted data={data} open={open} go={go} />
     <Kpis m={m} />
     <div className="grid g3">

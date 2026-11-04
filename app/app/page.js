@@ -268,6 +268,18 @@ function App() {
       });
       return { message: "Import terminé", ok: true, summary: { comptes: createdAcc.length + updated.length, operations: createdTx.length, ignorees: (file.operations || []).length - createdTx.length, placements: createdH.length + updH.length, budgets: budgets.length, jours: hist.length } };
     },
+    // Cours de bourse en direct (serveur Patrimo → Tradegate / Yahoo / Twelve Data)
+    async fetchQuotes(symbols, withDay) {
+      const token = live.current?.session?.access_token;
+      const r = await fetch(`/api/cours?symbols=${encodeURIComponent(symbols.join(","))}${withDay ? "&jour=1" : ""}`, { headers: token ? { Authorization: "Bearer " + token } : {} });
+      if (!r.ok) throw new Error("Cours indisponibles");
+      return r.json();
+    },
+    // Enregistre de temps en temps la valeur au dernier cours (pour l'historique et le calcul du soir)
+    async syncHoldingValues(list) {
+      if (demo) return;
+      for (const h of list) await supabaseBrowser().from("holdings").update({ value: h.value, updated_at: new Date().toISOString() }).eq("id", h.id);
+    },
     async deleteAccountForever() {
       if (demo) return { message: "Démonstration : rien n’est supprimé." };
       await api("/api/compte/supprimer");

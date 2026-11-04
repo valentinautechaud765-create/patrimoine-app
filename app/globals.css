@@ -334,7 +334,7 @@ input[type="range"]::-moz-range-thumb { width: 18px; height: 18px; border-radius
 
 .investHero { position: relative; overflow: hidden; }
 .investHero::before { content: ""; position: absolute; inset: 0; background: radial-gradient(ellipse 60% 80% at 100% 0%, rgba(61, 124, 255, 0.14), transparent 70%); pointer-events: none; }
-.investStats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); position: relative; }
+.investStats { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 12px; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); position: relative; }
 .investStats small { display: block; font-size: 12px; color: var(--muted); margin-bottom: 3px; }
 .investStats b { font-weight: 500; font-size: 16px; font-variant-numeric: tabular-nums; }
 .allocBox { display: flex; align-items: center; gap: 20px; padding: 6px 0 10px; }
@@ -831,3 +831,18 @@ button.budgetRow.tap:hover { background: rgba(255, 255, 255, 0.03); }
 .side:hover .navLabel, .side:hover .lockBadge { opacity: 1; transition-delay: 0.06s; }
 .navItem.on { background: rgba(61, 124, 255, 0.14); }
 @media (hover: none) { .side:active { width: 252px; } }
+
+/* Courbe façon Mon Patrimoine : pleine largeur, bords gauche et droit fondus */
+.area.fade svg { -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 9%, #000 91%, transparent 100%); mask-image: linear-gradient(90deg, transparent 0, #000 9%, #000 91%, transparent 100%); }
+.netWorth .area { margin: 18px -24px 0; width: auto; }
+@container app (max-width: 860px) { .netWorth .area { margin: 16px -18px 0; } }
+.liveDot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 0 rgba(46, 229, 157, 0.6); animation: livePulse 1.8s infinite; margin-right: 6px; vertical-align: 1px; }
+@keyframes livePulse { 70% { box-shadow: 0 0 0 7px rgba(46, 229, 157, 0); } 100% { box-shadow: 0 0 0 0 rgba(46, 229, 157, 0); } }
+.liveBadge { display: inline-flex; align-items: center; font-size: 12px; color: var(--muted); margin-left: 4px; }
+.priceCell { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; }
+.priceCell small { font-size: 12px; }
+@container app (max-width: 860px) {
+  .table :is(th, td):nth-child(3) { display: table-cell; }
+  .table :is(th, td):nth-child(4) { display: none; }
+  .liveBadge { width: 100%; margin: 4px 0 0; }
+}

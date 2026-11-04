@@ -55,7 +55,7 @@ export function Accounts({ m, data, connectBank, limits, openPlans, open }) {
 }
 
 /* ---------------- Investissements ---------------- */
-export function Investments({ m, data, limits, openPlans, open }) {
+export function Investments({ m, data, limits, openPlans, open, liveInfo }) {
   const holdings = [...data.holdings].sort((a, b) => b.value - a.value);
   const gain = m.hValue - m.cost, gainPct = m.cost > 0 ? (gain / m.cost) * 100 : 0;
   const parts = Object.entries(m.allocation).map(([label, value]) => ({ label, value, color: ASSET_COLORS[label] || "#7fa8ff" })).sort((a, b) => b.value - a.value);
@@ -63,9 +63,10 @@ export function Investments({ m, data, limits, openPlans, open }) {
   const content = <>
     <div className="grid g3">
       <section className="card panel investHero span2">
-        <div className="eyebrow">Valeur des placements</div>
+        <div className="eyebrow">Valeur des placements{liveInfo && <span className="liveBadge" style={{ textTransform: "none", letterSpacing: 0, marginLeft: 10 }}><i className="liveDot" />en direct · {new Date(liveInfo.at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</span>}</div>
         <div className="nwAmount" style={{ fontSize: "clamp(32px, 4vw, 42px)" }}><Amount value={m.invest} /></div>
         <div className="investStats">
+          {liveInfo && <div><small>Aujourd’hui</small><b className={liveInfo.dayGain >= 0 ? "ok" : "bad"}>{signed(liveInfo.dayGain)}</b></div>}
           <div><small>Plus-value latente</small><b className={gain >= 0 ? "ok" : "bad"}>{signed(gain)}</b></div>
           <div><small>Performance</small><b className={gain >= 0 ? "ok" : "bad"}>{pct(gainPct)}</b></div>
           <div><small>Montant investi</small><b>{money0(m.cost)}</b></div>
@@ -85,19 +86,20 @@ export function Investments({ m, data, limits, openPlans, open }) {
     </div>
     <Panel title="Positions" action="Ajouter une position" onAction={() => open("holding")}>
       {holdings.length ? <div className="tableWrap"><table className="table">
-        <thead><tr><th>Actif</th><th>Poids</th><th>Prix de revient</th><th>Valeur</th><th>+/− value</th></tr></thead>
+        <thead><tr><th>Actif</th><th>Poids</th><th>Cours</th><th>Prix de revient</th><th>Valeur</th><th>+/− value</th></tr></thead>
         <tbody>{holdings.map((h) => {
           const g = h.value - h.cost_basis, gp = h.cost_basis > 0 ? (g / h.cost_basis) * 100 : 0;
           return <tr key={h.id} className="tap" onClick={() => open("holding", { holding: h })}>
             <td><div className="name"><TickerIcon holding={h} /><div className="itemMain"><b>{h.name}</b><small>{h.ticker ? h.ticker + " · " : ""}{Number(h.quantity).toLocaleString("fr-FR", { maximumFractionDigits: 6 })} part{h.quantity > 1 ? "s" : ""}</small></div></div></td>
             <td><span className="weight"><i style={{ width: Math.round((h.value / (m.hValue || 1)) * 100) + "%", background: ASSET_COLORS[h.asset_class] || "#7fa8ff" }} />{Math.round((h.value / (m.hValue || 1)) * 100)} %</span></td>
-            <td>{money(h.cost_basis, h.currency)}</td>
-            <td><b style={{ fontWeight: 500 }}>{money(h.value, h.currency)}</b></td>
+            <td>{h.live ? <div className="priceCell"><span>{money(h.live.price, h.live.currency)}</span>{h.live.changePct != null && <small className={h.live.changePct >= 0 ? "ok" : "bad"}>{pct(h.live.changePct)}</small>}</div> : <span className="faint">{h.ticker ? "—" : "Saisi"}</span>}</td>
+            <td>{money(h.cost_basis, "EUR")}</td>
+            <td><b style={{ fontWeight: 500 }}>{money(h.value, "EUR")}</b></td>
             <td><div className="gainCell"><span className={g >= 0 ? "ok" : "bad"}>{signed(g)}</span><small className={g >= 0 ? "ok" : "bad"}>{pct(gp)}</small></div></td>
           </tr>;
         })}</tbody>
       </table></div> : <Empty icon="trending" title="Aucune position" text="Ajoutez vos actions, ETF et cryptos pour suivre vos plus-values."><button className="btn primary sm" onClick={() => open("holding")}><Icon name="plus" size={15} />Ajouter une position</button></Empty>}
-      {holdings.length > 0 && <p className="finePrint" style={{ justifyContent: "flex-start", margin: "10px 0 4px" }}><Icon name="info" size={13} />Touchez une ligne pour mettre à jour sa valeur.</p>}
+      {holdings.length > 0 && <p className="finePrint" style={{ justifyContent: "flex-start", margin: "10px 0 4px" }}><Icon name="info" size={13} />{liveInfo ? "Les lignes avec un symbole boursier suivent le cours en direct (Tradegate, Yahoo Finance). Touchez une ligne pour la modifier." : "Ajoutez le symbole boursier d’une ligne (ex. VWCE, AAPL) pour suivre son cours en direct. Touchez une ligne pour la modifier."}</p>}
     </Panel>
   </>;
   if (limits.investments) return content;

@@ -51,7 +51,73 @@ export default function AppView({ data, demo, embedded, initialTab = "overview",
   useEffect(() => { if (embedded) return; try { setPrivacyState(localStorage.getItem("patrimo.privacy") === "1"); } catch {} }, [embedded]);
   const setPrivacy = (v) => { setPrivacyState(v); try { localStorage.setItem("patrimo.privacy", v ? "1" : "0"); } catch {} };
   const toastTimer = useRef(0), searchRef = useRef(null), scroller = useRef(null);
-  const m = useMemo(() => computeModel(data), [data]);
+  const p0 = data.profile || { plan: "free" }, limits0 = limitsFor(p0.plan || "free");
+  // ---------- Cours en direct : rafraîchis toutes les 30 s, courbe du jour toutes les 5 min ----------
+  const [market, setMarket] = useState({ quotes: {}, eurPerUsd: null, intraday: {}, at: null });
+  const symbols = useMemo(() => [...new Set(data.holdings.filter((h) => h.ticker && Number(h.quantity) > 0).map((h) => String(h.ticker).toUpperCase()))].sort(), [data.holdings]);
+  const symKey = symbols.join(",");
+  useEffect(() => {
+    if (embedded || !symbols.length || !limits0.investments || !actions.fetchQuotes) return;
+    let stop = false, lastDay = 0, timer = 0;
+    const tick = async () => {
+      const withDay = Date.now() - lastDay > 5 * 60e3;
+      try {
+        const r = await actions.fetchQuotes(symbols, withDay);
+        if (stop) return;
+        if (withDay) lastDay = Date.now();
+        setMarket((m0) => ({ quotes: { ...m0.quotes, ...r.quotes }, eurPerUsd: r.eurPerUsd || m0.eurPerUsd, intraday: withDay ? r.intraday : m0.intraday, at: r.at }));
+      } catch {}
+      if (!stop) timer = setTimeout(tick, document.hidden ? 120e3 : 30e3);
+    };
+    tick();
+    const vis = () => { if (!document.hidden) { clearTimeout(timer); tick(); } };
+    document.addEventListener("visibilitychange", vis);
+    return () => { stop = true; clearTimeout(timer); document.removeEventListener("visibilitychange", vis); };
+  }, [symKey, embedded, limits0.investments]); // eslint-disable-line
+  const toEur = (price, cur) => cur === "EUR" ? price : cur === "USD" && market.eurPerUsd ? price * market.eurPerUsd : null;
+  const liveData = useMemo(() => {
+    if (!Object.keys(market.quotes).length) return data;
+    const holdings = data.holdings.map((h) => {
+      const q = market.quotes[String(h.ticker || "").toUpperCase()], qty = Number(h.quantity) || 0;
+      const eur = q && qty > 0 ? toEur(q.price, q.currency) : null;
+      if (!(eur > 0)) return h;
+      const value = Math.round(qty * eur * 100) / 100;
+      return { ...h, value, live: { price: q.price, currency: q.currency, priceEur: eur, changePct: q.changePct, source: q.source, dayGain: q.changePct != null ? value - value / (1 + q.changePct / 100) : null } };
+    });
+    return { ...data, holdings };
+  }, [data, market]); // eslint-disable-line
+  // Valeur au dernier cours enregistrée au plus toutes les 15 minutes
+  const lastSync = useRef(0);
+  useEffect(() => {
+    if (embedded || !market.at || Date.now() - lastSync.current < 15 * 60e3) return;
+    const changed = liveData.holdings.filter((h) => h.live && Math.abs(h.value - (data.holdings.find((x) => x.id === h.id)?.value || 0)) >= 0.01);
+    if (!changed.length) return;
+    lastSync.current = Date.now();
+    actions.syncHoldingValues?.(changed).catch(() => {});
+  }, [market.at]); // eslint-disable-line
+  // Courbe de la journée : reste du patrimoine constant + placements cotés à chaque instant
+  const dayCurve = useMemo(() => {
+    const series = Object.entries(market.intraday || {});
+    if (!series.length) return null;
+    const lines = liveData.holdings.filter((h) => h.live && market.intraday[String(h.ticker).toUpperCase()]);
+    if (!lines.length) return null;
+    const totalNow = computeModel(liveData).total, base = totalNow - lines.reduce((n, h) => n + h.value, 0);
+    const times = [...new Set(lines.flatMap((h) => market.intraday[String(h.ticker).toUpperCase()].points.map((x) => x.t)))].sort((a, b) => a - b);
+    const pts = times.map((t) => {
+      let v = base;
+      for (const h of lines) {
+        const d = market.intraday[String(h.ticker).toUpperCase()], arr = d.points;
+        let k = arr.findIndex((x) => x.t > t); k = k < 0 ? arr.length - 1 : Math.max(0, k - 1);
+        const eur = toEur(arr[k].p, d.currency); v += (Number(h.quantity) || 0) * (eur || 0);
+      }
+      return { date: new Date(t).toISOString(), value: Math.round(v * 100) / 100 };
+    });
+    pts.push({ date: new Date().toISOString(), value: Math.round(totalNow * 100) / 100 });
+    return pts;
+  }, [market.intraday, liveData]); // eslint-disable-line
+  const liveInfo = market.at && liveData.holdings.some((h) => h.live) ? { at: market.at, dayGain: liveData.holdings.reduce((n, h) => n + (h.live?.dayGain || 0), 0) } : null;
+
+  const m = useMemo(() => computeModel(liveData), [liveData]);
   const list = useMemo(() => insights(m), [m]);
   const p = data.profile || { plan: "free" }, plan = p.plan || "free", limits = limitsFor(plan);
   const email = data.session?.user?.email, name = p.full_name || (email ? email.split("@")[0] : "");
@@ -86,9 +152,9 @@ export default function AppView({ data, demo, embedded, initialTab = "overview",
   const trialing = p.plan_status === "trialing", trialLeft = p.trial_days_left ?? TRIAL_DAYS;
 
   const screen = {
-    overview: <Overview m={m} data={data} limits={limits} go={go} openPlans={openPlans} list={list} open={open} goOps={goOps} />,
+    overview: <Overview m={m} data={liveData} dayCurve={dayCurve} liveInfo={liveInfo} limits={limits} go={go} openPlans={openPlans} list={list} open={open} goOps={goOps} />,
     accounts: <Accounts m={m} data={data} limits={limits} openPlans={openPlans} open={open} connectBank={() => run(actions.connectBank)} />,
-    invest: <Investments m={m} data={data} limits={limits} openPlans={openPlans} open={open} />,
+    invest: <Investments m={m} data={liveData} liveInfo={liveInfo} limits={limits} openPlans={openPlans} open={open} />,
     budget: <Budget m={m} data={data} limits={limits} openPlans={openPlans} open={open} />,
     ops: <Operations key={opsCat} data={data} query={query} setQuery={setQuery} limits={limits} openPlans={openPlans} open={open} flash={flash} initialCategory={opsCat} />,
     settings: <Settings data={data} demo={demo} openPlans={openPlans} managePlan={() => run(actions.managePlan)} logout={() => run(actions.logout)} resetPassword={() => run(actions.resetPassword)} saveName={(n) => run(actions.saveName, n)} importData={() => open("import")} privacy={privacy} setPrivacy={setPrivacy} deleteMe={() => open("deleteMe")} />,

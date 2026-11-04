@@ -2,7 +2,7 @@
 import { useId, useMemo, useRef, useState } from "react";
 
 // Courbe principale : l'en-tête (render prop) reçoit le point survolé.
-export function AreaChart({ points, height = 200, children, color: forced }) {
+export function AreaChart({ points, height = 200, children, color: forced, fade }) {
   const [hover, setHover] = useState(null);
   const gid = "ag" + useId().replace(/:/g, "");
   const box = useRef(null), raf = useRef(0), timer = useRef(0);
@@ -34,13 +34,13 @@ export function AreaChart({ points, height = 200, children, color: forced }) {
   const i = hover == null ? geo.pts.length - 1 : hover, p = geo.xy[i];
   return <>
     {children && children(geo.pts[i], geo.pts[0], hover != null)}
-    <div className="area" ref={box} style={{ height }} onPointerDown={pick} onPointerMove={(e) => (e.pointerType === "mouse" || e.buttons) && pick(e)} onPointerLeave={(e) => e.pointerType === "mouse" && setHover(null)} onPointerUp={(e) => { if (e.pointerType !== "mouse") timer.current = setTimeout(() => setHover(null), 2200); }}>
+    <div className={"area" + (fade ? " fade" : "")} ref={box} style={{ height }} onPointerDown={pick} onPointerMove={(e) => (e.pointerType === "mouse" || e.buttons) && pick(e)} onPointerLeave={(e) => e.pointerType === "mouse" && setHover(null)} onPointerUp={(e) => { if (e.pointerType !== "mouse") timer.current = setTimeout(() => setHover(null), 2200); }}>
       <svg viewBox="0 0 1000 104" preserveAspectRatio="none" role="img" aria-label="Évolution">
         <defs><linearGradient id={gid} x1="0" x2="0" y1="0" y2="1"><stop offset="0" stopColor={color} stopOpacity=".32" /><stop offset=".7" stopColor={color} stopOpacity=".04" /><stop offset="1" stopColor={color} stopOpacity="0" /></linearGradient></defs>
         <path d={geo.fill} fill={`url(#${gid})`} />
         <path d={geo.line} fill="none" stroke={color} strokeWidth="2.2" vectorEffect="non-scaling-stroke" strokeLinecap="round" />
       </svg>
-      {p && <span className={"areaDot" + (hover == null ? " live" : "")} style={{ left: p[0] / 10 + "%", top: (p[1] / 104) * 100 + "%", "--c": color }} />}
+      {p && (hover != null || !fade) && <span className={"areaDot" + (hover == null ? " live" : "")} style={{ left: p[0] / 10 + "%", top: (p[1] / 104) * 100 + "%", "--c": color }} />}
       {hover != null && p && <span className="areaRule" style={{ left: p[0] / 10 + "%" }} />}
     </div>
   </>;
