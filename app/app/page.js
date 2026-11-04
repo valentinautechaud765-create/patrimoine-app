@@ -322,6 +322,12 @@ function App() {
       return { message: a.id ? "Compte modifié" : "Compte ajouté" };
     },
     async deleteAccount(a) {
+      // Compte synchronisé : supprimé aussi chez Powens (sinon la synchro le remettrait), avec ses opérations bancaires
+      if (a.powens_account_id && !demo) {
+        await api("/api/powens/supprimer", { accountId: a.id });
+        setData((d) => ({ ...d, accounts: d.accounts.filter((x) => x.id !== a.id), transactions: d.transactions.filter((t) => !(t.account_id === a.id && t.external_id)).map((t) => t.account_id === a.id ? { ...t, account_id: null } : t) }));
+        return { message: "Compte supprimé (et retiré de la synchronisation bancaire)" };
+      }
       await erase("accounts", { id: a.id });
       setData((d) => ({ ...d, accounts: d.accounts.filter((x) => x.id !== a.id), transactions: d.transactions.map((t) => t.account_id === a.id ? { ...t, account_id: null } : t) }));
       return { message: "Compte supprimé" };
@@ -558,6 +564,7 @@ function App() {
       await load();
       setData((d) => d && ({ ...d, bankErrors: r.errors || [], lastSync: r.at }));
       if (r.errors?.length) return { ok: true, message: `${r.errors[0].bank} demande une nouvelle connexion (sécurité de votre banque).` };
+      if (r.removedDuplicateAccounts) return { message: `${r.removedDuplicateAccounts} compte${r.removedDuplicateAccounts > 1 ? "s" : ""} en double supprimé${r.removedDuplicateAccounts > 1 ? "s" : ""}, comptes à jour` };
       const mir = r.mirroredTransfers ? ` · ${r.mirroredTransfers} virement${r.mirroredTransfers > 1 ? "s" : ""} reporté${r.mirroredTransfers > 1 ? "s" : ""} sur vos comptes saisis à la main` : "";
       return { message: (r.transactions ? `${r.transactions} nouvelle${r.transactions > 1 ? "s" : ""} opération${r.transactions > 1 ? "s" : ""} importée${r.transactions > 1 ? "s" : ""}` : "Comptes à jour") + mir };
     },

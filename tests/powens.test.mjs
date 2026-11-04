@@ -18,7 +18,9 @@ function fakeDb() {
       gte(k, v) { filters.push((r) => String(r[k]) >= String(v)); return b; }, in(k, v) { filters.push((r) => v.includes(r[k])); return b; },
       maybeSingle() { return Promise.resolve({ data: apply()[0] || null }); },
       update(p) { op = "update"; payload = p; return b; }, insert(p) { op = "insert"; payload = p; return b; }, upsert(p, o) { op = "upsert"; payload = p; opts = o; return b; },
+      delete() { op = "delete"; return b; },
       then(res) {
+        if (op === "delete") { const gone = apply(); t[table] = t[table].filter((r) => !gone.includes(r)); return res({ data: gone, error: null }); }
         if (op === "update") { apply().forEach((r) => Object.assign(r, payload)); return res({ data: null, error: null }); }
         if (op === "insert") { const ins = (Array.isArray(payload) ? payload : [payload]).map((r) => ({ id: "id" + n++, ...r })); t[table].push(...ins); return res({ data: ins, error: null }); }
         if (op === "upsert") { const ins = payload.filter((r) => !t[table].some((x) => x.user_id === r.user_id && x.external_id === r.external_id)).map((r) => ({ id: "id" + n++, ...r })); t[table].push(...ins); return res({ data: ins, error: null }); }
@@ -48,8 +50,10 @@ const bankV1 = () => ({
     { id: 106, id_account: 1, date: "2026-11-02", value: -150, simplified_wording: "To pocket Appart" },
     { id: 107, id_account: 2, date: "2026-11-02", value: 150, simplified_wording: "From main" }],
 });
-globalThis.fetch = async (url) => {
+const CALLS = [];
+globalThis.fetch = async (url, opts = {}) => {
   const path = String(url).replace("https://test.biapi.pro/2.0", "");
+  CALLS.push((opts.method || "GET") + " " + path.split("?")[0]);
   const body = path.startsWith("/users/me/connections") ? { connections: BANK.connections }
     : path.startsWith("/users/me/accounts") ? { accounts: BANK.accounts }
     : path.startsWith("/users/me/transactions") ? { transactions: BANK.transactions } : {};
@@ -216,4 +220,38 @@ test("virement BNP ↔ Revolut (saisi à la main) : l'opération en face est cr�
   // Nouvelle synchro : rien n'est recréé, les soldes ne bougent pas
   const r2 = await syncUser(db, "u1");
   assert.equal(r2.mirroredTransfers, 0); assert.equal(acc("rev1").balance, 20.83); assert.equal(tx.length, onRev1.length + 1 + 5);
+});
+
+
+test("connexions en double (« Connecter ma banque » cliqué 5 fois) : 2 comptes seulement, copies et opérations en trop nettoyées", async () => {
+  // Powens : 5 connexions BNP de test, chacune avec les 2 mêmes comptes (même numéro) et les mêmes opérations
+  const connections = [11, 12, 13, 14, 15].map((id) => ({ id, connector: { name: "BNP Paribas" } }));
+  const accounts = connections.flatMap((c, i) => [
+    { id: 100 + i * 2, id_connection: c.id, name: "Compte de chèques", number: "FR001", type: "checking", balance: -90 },
+    { id: 101 + i * 2, id_connection: c.id, name: "Compte de chèques", number: "FR002", type: "checking", balance: -99.01 }]);
+  const transactions = accounts.map((a, i) => ({ id: 1000 + i, id_account: a.id, date: "2026-11-04", value: a.number === "FR001" ? -90 : -99.01, simplified_wording: "PRLV TEST" }));
+  BANK = { connections, accounts, transactions };
+  const db = fakeDb();
+  // Dans Patrimo : les 10 copies déjà créées ce matin, chacune avec son opération, + une opération bancaire orpheline
+  accounts.forEach((a) => {
+    db.tables.accounts.push({ id: "acc" + a.id, user_id: "u1", powens_account_id: String(a.id), name: a.name, institution: "BNP Paribas", kind: "courant", balance: a.balance });
+    db.tables.transactions.push({ id: "tx" + a.id, user_id: "u1", account_id: "acc" + a.id, date: "2026-11-04", amount: a.balance, label: "PRLV TEST", external_id: "powens:" + (1000 + accounts.indexOf(a)) });
+  });
+  db.tables.transactions.push({ id: "orphan", user_id: "u1", account_id: null, date: "2026-11-03", amount: -90, label: "VIEUX", external_id: "powens:999" });
+  db.tables.transactions.push({ id: "manuelle", user_id: "u1", account_id: null, date: "2026-11-03", amount: -12, label: "Kebab", external_id: null });
+  CALLS.length = 0;
+  const r = await syncUser(db, "u1");
+  const accs = db.tables.accounts, tx = db.tables.transactions;
+  assert.equal(accs.length, 2);                                                   // plus que 2 comptes
+  assert.deepEqual(accs.map((a) => a.balance).sort(), [-90, -99.01].sort());
+  assert.equal(Math.round(accs.reduce((s, a) => s + a.balance, 0) * 100) / 100, -189.01); // et non −945 €
+  assert.equal(r.removedDuplicateAccounts, 8);
+  assert.equal(tx.filter((t) => t.label === "PRLV TEST").length, 2);              // une opération par vrai compte
+  assert.ok(!tx.some((t) => t.id === "orphan"));                                   // orpheline bancaire supprimée
+  assert.ok(tx.some((t) => t.id === "manuelle"));                                  // une opération manuelle n'est jamais touchée
+  assert.equal(CALLS.filter((c) => c.startsWith("DELETE /users/me/connections/")).length, 4); // 4 connexions inutiles supprimées chez Powens
+  assert.ok(!CALLS.includes("DELETE /users/me/connections/15"));                  // la plus récente est gardée
+  // Synchro suivante : stable
+  const r2 = await syncUser(db, "u1");
+  assert.equal(db.tables.accounts.length, 2); assert.equal(r2.newAccounts, 0); assert.equal(r2.transactions, 0);
 });
