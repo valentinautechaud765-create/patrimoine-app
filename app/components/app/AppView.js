@@ -7,6 +7,7 @@ import { BRAND, PLANS, TRIAL_DAYS, formatPrice, planById, limitsFor } from "../.
 import Overview from "./Overview.js";
 import { Accounts, Investments, Budget, Operations, Settings } from "./Screens.js";
 import { InsightList } from "./Overview.js";
+import { HoldingSheet, TradeForm, PortfolioCurve } from "./Holding.js";
 import { Modal, Head, TxForm, AccountForm, AccountSheet, BudgetForm, HoldingForm, DeleteMeModal, ImportModal } from "./Forms.js";
 
 export const NAV = [
@@ -47,8 +48,9 @@ function PlansModal({ current, initial, trialUsed, onClose, onChoose }) {
 export default function AppView({ data, demo, embedded, initialTab = "overview", actions = {}, initialModal = null }) {
   const [tab, setTab] = useState(initialTab), [modal, setModal] = useState(initialModal), [toast, setToast] = useState(null);
   const [query, setQuery] = useState(""), [bell, setBell] = useState(false), [scrolled, setScrolled] = useState(false);
-  const [privacy, setPrivacyState] = useState(false), [opsCat, setOpsCat] = useState("");
-  useEffect(() => { if (embedded) return; try { setPrivacyState(localStorage.getItem("patrimo.privacy") === "1"); } catch {} }, [embedded]);
+  const [privacy, setPrivacyState] = useState(false), [opsCat, setOpsCat] = useState(""), [charts, setChartsState] = useState(true);
+  useEffect(() => { if (embedded) return; try { setPrivacyState(localStorage.getItem("patrimo.privacy") === "1"); setChartsState(localStorage.getItem("patrimo.charts") !== "0"); } catch {} }, [embedded]);
+  const setCharts = (v) => { setChartsState(v); try { localStorage.setItem("patrimo.charts", v ? "1" : "0"); } catch {} };
   const setPrivacy = (v) => { setPrivacyState(v); try { localStorage.setItem("patrimo.privacy", v ? "1" : "0"); } catch {} };
   const toastTimer = useRef(0), searchRef = useRef(null), scroller = useRef(null);
   const p0 = data.profile || { plan: "free" }, limits0 = limitsFor(p0.plan || "free");
@@ -153,14 +155,17 @@ export default function AppView({ data, demo, embedded, initialTab = "overview",
   const trialing = p.plan_status === "trialing", trialLeft = p.trial_days_left ?? TRIAL_DAYS;
 
   const screen = {
-    overview: <Overview m={m} data={liveData} dayCurve={dayCurve} liveInfo={liveInfo} limits={limits} go={go} openPlans={openPlans} list={list} open={open} goOps={goOps} />,
+    overview: <Overview m={m} data={liveData} dayCurve={dayCurve} liveInfo={liveInfo} showChart={charts} limits={limits} go={go} openPlans={openPlans} list={list} open={open} goOps={goOps} />,
     accounts: <Accounts m={m} data={data} limits={limits} openPlans={openPlans} open={open} connectBank={() => run(actions.connectBank)} />,
-    invest: <Investments m={m} data={liveData} liveInfo={liveInfo} limits={limits} openPlans={openPlans} open={open} />,
+    invest: <Investments m={m} data={liveData} liveInfo={liveInfo} curve={charts && limits.investments ? <PortfolioCurve holdings={liveData.holdings} intraday={market.intraday} eurPerUsd={market.eurPerUsd} fetchHistory={actions.fetchHistory} /> : null} limits={limits} openPlans={openPlans} open={open} />,
     budget: <Budget m={m} data={data} limits={limits} openPlans={openPlans} open={open} />,
     ops: <Operations key={opsCat} data={data} query={query} setQuery={setQuery} limits={limits} openPlans={openPlans} open={open} flash={flash} initialCategory={opsCat} />,
     settings: <Settings data={data} demo={demo} openPlans={openPlans} managePlan={() => run(actions.managePlan)} logout={() => run(actions.logout)} resetPassword={() => run(actions.resetPassword)} saveName={(n) => run(actions.saveName, n)} importData={() => open("import")} privacy={privacy} setPrivacy={setPrivacy} deleteMe={() => open("deleteMe")} />,
   }[tab];
   const viewed = modal?.type === "accountView" ? data.accounts.find((a) => a.id === modal.id) : null;
+  const holdingOf = (id) => liveData.holdings.find((h) => h.id === id);
+  const viewedH = modal?.type === "holdingView" || modal?.type === "trade" ? holdingOf(modal.id) : null;
+  const tradesOf = (id) => (data.trades || []).filter((t) => t.holding_id === id);
 
   return (
     <div className={"appRoot" + (embedded ? " embedded" : "") + (privacy ? " privacy" : "")}>
@@ -192,6 +197,7 @@ export default function AppView({ data, demo, embedded, initialTab = "overview",
             <div className="topTitle"><h1>{title}</h1>{tab === "overview" && <small>{today.charAt(0).toUpperCase() + today.slice(1)}</small>}</div>
             <label className="search"><Icon name="search" size={16} /><input ref={searchRef} placeholder="Rechercher…" value={query} onChange={(e) => { setQuery(e.target.value); if (tab !== "ops") setTab("ops"); }} /><kbd>⌘K</kbd></label>
             <button className="iconBtn" aria-label={privacy ? "Afficher les montants" : "Masquer les montants"} title={privacy ? "Afficher les montants" : "Masquer les montants"} onClick={() => setPrivacy(!privacy)}><Icon name={privacy ? "eyeOff" : "eye"} size={18} /></button>
+            <button className={"iconBtn" + (charts ? " active" : "")} aria-label={charts ? "Masquer les courbes" : "Afficher les courbes"} title={charts ? "Masquer les courbes" : "Afficher les courbes"} onClick={() => setCharts(!charts)}><Icon name={charts ? "chart" : "chartOff"} size={18} /></button>
             <div className="bellWrap">
               <button className="iconBtn" aria-label="Notifications" onClick={() => setBell(!bell)}><Icon name="bell" size={18} />{limits.insights && list.length > 0 && <i className="badgeDot" />}</button>
               {bell && <div className="popover"><div className="popHead">Notifications</div>{limits.insights ? <InsightList list={list} /> : <div className="muted" style={{ fontSize: 13.5, padding: "6px 0 4px" }}>Les alertes de budget et l’analyse automatique arrivent avec Plus. <button className="link" onClick={() => { setBell(false); openPlans("plus"); }}>Découvrir</button></div>}</div>}
@@ -203,6 +209,7 @@ export default function AppView({ data, demo, embedded, initialTab = "overview",
             <div className="topTitle"><h1>{title}</h1>{tab === "overview" && <small>{today.charAt(0).toUpperCase() + today.slice(1)}</small>}</div>
             <div style={{ display: "flex", gap: 8 }}>
               <button className="iconBtn" aria-label={privacy ? "Afficher les montants" : "Masquer les montants"} onClick={() => setPrivacy(!privacy)}><Icon name={privacy ? "eyeOff" : "eye"} size={18} /></button>
+              <button className={"iconBtn" + (charts ? " active" : "")} aria-label={charts ? "Masquer les courbes" : "Afficher les courbes"} onClick={() => setCharts(!charts)}><Icon name={charts ? "chart" : "chartOff"} size={18} /></button>
               <button className="iconBtn" aria-label="Ajouter une opération" onClick={() => setModal({ type: "tx" })}><Icon name="plus" size={18} /></button>
               <button className="avatarBtn" aria-label="Réglages" onClick={() => go("settings")}><span className="avatar">{(first || "?").charAt(0)}</span></button>
             </div>
@@ -226,6 +233,8 @@ export default function AppView({ data, demo, embedded, initialTab = "overview",
       {modal?.type === "budget" && <BudgetForm budget={modal.budget} suggested={modal.suggested} existing={data.budgets.map((b) => b.category)} average={average} onClose={close} onSave={(b, prev) => run(actions.saveBudget, b, prev)} onDelete={(c) => run(actions.deleteBudget, c)} />}
       {modal?.type === "holding" && <HoldingForm holding={modal.holding} onClose={close} onSave={(h) => run(actions.saveHolding, h)} onDelete={(h) => run(actions.deleteHolding, h)} />}
       {modal?.type === "import" && <ImportModal email={email} onClose={close} onImport={(f) => run(actions.importMonPatrimoine, f)} />}
+      {modal?.type === "holdingView" && viewedH && <HoldingSheet holding={viewedH} trades={tradesOf(viewedH.id)} tradesMissing={data.tradesMissing} fetchHistory={actions.fetchHistory} onClose={close} onEdit={() => open("holding", { holding: data.holdings.find((h) => h.id === viewedH.id) })} onTrade={(type) => open("trade", { id: viewedH.id, tradeType: type })} onOpenTrade={(t) => open("trade", { id: viewedH.id, trade: t })} />}
+      {modal?.type === "trade" && viewedH && <TradeForm holding={viewedH} trade={modal.trade} initialType={modal.tradeType} eurPerUsd={market.eurPerUsd} onClose={() => open("holdingView", { id: viewedH.id })} onSave={(t) => run(actions.saveTrade, t)} onDelete={(t) => run(actions.deleteTrade, t)} />}
       {modal?.type === "deleteMe" && <DeleteMeModal onClose={close} onConfirm={() => run(actions.deleteAccountForever)} />}
       {toast && <div className={"toast " + toast.tone}><Icon name={toast.tone === "bad" ? "info" : "check"} size={16} />{toast.text}</div>}
     </div>

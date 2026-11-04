@@ -18,7 +18,7 @@ export function historyPoints(snapshots, total, days) {
   return pts;
 }
 
-function NetWorth({ m, data, limits, openPlans, dayCurve, liveInfo }) {
+function NetWorth({ m, data, limits, openPlans, dayCurve, liveInfo, showChart = true }) {
   const periods = dayCurve ? [["1J", 0], ...PERIODS] : PERIODS;
   const [label, setLabel] = useState(dayCurve ? "1J" : "1M");
   const current = periods.find((x) => x[0] === label) || periods.find((x) => x[0] === "1M");
@@ -33,7 +33,7 @@ function NetWorth({ m, data, limits, openPlans, dayCurve, liveInfo }) {
   const sumParts = parts.reduce((n, p) => n + p.value, 0) || 1;
   return (
     <section className="card netWorth fadeIn">
-      <AreaChart points={points} height={200} fade>
+      <AreaChart points={points} height={showChart ? 200 : 0} fade>
         {(pt, first, hovering) => {
           const delta = pt.value - first.value, rel = first.value ? (delta / Math.abs(first.value)) * 100 : 0;
           return <div className="nwTop">
@@ -218,14 +218,14 @@ export function Upcoming({ data, compact }) {
   </>;
 }
 
-export default function Overview({ m, data, limits, go, openPlans, list, open, goOps, dayCurve, liveInfo }) {
+export default function Overview({ m, data, limits, go, openPlans, list, open, goOps, dayCurve, liveInfo, showChart }) {
   const accounts = [...data.accounts].sort((a, b) => b.balance - a.balance);
   const series = useMemo(() => {
     const s = monthlySeries(data.transactions, 6), first = s.findIndex((x) => x.count > 0);
     return first < 0 ? [] : s.slice(Math.min(first, s.length - 3));
   }, [data.transactions]);
   return <>
-    <NetWorth m={m} data={data} limits={limits} openPlans={openPlans} dayCurve={dayCurve} liveInfo={liveInfo} />
+    <NetWorth m={m} data={data} limits={limits} openPlans={openPlans} dayCurve={dayCurve} liveInfo={liveInfo} showChart={showChart} />
     <GettingStarted data={data} open={open} go={go} />
     <Kpis m={m} />
     <div className="grid g3">

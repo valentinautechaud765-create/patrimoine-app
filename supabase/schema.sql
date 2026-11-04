@@ -64,6 +64,22 @@ create table if not exists public.budgets (
   primary key (user_id, category)
 );
 
+-- Achats, ventes et dividendes d'une position (amount = montant en euros, frais compris)
+create table if not exists public.trades (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users on delete cascade,
+  holding_id uuid not null references public.holdings on delete cascade,
+  type text not null check (type in ('Achat','Vente','Dividende')),
+  quantity numeric(20,8) not null default 0,
+  price numeric(16,6) not null default 0,
+  fees numeric(14,2) not null default 0,
+  amount numeric(14,2) not null default 0,
+  currency text not null default 'EUR',
+  date date not null default current_date,
+  created_at timestamptz not null default now()
+);
+create index if not exists trades_holding_date on public.trades (holding_id, date);
+
 -- Valeur du patrimoine chaque jour (pour les courbes)
 create table if not exists public.net_worth_snapshots (
   user_id uuid not null references auth.users on delete cascade,
@@ -89,6 +105,7 @@ alter table public.transactions enable row level security;
 alter table public.budgets enable row level security;
 alter table public.net_worth_snapshots enable row level security;
 alter table public.powens_links enable row level security;
+alter table public.trades enable row level security;
 
 -- Le profil se lit mais ne se modifie pas depuis le navigateur (la formule est gérée par Stripe).
 drop policy if exists "profil: lecture" on public.profiles;
@@ -99,7 +116,7 @@ revoke update on public.profiles from authenticated;
 grant update (full_name) on public.profiles to authenticated;
 
 do $$ declare t text; begin
-  foreach t in array array['accounts','holdings','transactions','budgets','net_worth_snapshots'] loop
+  foreach t in array array['accounts','holdings','transactions','budgets','net_worth_snapshots','trades'] loop
     execute format('drop policy if exists "%1$s: propriétaire" on public.%1$s', t);
     execute format('create policy "%1$s: propriétaire" on public.%1$s for all using (auth.uid() = user_id) with check (auth.uid() = user_id)', t);
   end loop;

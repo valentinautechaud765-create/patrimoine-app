@@ -6,10 +6,11 @@ import { BrandMark } from "../components/Brand.js";
 import { supabaseBrowser, supabaseConfigured } from "../../lib/supabase.js";
 import { demoData } from "../../lib/demo.js";
 import { OWNER_EMAILS } from "../../lib/config.js";
-import { computeModel } from "../../lib/model.js";
+import { computeModel, positionFromTrades } from "../../lib/model.js";
 
 const NUM = ["amount", "quantity", "cost_basis", "value", "balance", "monthly_limit", "total"];
 const clean = (r) => { const o = { ...r }; NUM.forEach((k) => { if (k in o) o[k] = Number(o[k]) || 0; }); return o; };
+const todayStr = () => new Date().toISOString().slice(0, 10);
 const byDate = (l) => l.sort((a, b) => String(b.date).localeCompare(String(a.date)));
 
 const NOTICES = {
@@ -28,18 +29,19 @@ function App() {
   const demo = !supabaseConfigured;
 
   const load = useCallback(async () => {
-    if (demo) { setData({ ...demoData(), session: null }); return; }
+    if (demo) { setData({ ...demoData(), trades: [], session: null }); return; }
     const sb = supabaseBrowser();
     const { data: s } = await sb.auth.getSession();
     if (!s.session) { router.replace("/connexion"); return; }
     // Chaque requête ne renvoie que les lignes de l'utilisateur connecté (règles RLS côté base).
-    const [profile, accounts, holdings, transactions, budgets, snapshots] = await Promise.all([
+    const [profile, accounts, holdings, transactions, budgets, snapshots, trades] = await Promise.all([
       sb.from("profiles").select("*").eq("id", s.session.user.id).maybeSingle(),
       sb.from("accounts").select("*").order("created_at"),
       sb.from("holdings").select("*").order("value", { ascending: false }),
       sb.from("transactions").select("*").order("date", { ascending: false }).order("created_at", { ascending: false }).limit(1000),
       sb.from("budgets").select("*"),
       sb.from("net_worth_snapshots").select("date,total").order("date"),
+      sb.from("trades").select("*").order("date"),
     ]);
     const pr = profile.data || { plan: "free" };
     // Propriétaire : accès complet. Le serveur l'enregistre dans la base ; l'affichage est débloqué
@@ -60,6 +62,8 @@ function App() {
       transactions: num(transactions.data, ["amount"]),
       budgets: num(budgets.data, ["monthly_limit"]),
       snapshots: num(snapshots.data, ["total"]),
+      trades: num(trades.data, ["quantity", "price", "fees", "amount"]),
+      tradesMissing: Boolean(trades.error),
       session: s.session,
     });
   }, [demo, router]);
@@ -111,6 +115,15 @@ function App() {
     if (!acc || acc.powens_account_id || !delta) return;
     const saved = await write("accounts", { id: acc.id, balance: Math.round((Number(acc.balance) + delta) * 100) / 100, updated_at: new Date().toISOString() });
     replace("accounts", { ...acc, ...saved });
+  }
+
+  async function applyTrades(holdingId, allTrades) {
+    const h = live.current.holdings.find((x) => x.id === holdingId); if (!h) return;
+    const pos = positionFromTrades(allTrades.filter((x) => x.holding_id === holdingId));
+    const ratio = Number(h.quantity) > 0 ? Number(h.value) / Number(h.quantity) : 0;
+    const row = { id: h.id, quantity: pos.quantity, cost_basis: pos.cost, value: Math.round(pos.quantity * ratio * 100) / 100 || (pos.quantity > 0 ? pos.cost : 0), updated_at: new Date().toISOString() };
+    const saved = await write("holdings", row);
+    replace("holdings", { ...h, ...saved }, (l) => l.sort((x, y) => y.value - x.value));
   }
 
   // Photo du jour du patrimoine, pour que la courbe se construise même sans attendre la tâche du soir.
@@ -246,14 +259,33 @@ function App() {
       // 3. Placements
       const classOf = (p) => { const t = (p.type + " " + p.nom + " " + p.ticker).toLowerCase(); return /crypto|bitcoin|btc|eth/.test(t) ? "Crypto" : /etf|tracker|msci|s&p|world/.test(t) ? "ETF" : /oblig/.test(t) ? "Obligations" : /fonds|opcvm|scpi|assurance/.test(t) ? "Fonds" : "Action"; };
       const hIndex = Object.fromEntries(d.holdings.map((h) => [(h.name + "|" + (h.ticker || "")).toLowerCase(), h]));
-      const newH = [], updH = [];
+      const newH = [], updH = [], plMap = {}, newSrc = [];
       for (const pl of file.placements || []) {
         const row = { name: pl.nom || pl.ticker || "Placement", ticker: pl.ticker || null, asset_class: classOf(pl), quantity: Number(pl.quantite) || 0, cost_basis: Math.round((Number(pl.investi) || 0) * 100) / 100, value: Math.round((Number(pl.valeur) || 0) * 100) / 100, currency: pl.devise === "USD" ? "USD" : "EUR" };
         const hit = hIndex[(row.name + "|" + (row.ticker || "")).toLowerCase()];
-        if (hit) { const saved = await write("holdings", { id: hit.id, ...row, updated_at: new Date().toISOString() }); updH.push({ ...hit, ...saved }); }
-        else newH.push(row);
+        if (hit) { const saved = await write("holdings", { id: hit.id, ...row, updated_at: new Date().toISOString() }); updH.push({ ...hit, ...saved }); plMap[pl.id] = { id: hit.id, investi: row.cost_basis }; }
+        else { newH.push(row); newSrc.push(pl); }
       }
       const createdH = await insertMany("holdings", newH);
+      createdH.forEach((h, i) => { plMap[newSrc[i].id] = { id: h.id, investi: h.cost_basis }; });
+      // Transactions des placements (achats, ventes, dividendes), seulement pour les positions qui n'en ont pas encore.
+      // Pour un titre en dollars, les montants sont ramenés en euros au prorata du montant investi exporté.
+      let tradeCount = 0;
+      if (!d.tradesMissing && Array.isArray(file.trades) && file.trades.length) {
+        const already = new Set(d.trades.map((t) => t.holding_id)), rows = [];
+        const byPl = {}; file.trades.forEach((t) => { if (plMap[t.placementId]) (byPl[t.placementId] ||= []).push(t); });
+        for (const [plId, list] of Object.entries(byPl)) {
+          const target = plMap[plId]; if (already.has(target.id)) continue;
+          const native = (t) => t.type === "Dividende" ? t.price - t.fees : t.type === "Achat" ? t.quantity * t.price + t.fees : t.quantity * t.price - t.fees;
+          const usd = list.some((t) => t.currency === "USD");
+          let factor = 1;
+          if (usd) { const nativeCost = positionFromTrades(list.map((t) => ({ ...t, amount: native(t) }))).cost; factor = nativeCost > 0 && target.investi > 0 ? target.investi / nativeCost : 1; }
+          list.forEach((t) => rows.push({ holding_id: target.id, type: t.type, quantity: t.type === "Dividende" ? 0 : Number(t.quantity) || 0, price: Number(t.price) || 0, fees: Number(t.fees) || 0, amount: Math.round(native(t) * factor * 100) / 100, currency: t.currency === "USD" ? "USD" : "EUR", date: t.date }));
+        }
+        const createdT = await insertMany("trades", rows);
+        tradeCount = createdT.length;
+        if (createdT.length) setData((x) => ({ ...x, trades: [...x.trades, ...createdT] }));
+      }
       // 4. Budgets
       const budgets = Object.entries(file.budgets || {}).filter(([, v]) => Number(v) > 0).map(([category, v]) => ({ category: String(category).slice(0, 40), monthly_limit: Math.round(Number(v) * 100) / 100 }));
       if (!demo && budgets.length) { const { error } = await sb.from("budgets").upsert(budgets.map((b) => ({ ...b, user_id: user }))); if (error) throw new Error("Import impossible (budgets) : " + error.message); }
@@ -266,7 +298,7 @@ function App() {
         const snaps = Object.fromEntries(x.snapshots.map((sn) => [sn.date, sn])); hist.forEach((h) => { snaps[h.date] = h; });
         return { ...x, accounts, holdings, transactions: byDate([...x.transactions, ...createdTx]), budgets: [...x.budgets.filter((b) => !budgets.some((n) => n.category === b.category)), ...budgets], snapshots: Object.values(snaps).sort((a, b) => a.date.localeCompare(b.date)) };
       });
-      return { message: "Import terminé", ok: true, summary: { comptes: createdAcc.length + updated.length, operations: createdTx.length, ignorees: (file.operations || []).length - createdTx.length, placements: createdH.length + updH.length, budgets: budgets.length, jours: hist.length } };
+      return { message: "Import terminé", ok: true, summary: { comptes: createdAcc.length + updated.length, operations: createdTx.length, ignorees: (file.operations || []).length - createdTx.length, placements: createdH.length + updH.length, transactionsBourse: tradeCount, budgets: budgets.length, jours: hist.length } };
     },
     // Cours de bourse en direct (serveur Patrimo → Tradegate / Yahoo / Twelve Data)
     async fetchQuotes(symbols, withDay) {
@@ -279,6 +311,37 @@ function App() {
     async syncHoldingValues(list) {
       if (demo) return;
       for (const h of list) await supabaseBrowser().from("holdings").update({ value: h.value, updated_at: new Date().toISOString() }).eq("id", h.id);
+    },
+    // Achats / ventes / dividendes : la position (quantité, prix de revient) est recalculée à chaque fois
+    async saveTrade(t) {
+      if (live.current.tradesMissing) throw new Error("Mise à jour de la base nécessaire : relance le script supabase/schema.sql dans Supabase (SQL Editor → Run).");
+      // Première transaction sur une position déjà détenue : on enregistre d'abord ce qui était déjà là
+      // comme position de départ, pour ne pas perdre les parts ni le prix de revient existants.
+      let base = live.current.trades;
+      const h = live.current.holdings.find((x) => x.id === t.holding_id);
+      if (!t.id && h && Number(h.quantity) > 0 && !base.some((x) => x.holding_id === h.id)) {
+        const q = Number(h.quantity), cost = Number(h.cost_basis) || 0;
+        const opening = await write("trades", { holding_id: h.id, type: "Achat", quantity: q, price: q > 0 ? Math.round((cost / q) * 1e6) / 1e6 : 0, fees: 0, amount: cost, currency: "EUR", date: t.date < todayStr() ? t.date : todayStr() });
+        base = [...base, { holding_id: h.id, type: "Achat", quantity: q, amount: cost, date: opening.date, ...opening, created_at: opening.created_at || new Date(Date.now() - 1000).toISOString() }];
+      }
+      const saved = await write("trades", t);
+      const trades = [...base.filter((x) => x.id !== saved.id), { ...t, ...saved, created_at: saved.created_at || new Date().toISOString() }];
+      setData((d) => ({ ...d, trades }));
+      await applyTrades(t.holding_id, trades);
+      return { message: t.id ? "Transaction modifiée" : t.type === "Dividende" ? "Dividende ajouté" : t.type === "Achat" ? "Achat enregistré" : "Vente enregistrée" };
+    },
+    async deleteTrade(t) {
+      await erase("trades", { id: t.id });
+      const trades = live.current.trades.filter((x) => x.id !== t.id);
+      setData((d) => ({ ...d, trades }));
+      await applyTrades(t.holding_id, trades);
+      return { message: "Transaction supprimée" };
+    },
+    async fetchHistory(symbols, period) {
+      const token = live.current?.session?.access_token;
+      const r = await fetch(`/api/cours?historique=${encodeURIComponent(symbols.join(","))}&periode=${period}`, { headers: token ? { Authorization: "Bearer " + token } : {} });
+      if (!r.ok) throw new Error("Courbe indisponible");
+      return r.json();
     },
     async deleteAccountForever() {
       if (demo) return { message: "Démonstration : rien n’est supprimé." };

@@ -846,3 +846,37 @@ button.budgetRow.tap:hover { background: rgba(255, 255, 255, 0.03); }
   .table :is(th, td):nth-child(4) { display: none; }
   .liveBadge { width: 100%; margin: 4px 0 0; }
 }
+
+/* Fiche placement */
+.iconBtn.active { color: var(--blue2); border-color: rgba(61, 124, 255, 0.35); background: var(--blueSoft); }
+.area[style*="height: 0"] { display: none; }
+.holdChart { display: grid; gap: 12px; }
+.holdChart .area { margin: 14px -24px 0; width: auto; }
+.holdChartEmpty { min-height: 120px; display: grid; place-items: center; }
+.holdPeriods { justify-self: center; }
+.liveDot + * { }
+.seg .liveDot { margin-right: 5px; width: 6px; height: 6px; }
+.holdStats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+.holdStats > div { padding: 12px 14px; border-radius: 14px; background: var(--surface2); border: 1px solid var(--line); min-width: 0; }
+.holdStats small { display: block; color: var(--muted); font-size: 12px; }
+.holdStats b { font-weight: 500; font-size: 16px; font-variant-numeric: tabular-nums; }
+.holdStats em { font-style: normal; font-size: 12.5px; opacity: 0.85; }
+.tradeBtns { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.buyBtn { color: #49e0ae; border-color: rgba(46, 229, 157, 0.35); background: rgba(46, 229, 157, 0.08); }
+.buyBtn:hover { background: rgba(46, 229, 157, 0.14); }
+.sellBtn { color: #ff8a9b; border-color: rgba(255, 107, 122, 0.35); background: rgba(255, 107, 122, 0.08); }
+.sellBtn:hover { background: rgba(255, 107, 122, 0.14); }
+.divBtn { color: #f5c76b; border-color: rgba(245, 199, 107, 0.35); background: rgba(245, 199, 107, 0.08); }
+.buyBtn.solid { background: #19a974; color: #fff; border-color: transparent; }
+.sellBtn.solid { background: #d6455b; color: #fff; border-color: transparent; }
+.tradeIco { width: 36px; height: 36px; flex: 0 0 36px; border-radius: 11px; display: grid; place-items: center; }
+.tradeIco.Achat { background: rgba(46, 229, 157, 0.12); color: #49e0ae; }
+.tradeIco.Vente { background: rgba(255, 107, 122, 0.12); color: #ff8a9b; }
+.tradeIco.Dividende { background: rgba(245, 199, 107, 0.12); color: #f5c76b; }
+.portfolioCurve .area { margin: 16px -24px 0; width: auto; }
+.privacy :is(.holdStats b, .projAmount) { filter: blur(7px); }
+@container app (max-width: 860px) {
+  .holdChart .area, .portfolioCurve .area { margin-left: -18px; margin-right: -18px; }
+  .holdPeriods { justify-self: stretch; }
+  .holdPeriods button { flex: 1; }
+}
