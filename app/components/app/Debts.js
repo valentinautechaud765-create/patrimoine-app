@@ -67,9 +67,9 @@ export function DebtForm({ debt, onClose, onSave, onDelete }) {
       <Head title={editing ? "Modifier la dette" : "Nouvelle dette"} onClose={onClose} />
       <div className="seg billingSeg">{Object.entries(KINDS).map(([k, v]) => <button type="button" key={k} className={kind === k ? "on" : ""} onClick={() => setKind(k)} disabled={synced}>{v.short}</button>)}</div>
       <div className="grid g2" style={{ gap: 12 }}>
-        <label className="label">{kind === "on_me_doit" ? "Qui vous doit ?" : kind === "credit" ? "Organisme" : "À qui ?"}<input className="input" placeholder={kind === "credit" ? "Ex. Cetelem, votre banque…" : "Ex. Valya, Yanis…"} value={person} onChange={(e) => setPerson(e.target.value)} maxLength={80} /></label>
-        <label className="label">Motif<input className="input" placeholder={kind === "credit" ? "Ex. Prêt auto" : "Ex. Avance loyer"} value={label} onChange={(e) => setLabel(e.target.value)} maxLength={120} /></label>
-        <label className="label">Montant de départ (€)<input className="input" inputMode="decimal" value={initial} onChange={(e) => setInitial(e.target.value.replace(/[^\d.,]/g, ""))} disabled={synced} /></label>
+        <label className="label">{kind === "on_me_doit" ? "Qui vous doit ?" : kind === "credit" ? "Organisme" : "À qui ?"}<input className="input" placeholder={kind === "credit" ? "Ex. Votre banque, Cetelem, Cofidis…" : kind === "on_me_doit" ? "Ex. Un ami, un membre de la famille…" : "Ex. Un ami, un proche, un collègue…"} value={person} onChange={(e) => setPerson(e.target.value)} maxLength={80} /></label>
+        <label className="label">Motif<input className="input" placeholder={kind === "credit" ? "Ex. Prêt auto, prêt étudiant, travaux…" : kind === "on_me_doit" ? "Ex. Avance pour un concert, part d’un cadeau…" : "Ex. Prêt pour un voyage, avance sur le loyer…"} value={label} onChange={(e) => setLabel(e.target.value)} maxLength={120} /></label>
+        <label className="label">Montant de départ (€)<input className="input" inputMode="decimal" placeholder={kind === "credit" ? "Ex. 8 000" : "Ex. 200"} value={initial} onChange={(e) => setInitial(e.target.value.replace(/[^\d.,]/g, ""))} disabled={synced} /></label>
         <label className="label">Reste à rembourser (€)<input className="input" inputMode="decimal" placeholder={initial || "Égal au départ"} value={remaining} onChange={(e) => setRemaining(e.target.value.replace(/[^\d.,]/g, ""))} disabled={synced} /></label>
       </div>
       {kind === "credit" && <div className="grid g2" style={{ gap: 12 }}>
