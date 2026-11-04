@@ -52,10 +52,10 @@ function useLongTermRates(fetchHistory, holdings) {
   return { cagrs, loading: Boolean(fetchHistory && symbols.length) && hist.loading };
 }
 
-function RateBreakdown({ bd, auto, loading, onReset, overridden }) {
+function RateBreakdown({ bd, loading }) {
   const rows = bd.rows.slice(0, 7), rest = bd.rows.slice(7);
   return <div className="rateBox">
-    <div className="rateHead"><span>Rendement moyen {auto ? <span className="chip blue" style={{ height: 20, fontSize: 11 }}>Automatique</span> : <span className="chip" style={{ height: 20, fontSize: 11 }}>Choisi par vous</span>}</span><b>{bd.rate.toLocaleString("fr-FR")} % / an</b></div>
+    <div className="rateHead"><span>Rendement moyen <span className="chip blue" style={{ height: 20, fontSize: 11 }}>Automatique</span></span><b>{bd.rate.toLocaleString("fr-FR")} % / an</b></div>
     {loading && <small className="muted">Calcul de la performance réelle de vos placements…</small>}
     {rows.map((r) => <div className="rateRow" key={r.label + r.value}>
       <span className="rateName"><b>{r.label}</b><small className={r.missing ? "warnText" : ""}>{r.source}</small></span>
@@ -64,7 +64,6 @@ function RateBreakdown({ bd, auto, loading, onReset, overridden }) {
     </div>)}
     {rest.length > 0 && <div className="rateRow"><span className="rateName"><b>{rest.length} autre{rest.length > 1 ? "s" : ""}</b></span><span className="rateW">{Math.round((rest.reduce((n, r) => n + r.value, 0) / (bd.total || 1)) * 100)} %</span><span className="rateR">—</span></div>}
     <small className="muted">Chaque taux compte selon son poids dans le total (colonne du milieu).</small>
-    {overridden && <button className="link" onClick={onReset}>Revenir au rendement automatique ({bd.rate.toLocaleString("fr-FR")} %)</button>}
   </div>;
 }
 
@@ -87,8 +86,8 @@ export function WealthProjection({ m, data, fetchHistory }) {
   const suggested = Math.max(0, Math.round(calc.total / 10) * 10);
   const { cagrs, loading } = useLongTermRates(fetchHistory, data.holdings);
   const bd = useMemo(() => rateBreakdown({ accounts: data.accounts, holdings: data.holdings, cagrs }), [data.accounts, data.holdings, cagrs]);
-  const [monthly, setMonthly] = useState(null), [years, setYears] = useState(10), [rateOverride, setRate] = useState(null);
-  const rate = rateOverride ?? bd.rate;
+  const [monthly, setMonthly] = useState(null), [years, setYears] = useState(10);
+  const rate = bd.rate;
   const mth = monthly ?? suggested;
   const [infl, setInfl] = useState(false);
   const sim = useMemo(() => simulate({ start: m.total, monthly: mth, rate, years, inflation: infl ? 2 : 0 }), [m.total, mth, rate, years, infl]);
@@ -106,7 +105,6 @@ export function WealthProjection({ m, data, fetchHistory }) {
       <div className="projSliders">
         <Slider label="Épargne par mois" value={mth} display={money0(mth)} min={0} max={Math.max(2000, suggested * 2)} step={10} onChange={setMonthly} />
         <Slider label="Durée" value={years} display={`${years} an${years > 1 ? "s" : ""}`} min={1} max={30} onChange={setYears} />
-        <Slider label="Rendement annuel" value={rate} display={`${rate.toLocaleString("fr-FR")} %`} min={0} max={10} step={0.5} onChange={setRate} />
         <label className="item switchRow inflRow"><div className="itemMain"><b>En euros d’aujourd’hui</b><small>Retire l’inflation (2 % par an, objectif de la BCE) : ce que la somme vaudra vraiment en pouvoir d’achat.</small></div><input type="checkbox" className="switch" checked={infl} onChange={(e) => setInfl(e.target.checked)} /></label>
       </div>
     </div>
@@ -116,7 +114,7 @@ export function WealthProjection({ m, data, fetchHistory }) {
       {rows.map(([icon, label, v, tone, sub]) => <div className="calcRow" key={label}><span><Icon name={icon} size={14} />{label}<small>{sub}</small></span><b className={Math.round(v) ? tone : "muted"}>{Math.round(v) === 0 ? "" : v > 0 ? "+" : "−"}{money0(Math.abs(v))}</b></div>)}
       <div className="calcRow total"><span>Épargne estimée par mois</span><b className={calc.total >= 0 ? "ok" : "bad"}>{calc.total >= 0 ? "+" : "−"}{money0(Math.abs(calc.total))}</b></div>
       {monthly != null && monthly !== suggested && <button className="link" onClick={() => setMonthly(null)}>Revenir à l’estimation ({money0(suggested)})</button>}
-      <RateBreakdown bd={bd} auto={rateOverride == null} loading={loading} overridden={rateOverride != null} onReset={() => setRate(null)} />
+      <RateBreakdown bd={bd} loading={loading} />
       <p>Chaque mois, l’épargne s’ajoute au patrimoine, et l’ensemble rapporte {rate.toLocaleString("fr-FR")} % par an. La fourchette montre le résultat avec 2 points de rendement en moins ou en plus. Au bout de {years} an{years > 1 ? "s" : ""}, les intérêts représentent <b className="ok">{money0(Math.max(0, gain))}</b>.</p>
       <p className="faint">{infl ? "Montants en euros d’aujourd’hui (inflation de 2 % par an retirée)." : "Montants en euros de l’époque, sans retirer l’inflation."} Estimation indicative, pas une promesse ni un conseil en investissement.</p>
     </div>
@@ -131,8 +129,8 @@ export function InvestProjection({ holdings, total, fetchHistory }) {
   const { cagrs, loading } = useLongTermRates(fetchHistory, holdings);
   const bd = useMemo(() => rateBreakdown({ accounts: [], holdings: sel ? [sel] : lines, cagrs, onlyHoldings: true }), [sel, lines, cagrs]); // eslint-disable-line
   const baseRate = bd.rate;
-  const [monthly, setMonthly] = useState(150), [years, setYears] = useState(20), [rateOverride, setRate] = useState(null);
-  const rate = rateOverride ?? baseRate;
+  const [monthly, setMonthly] = useState(150), [years, setYears] = useState(20);
+  const rate = baseRate;
   const start = sel ? Number(sel.value) : total;
   const [infl, setInfl] = useState(false);
   const sim = useMemo(() => simulate({ start, monthly, rate, years, spread: sel?.asset_class === "Crypto" ? 6 : 3, inflation: infl ? 2 : 0 }), [start, monthly, rate, years, sel, infl]);
@@ -140,15 +138,14 @@ export function InvestProjection({ holdings, total, fetchHistory }) {
   return <div className="projGrid">
     <div>
       <div className="assetPick">
-        <button className={pick === "all" ? "on" : ""} onClick={() => { setPick("all"); setRate(null); }}><span className="allIco"><Icon name="pie" size={16} /></span>Tout le portefeuille</button>
-        {lines.map((h) => <button key={h.id} className={pick === h.id ? "on" : ""} onClick={() => { setPick(h.id); setRate(null); }}><TickerIcon holding={h} />{h.ticker || h.name}</button>)}
+        <button className={pick === "all" ? "on" : ""} onClick={() => setPick("all")}><span className="allIco"><Icon name="pie" size={16} /></span>Tout le portefeuille</button>
+        {lines.map((h) => <button key={h.id} className={pick === h.id ? "on" : ""} onClick={() => setPick(h.id)}><TickerIcon holding={h} />{h.ticker || h.name}</button>)}
       </div>
       <div className="eyebrow">Valeur moyenne projetée d’ici {new Date().getFullYear() + years}{sel ? ` · ${sel.name}` : ""}</div>
       <ProjectionChart sim={sim} years={years} />
       <div className="projSliders">
         <Slider label="Apport mensuel" value={monthly} display={money0(monthly)} min={0} max={2000} step={10} onChange={setMonthly} />
         <Slider label="Durée" value={years} display={`${years} ans`} min={1} max={40} onChange={setYears} />
-        <Slider label="Rendement annuel" value={rate} display={`${rate.toLocaleString("fr-FR")} %`} min={0} max={sel?.asset_class === "Crypto" ? 30 : 15} step={0.5} onChange={setRate} />
         <label className="item switchRow inflRow"><div className="itemMain"><b>En euros d’aujourd’hui</b><small>Retire l’inflation (2 % par an, objectif de la BCE) : ce que la somme vaudra vraiment en pouvoir d’achat.</small></div><input type="checkbox" className="switch" checked={infl} onChange={(e) => setInfl(e.target.checked)} /></label>
       </div>
     </div>
@@ -156,7 +153,7 @@ export function InvestProjection({ holdings, total, fetchHistory }) {
       <b className="projExplainTitle"><Icon name="info" size={15} />Comment c’est calculé</b>
       <div className="calcRow start"><span>Valeur actuelle{sel ? ` (${sel.ticker || sel.name})` : " du portefeuille"}</span><b className="money">{money(start)}</b></div>
       <div className="calcRow"><span><Icon name="plus" size={14} />Apport chaque mois<small>achat programmé de {money0(monthly)}</small></span><b>+{money0(monthly)}</b></div>
-      <RateBreakdown bd={bd} auto={rateOverride == null} loading={loading} overridden={rateOverride != null} onReset={() => setRate(null)} />
+      <RateBreakdown bd={bd} loading={loading} />
       <div className="calcRow total"><span>Total versé en {years} ans</span><b className="money">{money0(sim.contrib[sim.n])}</b></div>
       <div className="calcRow total"><span>Gains estimés</span><b className="ok">+{money0(Math.max(0, sim.mid[sim.n] - sim.contrib[sim.n]))}</b></div>
       <p>Les gains sont réinvestis chaque mois (intérêts composés). La fourchette montre le résultat avec {sel?.asset_class === "Crypto" ? 6 : 3} points de rendement en moins ou en plus : les marchés ne montent pas en ligne droite.</p>

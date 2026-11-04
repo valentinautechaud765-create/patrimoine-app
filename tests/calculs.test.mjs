@@ -35,6 +35,7 @@ test("fiabilité du rendement selon la durée d'historique", () => {
   assert.equal(reliableRate({ rate: 10, years: 5 }, "ETF").rate, 8); // 50 % réel + 50 % long terme
   assert.equal(reliableRate({ rate: 20, years: 12 }, "Action").rate, 12); // plafond de prudence
   assert.equal(reliableRate({ rate: 8, years: 10 }, "ETF").rate, 8);
+  assert.equal(reliableRate({ rate: 8, years: 9.9 }, "ETF").kind, "real"); // « 10 ans » de la source = 9,9 ans
 });
 
 test("rendement moyen pondéré par le poids de chaque élément", () => {
