@@ -558,7 +558,8 @@ function App() {
       await load();
       setData((d) => d && ({ ...d, bankErrors: r.errors || [], lastSync: r.at }));
       if (r.errors?.length) return { ok: true, message: `${r.errors[0].bank} demande une nouvelle connexion (sécurité de votre banque).` };
-      return { message: r.transactions ? `${r.transactions} nouvelle${r.transactions > 1 ? "s" : ""} opération${r.transactions > 1 ? "s" : ""} importée${r.transactions > 1 ? "s" : ""}` : "Comptes à jour" };
+      const mir = r.mirroredTransfers ? ` · ${r.mirroredTransfers} virement${r.mirroredTransfers > 1 ? "s" : ""} reporté${r.mirroredTransfers > 1 ? "s" : ""} sur vos comptes saisis à la main` : "";
+      return { message: (r.transactions ? `${r.transactions} nouvelle${r.transactions > 1 ? "s" : ""} opération${r.transactions > 1 ? "s" : ""} importée${r.transactions > 1 ? "s" : ""}` : "Comptes à jour") + mir };
     },
     // ---------- Dettes ----------
     async saveDebt(d) {

@@ -184,3 +184,36 @@ test("cas réel : Revolut saisi à la main + BNP synchronisée → les comptes R
   assert.equal(db.tables.transactions.find((t) => t.label === "VIR VERS REVOLUT").category, "Virement interne");
   assert.equal(db.tables.transactions.find((t) => t.label === "BOULANGERIE").category === "Virement interne", false);
 });
+
+test("virement BNP ↔ Revolut (saisi à la main) : l'opération en face est créée toute seule, solde Revolut à jour, sans doublon", async () => {
+  BANK = { connections: [{ id: 5, connector: { name: "BNP Paribas" } }],
+    accounts: [{ id: 70, id_connection: 5, name: "Compte chèques", type: "checking", balance: 312.5 }],
+    transactions: [
+      { id: 800, id_account: 70, date: "2026-10-20", value: -100, simplified_wording: "VIR VERS REVOLUT" },          // avant la connexion : on n'y touche pas
+      { id: 801, id_account: 70, date: "2026-11-03", value: -50, simplified_wording: "VIR VERS REVOLUT" },           // BNP → Revolut
+      { id: 802, id_account: 70, date: "2026-11-04", value: 30, simplified_wording: "VIR DE REVOLUT VALENTIN" },     // Revolut → BNP
+      { id: 803, id_account: 70, date: "2026-11-05", value: -40, simplified_wording: "VIREMENT REVOLUT" },           // déjà noté à la main
+      { id: 804, id_account: 70, date: "2026-11-05", value: -20, simplified_wording: "VIR VERS REVOLUT APPART" }]};  // vers la pocket « appart »
+  const db = fakeDb();
+  db.tables.powens_links[0].created_at = "2026-11-01T10:00:00Z";
+  db.tables.accounts.push({ id: "rev1", user_id: "u1", powens_account_id: null, name: "Compte principal", institution: "Revolut", kind: "courant", balance: 0.83 });
+  db.tables.accounts.push({ id: "rev2", user_id: "u1", powens_account_id: null, name: "appart", institution: "Revolut", kind: "courant", balance: 0 });
+  db.tables.transactions.push({ id: "deja", user_id: "u1", account_id: "rev1", date: "2026-11-05", amount: 40, label: "Depuis BNP", category: "Autre", external_id: null });
+  const r = await syncUser(db, "u1");
+  const tx = db.tables.transactions, acc = (id) => db.tables.accounts.find((a) => a.id === id);
+  const onRev1 = tx.filter((t) => t.account_id === "rev1");
+  assert.equal(r.mirroredTransfers, 3);
+  assert.ok(onRev1.some((t) => t.amount === 50 && t.date === "2026-11-03" && t.category === "Virement interne"));
+  assert.ok(onRev1.some((t) => t.amount === -30 && t.date === "2026-11-04"));
+  assert.ok(!onRev1.some((t) => t.amount === 100));                                    // ancien virement : rien
+  assert.equal(onRev1.filter((t) => t.amount === 40).length, 1);                       // déjà noté : pas de doublon
+  assert.equal(tx.find((t) => t.id === "deja").category, "Virement interne");
+  assert.ok(tx.some((t) => t.account_id === "rev2" && t.amount === 20));              // la pocket citée dans le libellé
+  assert.equal(acc("rev1").balance, 20.83);                                             // 0,83 + 50 − 30
+  assert.equal(acc("rev2").balance, 20);
+  // Côté BNP, ces virements ne sont pas des dépenses
+  assert.ok(tx.filter((t) => t.account_id !== "rev1" && t.account_id !== "rev2").every((t) => t.category === "Virement interne"));
+  // Nouvelle synchro : rien n'est recréé, les soldes ne bougent pas
+  const r2 = await syncUser(db, "u1");
+  assert.equal(r2.mirroredTransfers, 0); assert.equal(acc("rev1").balance, 20.83); assert.equal(tx.length, onRev1.length + 1 + 5);
+});
