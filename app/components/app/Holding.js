@@ -75,7 +75,7 @@ export function HoldingSheet({ holding: h, trades, tradesMissing, fetchHistory, 
     <div className="holdStats">
       <div><small>Valeur actuelle</small><b className="money">{money(h.value)}</b></div>
       <div><small>Plus-value latente</small><b className={gain >= 0 ? "ok" : "bad"}>{signed(gain)}{gainPct !== null && <em> {pct(gainPct)}</em>}</b></div>
-      <div><small>Quantité détenue</small><b>{Number(h.quantity).toLocaleString("fr-FR", { maximumFractionDigits: 8 })}</b></div>
+      <div><small>Quantité détenue</small><b className="money">{Number(h.quantity).toLocaleString("fr-FR", { maximumFractionDigits: 8 })}</b></div>
       <div><small>Prix de revient moyen</small><b className="money">{pru !== null ? money(pru) : "—"}</b></div>
       <div><small>Total investi</small><b className="money">{money(h.cost_basis)}</b></div>
       {h.live?.dayGain != null && <div><small>Aujourd’hui</small><b className={h.live.dayGain >= 0 ? "ok" : "bad"}>{signed(h.live.dayGain)}</b></div>}

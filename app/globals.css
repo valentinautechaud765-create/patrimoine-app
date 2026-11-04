@@ -1025,3 +1025,13 @@ button.budgetRow.tap:hover { background: rgba(255, 255, 255, 0.03); }
 .syncBar .muted { flex: 1; font-size: 13px; min-width: 160px; }
 .spin { animation: spin 0.9s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* Mode discret : seuls les montants (soldes, totaux, valeurs) sont floutés.
+   Les gains (+/−) et les pourcentages restent visibles. */
+.privacy :is(
+  .chip.up, .chip.down, .nwDelta > span, .gainCell, .podium em,
+  .investStats b.ok, .investStats b.bad, .holdStats b:not(.money),
+  .table td:nth-child(3), .table td:nth-child(6), .table td:nth-child(2),
+  .ringCenter b, .grid.g4 .kpi:nth-child(3) > b, .rateRow, .rateHead b,
+  .projLegend > div:nth-child(1) small
+) { filter: none; user-select: auto; }
