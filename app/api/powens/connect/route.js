@@ -35,7 +35,8 @@ export async function POST(request) {
     const url = new URL("https://webview.powens.com/fr/connect");
     url.searchParams.set("domain", domain);
     url.searchParams.set("client_id", clientId);
-    url.searchParams.set("redirect_uri", `${siteUrl(request)}/api/powens/callback`);
+    // Adresse de retour : exactement celle déclarée dans la console Powens (POWENS_REDIRECT_URI), sinon celle du site.
+    url.searchParams.set("redirect_uri", String(process.env.POWENS_REDIRECT_URI || "").trim().replace(/\/+$/, "") || `${siteUrl(request)}/api/powens/callback`);
     url.searchParams.set("code", code.code);
     url.searchParams.set("state", state);
     return NextResponse.json({ url: url.toString() });

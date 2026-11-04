@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "../../../../lib/supabase.js";
-import { siteUrl } from "../../../../lib/stripe.js";
 import { syncUser } from "../../../../lib/powensSync.js";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -8,7 +7,8 @@ export const maxDuration = 60;
 
 // Retour de la page Powens : on vérifie l'état (anti-falsification), puis on importe comptes et opérations.
 export async function GET(request) {
-  const url = new URL(request.url), back = new URL("/app", siteUrl(request));
+  // Retour sur le même site que celui où l'utilisateur est connecté (même adresse que ce lien de retour).
+  const url = new URL(request.url), back = new URL("/app", url.origin);
   try {
     const state = url.searchParams.get("state") || "";
     if (!/^[a-f0-9]{48}$/.test(state)) throw new Error("état invalide");

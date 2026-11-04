@@ -94,6 +94,18 @@ function App() {
   }, [demo, router]);
 
   useEffect(() => { load(); }, [load]);
+  // Session tenue à jour toute seule : jeton renouvelé, retour sur l'appli après une longue pause.
+  useEffect(() => {
+    if (demo) return;
+    const sb = supabaseBrowser();
+    const { data: sub } = sb.auth.onAuthStateChange((event, session) => {
+      if (event === "TOKEN_REFRESHED" && session) setData((d) => d && ({ ...d, session }));
+      if (event === "SIGNED_OUT") router.replace("/connexion");
+    });
+    const wake = () => { if (!document.hidden) sb.auth.startAutoRefresh?.(); else sb.auth.stopAutoRefresh?.(); };
+    document.addEventListener("visibilitychange", wake);
+    return () => { sub?.subscription?.unsubscribe(); document.removeEventListener("visibilitychange", wake); };
+  }, [demo]); // eslint-disable-line
 
   const notice = useMemo(() => {
     for (const [k, v] of Object.entries(NOTICES)) { const [a, b] = k.split("="); if (params.get(a) === b) return v; }
