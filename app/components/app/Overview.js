@@ -265,7 +265,7 @@ export default function Overview({ m, data, limits, go, openPlans, list, open, g
         {accounts.length ? <div className="list">{accounts.slice(0, 5).map((a) => <button className="item hover tap" key={a.id} onClick={() => open("accountView", { id: a.id })}>
           <InstIcon name={a.institution || a.name} />
           <div className="itemMain"><b>{a.name}</b><small>{a.institution ? a.institution + " · " : ""}{KIND_LABEL[a.kind]}</small></div>
-          <div className="itemSide"><b>{money(a.balance, a.currency)}</b><small className="faint">{a.powens_account_id ? "Synchro " : "Mis à jour "}{ago(a.updated_at)}</small></div>
+          <div className="itemSide"><b>{money(a.balance, a.currency)}</b><small className="faint"><span className="hideNarrow">{a.powens_account_id ? "Synchro " : "Mis à jour "}</span>{ago(a.updated_at)}</small></div>
         </button>)}</div> : <Empty icon="bank" title="Aucun compte pour l’instant" text="Ajoutez vos comptes à la main, ou connectez votre banque."><button className="btn primary sm" onClick={() => open("account")}><Icon name="plus" size={15} />Ajouter un compte</button></Empty>}
       </Panel>
       <Panel title="Analyse du mois" icon="sparkles" className="fadeIn">

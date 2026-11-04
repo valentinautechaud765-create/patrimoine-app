@@ -62,7 +62,7 @@ export function Accounts({ m, data, connectBank, syncBank, limits, openPlans, op
       <div className="list">{g.list.map((a) => <button className={"item hover tap" + (a.hidden ? " paused" : "")} key={a.id} onClick={() => open("accountView", { id: a.id })}>
         <span className="kindIco"><Icon name={a.kind === "epargne" ? "piggy" : a.kind === "investissement" ? "trending" : "card"} size={17} /></span>
         <div className="itemMain"><b>{a.name}{a.hidden && <span className="chip" style={{ height: 20, marginLeft: 8, fontSize: 11 }}>Masqué</span>}</b><small>{KIND_LABEL[a.kind]}{a.powens_account_id ? " · synchronisé" : " · manuel"}{a.hidden ? " · non compté dans le patrimoine" : ""}</small></div>
-        <div className="itemSide"><b>{money(a.balance, a.currency)}</b><small className="faint">{a.updated_at ? "Mis à jour " + ago(a.updated_at) : ""}</small></div>
+        <div className="itemSide"><b>{money(a.balance, a.currency)}</b><small className="faint"><span className="hideNarrow">Mis à jour </span>{a.updated_at ? ago(a.updated_at) : ""}</small></div>
         <Icon name="chevronRight" size={16} className="faint" />
       </button>)}</div>
     </section>) : <section className="card panel"><Empty icon="bank" title="Ajoutez votre premier compte" text="Saisissez-le à la main, ou connectez votre banque pour que tout se mette à jour tout seul."><button className="btn primary" onClick={() => open("account")}><Icon name="plus" size={16} />Ajouter un compte</button></Empty></section>}
@@ -101,7 +101,7 @@ export function Investments({ m, data, limits, openPlans, open, liveInfo, curve,
       </Panel>
     </div>
     <Panel title="Positions" action="Ajouter une position" onAction={() => open("holding")}>
-      {holdings.length ? <div className="tableWrap"><table className="table">
+      {holdings.length ? <div className="tableWrap"><table className="table posTable">
         <thead><tr><th>Actif</th><th>Poids</th><th>Cours</th><th>Prix de revient</th><th>Valeur</th><th>+/− value</th></tr></thead>
         <tbody>{holdings.map((h) => {
           const g = h.value - h.cost_basis, gp = h.cost_basis > 0 ? (g / h.cost_basis) * 100 : 0;
@@ -144,7 +144,7 @@ export function Budget({ m, data, limits, openPlans, open }) {
       <div className="budgetHeroText">
         <div className="eyebrow">{monthLabel(m.month)}</div>
         <div className="nwAmount money" style={{ fontSize: "clamp(30px, 4vw, 40px)" }}>{money0(Math.max(0, limit - used))} <small>restants</small></div>
-        <p className="muted" style={{ margin: 0 }}>{money0(used)} dépensés sur {money0(limit)} budgétés · {m.daysLeft} jour{m.daysLeft > 1 ? "s" : ""} restant{m.daysLeft > 1 ? "s" : ""}</p>
+        <p className="muted budgetSum" style={{ margin: 0 }}>{money0(used)} dépensés sur {money0(limit)} budgétés · {m.daysLeft} jour{m.daysLeft > 1 ? "s" : ""} restant{m.daysLeft > 1 ? "s" : ""}</p>
         <div className="paceLegend"><span><i className="paceMark" />Rythme attendu au {m.dayOfMonth} du mois</span></div>
       </div>
       <button className="btn primary budgetAdd" onClick={() => add()}>{canAdd ? <Icon name="plus" size={16} /> : <Icon name="lock" size={15} />}Nouveau budget</button>
@@ -238,7 +238,7 @@ export function Operations({ data, query, setQuery, limits, openPlans, open, fla
   return <>
     {switcher}
     <section className="card panel opsBar">
-      <div className="search wide"><Icon name="search" size={16} /><input placeholder="Rechercher un libellé, une catégorie, un montant…" value={query} onChange={(e) => setQuery(e.target.value)} />{query && <button className="clear" onClick={() => setQuery("")} aria-label="Effacer"><Icon name="x" size={14} /></button>}</div>
+      <div className="search wide"><Icon name="search" size={16} /><input placeholder="Libellé, catégorie, montant…" value={query} onChange={(e) => setQuery(e.target.value)} />{query && <button className="clear" onClick={() => setQuery("")} aria-label="Effacer"><Icon name="x" size={14} /></button>}</div>
       <div className="filters">
         {[["all", "Toutes"], ["out", "Dépenses"], ["in", "Revenus"]].map(([k, l]) => <button key={k} className={"pillBtn" + (kind === k ? " on" : "")} onClick={() => setKind(k)}>{l}</button>)}
         <span className={"selectPill" + (category ? " on" : "")}><Icon name="filter" size={13} /><select value={category} onChange={(e) => setCategory(e.target.value)} aria-label="Catégorie"><option value="">Catégories</option>{cats.map((c) => <option key={c}>{c}</option>)}</select></span>

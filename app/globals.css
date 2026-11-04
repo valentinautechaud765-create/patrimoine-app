@@ -1259,3 +1259,66 @@ button.budgetRow.tap:hover { background: rgba(255, 255, 255, 0.03); }
 .nwAxis { display: flex; justify-content: space-between; gap: 8px; margin: 6px 4px 0; font-size: 11.5px; color: var(--faint); font-variant-numeric: tabular-nums; }
 .heroOpen .nwAxis { max-width: none; }
 .mixLegend b.bad { color: var(--bad); }
+
+/* ======================================================================
+   iPhone — finitions « appli native » (n'affecte pas l'ordinateur)
+   ====================================================================== */
+.hideNarrow { display: inline; }
+@container app (max-width: 860px) {
+  .hideNarrow { display: none; }
+
+  /* En-tête : le contenu glisse dessous en fondu, plus de coupure nette */
+  .mobileTop { background: rgba(6, 7, 10, 0.72); backdrop-filter: blur(20px) saturate(170%); -webkit-backdrop-filter: blur(20px) saturate(170%); }
+  .mobileTop::after { content: ""; position: absolute; left: 0; right: 0; top: 100%; height: 18px; pointer-events: none; background: linear-gradient(180deg, rgba(6, 7, 10, 0.72), rgba(6, 7, 10, 0)); }
+  .mobileTop .topTitle { min-width: 0; }
+  .mobileTop h1 { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /* Bas de page : léger fondu derrière la barre flottante */
+  .shell::after { content: ""; position: fixed; left: 0; right: 0; bottom: 0; height: calc(90px + env(safe-area-inset-bottom)); pointer-events: none; z-index: 35; background: linear-gradient(180deg, rgba(6, 7, 10, 0), rgba(6, 7, 10, 0.85) 70%); }
+
+  /* Cartes : titres alignés, respiration homogène */
+  .panelHead { min-height: 28px; margin-bottom: 4px; }
+  .panelHead h3, .panelHead h2 { font-size: 16px; letter-spacing: -0.01em; }
+  .panel > .list > .item:first-child, .panel .list > .item:first-child { border-top: 0; }
+  .item { min-height: 56px; }
+  .itemMain b { font-size: 15px; }
+  .itemMain small { font-size: 12.5px; }
+  .itemSide b { font-size: 15px; font-variant-numeric: tabular-nums; }
+  .itemSide small { font-size: 11.5px; }
+
+  /* Positions : un tableau devient une liste lisible (nom à gauche, valeur et gain à droite) */
+  .posTable, .posTable tbody { display: block; width: 100%; }
+  .posTable thead { display: none; }
+  .posTable tr { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "n v" "n g"; column-gap: 12px; align-items: center; padding: 11px 0; border-bottom: 1px solid var(--line); }
+  .posTable tr:last-child { border-bottom: 0; }
+  .posTable td { padding: 0 !important; border: 0; }
+  .posTable tr > td:not(:nth-child(1)):not(:nth-child(5)):not(:nth-child(6)) { display: none !important; }
+  .posTable td:nth-child(1) { display: block; grid-area: n; min-width: 0; }
+  .posTable td:nth-child(5) { display: block; grid-area: v; align-self: end; font-size: 15px; }
+  .posTable td:nth-child(6) { display: block; grid-area: g; align-self: start; }
+  .posTable td:nth-child(6) .gainCell { display: flex; flex-direction: row; align-items: baseline; gap: 6px; justify-content: flex-end; font-size: 12.5px; }
+  .posTable td:nth-child(6) .gainCell small { font-size: 12.5px; }
+  .posTable .name { min-width: 0; }
+  .posTable .itemMain { min-width: 0; }
+  .posTable .itemMain b { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tableWrap:has(.posTable) { overflow: visible; margin: 0; padding: 0; }
+
+  /* Fonctions réservées aux formules supérieures : un aperçu compact, pas trois écrans flous */
+  .locked:not(.lockedScreen) { max-height: 300px; border-radius: 16px; }
+  .locked:not(.lockedScreen) .lockedVeil { place-items: center; background: linear-gradient(180deg, rgba(15, 18, 24, 0.5), rgba(15, 18, 24, 0.96) 60%); }
+
+  /* Opérations : recherche et filtres */
+  .opsBar .filters { -webkit-mask-image: linear-gradient(90deg, #000 85%, transparent); mask-image: linear-gradient(90deg, #000 85%, transparent); }
+  .search input::placeholder { color: var(--faint); }
+  .dayHead { padding-top: 14px; font-size: 13px; }
+
+  /* Courbe : un peu moins haute pour voir la suite sans défiler */
+  .heroOpen .nwAmount { letter-spacing: -0.03em; }
+  .nwAxis { margin: 4px 2px 0; }
+
+  /* Retour tactile façon iOS sur toutes les lignes cliquables */
+  .item.tap:active, button.item:active, .posTable tr:active, button.budgetRow:active { background: rgba(255, 255, 255, 0.04); }
+  .posTable tr { border-radius: 0; }
+  * { -webkit-tap-highlight-color: transparent; }
+}
+@container app (max-width: 860px) { .budgetSum { font-size: 14px; line-height: 1.45; max-width: 290px; margin-inline: auto !important; } }
