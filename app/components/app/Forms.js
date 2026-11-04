@@ -237,6 +237,7 @@ export function RecurrenceForm({ rec, accounts, missing, onClose, onSave, onDele
   const [category, setCategory] = useState(rec?.category || "Logement"), [account, setAccount] = useState(rec?.account_id || "");
   const [frequency, setFrequency] = useState(rec?.frequency || "mensuelle");
   const [next, setNext] = useState(rec?.next_date || ""), [end, setEnd] = useState(rec?.end_date || ""), [active, setActive] = useState(rec ? rec.active : true), [busy, setBusy] = useState(false);
+  const syncedAcc = Boolean(account && accounts.find((a) => a.id === account)?.powens_account_id);
   const day = next ? Number(next.slice(8, 10)) : null;
   const base = type === "out" ? EXPENSE_CATEGORIES : ["Salaire", "Remboursement", "Autre"];
   const cats = rec?.category && !base.includes(rec.category) ? [...base, rec.category] : base;
@@ -265,9 +266,10 @@ export function RecurrenceForm({ rec, accounts, missing, onClose, onSave, onDele
         <label className="label">{editing ? "Prochaine échéance" : "Première échéance"}<input className="input" type="date" value={next} onChange={(e) => setNext(e.target.value)} /></label>
         <label className="label">Fin (facultatif)<input className="input" type="date" value={end} onChange={(e) => setEnd(e.target.value)} /></label>
       </div>
-      {rule && <p className="formHint"><Icon name="repeat" size={14} />{type === "out" ? "Dépense" : "Revenu"} de {value > 0 ? money(value) : "…"} {rule}, à partir du {new Date(next + "T12:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}{end ? ` jusqu’au ${new Date(end + "T12:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}` : ""}.{next < todayISO() ? " Les échéances déjà passées seront créées tout de suite." : ""}</p>}
+      {rule && <p className="formHint"><Icon name="repeat" size={14} />{type === "out" ? "Dépense" : "Revenu"} de {value > 0 ? money(value) : "…"} {rule}, à partir du {new Date(next + "T12:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}{end ? ` jusqu’au ${new Date(end + "T12:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}` : ""}.{next < todayISO() && !syncedAcc ? " Les échéances déjà passées seront créées tout de suite." : ""}</p>}
       <div className="label">Catégorie<CatGrid list={cats} value={category} onChange={setCategory} /></div>
-      <label className="label">Compte<select className="input" value={account} onChange={(e) => setAccount(e.target.value)}><option value="">Aucun</option>{accounts.filter((a) => !a.powens_account_id || a.id === account).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</select></label>
+      <label className="label">Compte<select className="input" value={account} onChange={(e) => setAccount(e.target.value)}><option value="">Aucun</option>{accounts.map((a) => <option key={a.id} value={a.id}>{a.name}{a.institution ? ` · ${a.institution}` : ""}{a.powens_account_id ? " (synchronisé)" : ""}</option>)}</select></label>
+      {syncedAcc && <p className="formHint"><Icon name="info" size={14} />Compte relié à la banque : l’opération réelle arrivera avec la synchronisation, elle ne sera pas créée une deuxième fois. Ici, elle sert à prévoir vos charges à venir.</p>}
       {editing && <label className="item switchRow" style={{ borderTop: 0, padding: 0 }}><div className="itemMain"><b>Active</b><small>Désactivez-la pour la mettre en pause sans la supprimer.</small></div><input type="checkbox" className="switch" checked={active} onChange={(e) => setActive(e.target.checked)} /></label>}
       <button className="btn primary lg block" disabled={busy || !ok || missing}>{busy ? "Enregistrement…" : editing ? "Enregistrer" : "Créer l’opération automatique"}</button>
       {editing && <DeleteButton onConfirm={async () => { if (await onDelete(rec) !== false) onClose(); }} label="Supprimer l’opération automatique" />}
