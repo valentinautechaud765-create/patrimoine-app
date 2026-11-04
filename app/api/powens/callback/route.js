@@ -16,11 +16,15 @@ export async function GET(request) {
     if (!/^[a-f0-9]{48}$/.test(state)) throw new Error("retour de Powens sans identifiant de session valide. Relancez « Connecter ma banque ».");
     const db = supabaseAdmin();
     const { data: link } = await db.from("powens_links").select("user_id").eq("pending_state", state).maybeSingle();
-    if (!link) throw new Error("tentative expirée ou déjà utilisée. Relancez « Connecter ma banque ».");
+    // Lien déjà utilisé (rechargement, double clic…) : la banque est reliée côté Powens,
+    // l'appli importera elle-même les comptes avec la session de l'utilisateur.
+    if (!link) { back.searchParams.set("banque", "sync"); return NextResponse.redirect(back); }
     linkedUser = link.user_id;
     await db.from("powens_links").update({ pending_state: null }).eq("user_id", link.user_id);
     try {
       const r = await syncUser(db, link.user_id, { days: 180 });
+      // Powens met parfois quelques secondes à récupérer les comptes chez la banque : l'appli réessaiera.
+      if (!r.accounts) { back.searchParams.set("banque", "sync"); return NextResponse.redirect(back); }
       back.searchParams.set("banque", "ok");
       back.searchParams.set("ops", String(r.transactions || 0));
     } catch (e) {

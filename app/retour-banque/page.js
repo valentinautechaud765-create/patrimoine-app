@@ -26,14 +26,14 @@ function Retour() {
     })();
   }, []); // eslint-disable-line
 
-  const ok = statut === "ok", partiel = statut === "partiel";
+  const ok = statut === "ok", partiel = statut === "partiel" || statut === "sync";
   return <main className="returnPage">
     <div className="returnCard">
       <BrandMark size={40} />
       {mode === "check" ? <p className="muted">Retour vers Patrimo…</p> : <>
         <span className={"returnIco " + (ok || partiel ? "ok" : "bad")}><Icon name={ok || partiel ? "check" : "info"} size={26} stroke={2.2} /></span>
         <h1>{ok ? "Banque connectée" : partiel ? "Banque connectée" : "La connexion n’a pas abouti"}</h1>
-        <p>{ok ? "Vos comptes ont été ajoutés." : partiel ? "L’import des comptes va se relancer dans l’appli." : raison || "Réessayez depuis l’appli."}</p>
+        <p>{ok ? "Vos comptes ont été ajoutés." : partiel ? "Vos comptes s’importent dans l’appli." : raison || "Réessayez depuis l’appli."}</p>
         <div className="returnSteps">
           <b>Revenez dans l’appli Patrimo</b>
           <span>Fermez cette page et rouvrez Patrimo depuis votre écran d’accueil : vos comptes s’importent automatiquement.</span>

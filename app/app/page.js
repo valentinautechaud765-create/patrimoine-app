@@ -114,17 +114,25 @@ function App() {
   const importAfterBank = useCallback(async () => {
     if (demo || !data?.session || bankBusy.current) return;
     let pending = 0; try { pending = Number(localStorage.getItem("patrimo.bankPending")) || 0; } catch {}
-    if (!pending || Date.now() - pending > 60 * 60e3) return;
+    const fromReturn = ["sync", "partiel"].includes(params.get("banque")) && !bankBusy.done;
+    if (!fromReturn && (!pending || Date.now() - pending > 60 * 60e3)) return;
+    bankBusy.done = true;
     bankBusy.current = true;
     try {
       localStorage.removeItem("patrimo.bankPending");
       setBankNotice({ text: "Import de vos comptes bancaires…", tone: "ok" });
-      const r = await api("/api/powens/sync", { force: true });
+      // Juste après la connexion, Powens peut encore être en train de lire la banque : on réessaie un peu.
+      let r = await api("/api/powens/sync", { force: true });
+      for (let i = 0; r.linked && !r.accounts && i < 5; i++) {
+        setBankNotice({ text: `Votre banque transmet vos comptes… (${i + 1}/5)`, tone: "ok" });
+        await new Promise((ok) => setTimeout(ok, 5000));
+        r = await api("/api/powens/sync", { force: true });
+      }
       if (!r.linked) setBankNotice({ text: "La banque n’a pas été reliée. Relancez « Connecter ma banque ».", tone: "bad" });
       else { await load(); setBankNotice({ text: r.newAccounts ? `Banque connectée : ${r.newAccounts} compte${r.newAccounts > 1 ? "s" : ""} ajouté${r.newAccounts > 1 ? "s" : ""}${r.transactions ? `, ${r.transactions} opérations importées` : ""}.` : r.accounts ? "Comptes bancaires à jour." : "La banque est reliée, mais elle n’a renvoyé aucun compte pour l’instant. Réessayez dans une minute avec « Synchroniser ».", tone: r.accounts ? "ok" : "bad" }); }
     } catch (e) { setBankNotice({ text: "Import bancaire : " + e.message, tone: "bad" }); }
     finally { bankBusy.current = false; }
-  }, [data?.session, demo]); // eslint-disable-line
+  }, [data?.session, demo, params]); // eslint-disable-line
   useEffect(() => {
     importAfterBank();
     const v = () => { if (!document.hidden) importAfterBank(); };
@@ -135,6 +143,7 @@ function App() {
   const notice = useMemo(() => {
     // Échec de la connexion bancaire : on affiche la vraie raison renvoyée par le serveur
     if (params.get("banque") === "erreur" && params.get("raison")) return { text: "Connexion bancaire : " + params.get("raison").slice(0, 220), tone: "bad" };
+    if (params.get("banque") === "sync") return null;
     if (params.get("banque") === "partiel") return { text: "Banque connectée, mais l’import a échoué : " + String(params.get("raison") || "").slice(0, 200) + " — touchez « Synchroniser » dans Comptes.", tone: "bad" };
     for (const [k, v] of Object.entries(NOTICES)) { const [a, b] = k.split("="); if (params.get(a) === b) return v; }
     return null;
