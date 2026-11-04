@@ -18,6 +18,6 @@ export async function POST(request) {
     return NextResponse.json(await syncUser(db, user.id));
   } catch (e) {
     console.error("[powens sync]", e.message);
-    return NextResponse.json({ error: /configur/i.test(e.message) ? e.message : "Synchronisation bancaire momentanément indisponible." }, { status: 500 });
+    return NextResponse.json({ error: e.message || "Synchronisation bancaire momentanément indisponible." }, { status: 500 });
   }
 }

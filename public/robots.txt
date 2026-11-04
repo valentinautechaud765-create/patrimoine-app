@@ -3,3 +3,4 @@ Allow: /
 Disallow: /app
 Disallow: /api/
 Disallow: /connexion
+Disallow: /retour-banque

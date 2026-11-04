@@ -1201,3 +1201,13 @@ button.budgetRow.tap:hover { background: rgba(255, 255, 255, 0.03); }
   .projLegend b { font-size: 16px; }
   .projLegend { gap: 8px 10px; }
 }
+/* Page de retour après la banque */
+.returnPage { min-height: 100vh; min-height: 100dvh; display: grid; place-items: center; padding: 24px 16px calc(24px + env(safe-area-inset-bottom)); background: radial-gradient(ellipse 70% 40% at 50% -10%, rgba(61, 124, 255, 0.14), transparent 60%), var(--bg); }
+.returnCard { width: min(400px, 100%); display: grid; justify-items: center; gap: 14px; text-align: center; }
+.returnCard h1 { margin: 6px 0 0; font-size: 24px; font-weight: 600; letter-spacing: -0.02em; }
+.returnCard p { margin: 0; color: var(--muted); font-size: 15px; line-height: 1.5; }
+.returnIco { width: 56px; height: 56px; border-radius: 50%; display: grid; place-items: center; margin-top: 8px; }
+.returnIco.ok { background: var(--okSoft); color: var(--ok); }
+.returnIco.bad { background: var(--badSoft); color: var(--bad); }
+.returnSteps { display: grid; gap: 4px; width: 100%; padding: 16px; margin: 6px 0 4px; border-radius: 16px; background: var(--surface); border: 1px solid var(--line2); text-align: left; }
+.returnSteps span { color: var(--muted); font-size: 14px; line-height: 1.45; }

@@ -107,6 +107,31 @@ function App() {
     return () => { sub?.subscription?.unsubscribe(); document.removeEventListener("visibilitychange", wake); };
   }, [demo]); // eslint-disable-line
 
+  // Retour de Powens : sur iPhone, la page de la banque s'ouvre dans Safari. Quand on revient dans
+  // l'appli, on importe tout de suite les comptes qui viennent d'être connectés.
+  const [bankNotice, setBankNotice] = useState(null);
+  const bankBusy = useRef(false);
+  const importAfterBank = useCallback(async () => {
+    if (demo || !data?.session || bankBusy.current) return;
+    let pending = 0; try { pending = Number(localStorage.getItem("patrimo.bankPending")) || 0; } catch {}
+    if (!pending || Date.now() - pending > 60 * 60e3) return;
+    bankBusy.current = true;
+    try {
+      localStorage.removeItem("patrimo.bankPending");
+      setBankNotice({ text: "Import de vos comptes bancaires…", tone: "ok" });
+      const r = await api("/api/powens/sync", { force: true });
+      if (!r.linked) setBankNotice({ text: "La banque n’a pas été reliée. Relancez « Connecter ma banque ».", tone: "bad" });
+      else { await load(); setBankNotice({ text: r.newAccounts ? `Banque connectée : ${r.newAccounts} compte${r.newAccounts > 1 ? "s" : ""} ajouté${r.newAccounts > 1 ? "s" : ""}${r.transactions ? `, ${r.transactions} opérations importées` : ""}.` : r.accounts ? "Comptes bancaires à jour." : "La banque est reliée, mais elle n’a renvoyé aucun compte pour l’instant. Réessayez dans une minute avec « Synchroniser ».", tone: r.accounts ? "ok" : "bad" }); }
+    } catch (e) { setBankNotice({ text: "Import bancaire : " + e.message, tone: "bad" }); }
+    finally { bankBusy.current = false; }
+  }, [data?.session, demo]); // eslint-disable-line
+  useEffect(() => {
+    importAfterBank();
+    const v = () => { if (!document.hidden) importAfterBank(); };
+    document.addEventListener("visibilitychange", v); window.addEventListener("focus", v);
+    return () => { document.removeEventListener("visibilitychange", v); window.removeEventListener("focus", v); };
+  }, [importAfterBank]);
+
   const notice = useMemo(() => {
     // Échec de la connexion bancaire : on affiche la vraie raison renvoyée par le serveur
     if (params.get("banque") === "erreur" && params.get("raison")) return { text: "Connexion bancaire : " + params.get("raison").slice(0, 220), tone: "bad" };
@@ -227,7 +252,7 @@ function App() {
   }, [data?.session, data?.accounts]); // eslint-disable-line
 
   const actions = {
-    notice,
+    notice: bankNotice || notice,
     async checkout(plan, billing) {
       if (demo) return { message: "Démonstration : le paiement s’activera une fois Stripe branché." };
       const { url } = await api("/api/stripe/checkout", { plan, billing });
@@ -241,6 +266,7 @@ function App() {
     async connectBank() {
       if (demo) return { message: "Démonstration : la connexion bancaire s’activera avec Powens." };
       const { url } = await api("/api/powens/connect");
+      try { localStorage.setItem("patrimo.bankPending", String(Date.now())); } catch {}
       window.location.href = url;
     },
     async saveTransaction(t, repeatFreq) {

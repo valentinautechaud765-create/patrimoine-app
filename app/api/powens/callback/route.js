@@ -8,7 +8,7 @@ export const maxDuration = 60;
 // Retour de la page Powens : on vérifie l'état (anti-falsification), puis on importe comptes et opérations.
 export async function GET(request) {
   // Retour sur le même site que celui où l'utilisateur est connecté (même adresse que ce lien de retour).
-  const url = new URL(request.url), back = new URL("/app", url.origin);
+  const url = new URL(request.url), back = new URL("/retour-banque", url.origin);
   let linkedUser = null;
   try {
     const state = url.searchParams.get("state") || "";
