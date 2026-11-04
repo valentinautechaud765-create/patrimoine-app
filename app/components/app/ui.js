@@ -13,10 +13,29 @@ export function InstIcon({ name, size = 40 }) {
 }
 
 // Avatar : monogramme sur verre sombre, entouré d'un anneau dégradé.
-export function Avatar({ name = "", size = 34 }) {
+export function Avatar({ name = "", size = 34, src = "" }) {
   const w = String(name).trim().split(/[\s._-]+/).filter(Boolean);
   const ini = ((w[0]?.[0] || "?") + (w[1]?.[0] || "")).toUpperCase();
-  return <span className="avatar ring" style={{ width: size, height: size, fontSize: Math.round(size * (ini.length > 1 ? 0.36 : 0.42)) }}><span>{ini}</span></span>;
+  return <span className="avatar ring" style={{ width: size, height: size, fontSize: Math.round(size * (ini.length > 1 ? 0.36 : 0.42)) }}>
+    {src ? <img src={src} alt="" className="avatarImg" /> : <span>{ini}</span>}
+  </span>;
+}
+
+// Photo choisie → carré recadré au centre, 320 px, JPEG léger (prêt à envoyer)
+export function squarePhoto(file, size = 320) {
+  return new Promise((resolve, reject) => {
+    if (!file || !/^image\//.test(file.type)) return reject(new Error("Choisissez une image."));
+    const url = URL.createObjectURL(file), img = new Image();
+    img.onload = () => {
+      const s = Math.min(img.width, img.height), c = document.createElement("canvas");
+      c.width = c.height = size;
+      c.getContext("2d").drawImage(img, (img.width - s) / 2, (img.height - s) / 2, s, s, 0, 0, size, size);
+      URL.revokeObjectURL(url);
+      resolve(c.toDataURL("image/jpeg", 0.85));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Image illisible.")); };
+    img.src = url;
+  });
 }
 
 export function CatIcon({ category, size = 40 }) {

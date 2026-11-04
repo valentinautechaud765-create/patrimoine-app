@@ -6,7 +6,7 @@ import { money, money0, signed, pct, dayTitle, monthLabel, todayISO } from "../.
 import { ASSET_COLORS } from "../../../lib/categories.js";
 import { budgetSuggestions, FREQ_LABEL, perMonth } from "../../../lib/model.js";
 import { planById, TRIAL_DAYS, BRAND } from "../../../lib/config.js";
-import { Amount, Avatar, CatIcon, InstIcon, TickerIcon, Panel, Empty, Locked, ago, KIND_LABEL } from "./ui.js";
+import { Amount, Avatar, squarePhoto, CatIcon, InstIcon, TickerIcon, Panel, Empty, Locked, ago, KIND_LABEL } from "./ui.js";
 import { BudgetRow, TxRow, Upcoming } from "./Overview.js";
 import { InvestProjection } from "./Projection.js";
 
@@ -261,16 +261,20 @@ export function Operations({ data, query, setQuery, limits, openPlans, open, fla
 }
 
 /* ---------------- Réglages ---------------- */
-export function Settings({ data, demo, openPlans, managePlan, logout, resetPassword, saveName, privacy, setPrivacy, deleteMe, importData }) {
+export function Settings({ data, demo, openPlans, managePlan, logout, resetPassword, saveName, saveAvatar, privacy, setPrivacy, deleteMe, importData }) {
   const p = data.profile, plan = planById(p.plan || "free"), email = data.session?.user?.email;
   const name = p.full_name || (email ? email.split("@")[0] : "Mon compte");
-  const [editName, setEditName] = useState(null);
+  const [editName, setEditName] = useState(null), [photoBusy, setPhotoBusy] = useState(false);
   const trialLeft = p.trial_days_left ?? TRIAL_DAYS;
   return <div className="settings">
     <section className="card panel profileCard fadeIn">
-      <Avatar name={name} size={56} />
+      <label className="avatarEdit" title="Changer la photo de profil">
+        <Avatar name={name} size={56} src={p.avatar_url} />
+        <span className="avatarCam"><Icon name={photoBusy ? "refresh" : "edit"} size={12} className={photoBusy ? "spin" : ""} /></span>
+        <input type="file" accept="image/*" hidden disabled={photoBusy} onChange={async (e) => { const f = e.target.files?.[0]; e.target.value = ""; if (!f) return; setPhotoBusy(true); try { await saveAvatar(await squarePhoto(f)); } catch (err) { window.alert(err.message); } setPhotoBusy(false); }} />
+      </label>
       {editName === null ? <>
-        <div className="itemMain"><b style={{ fontSize: 18 }}>{name}</b><small>{email || "Compte de démonstration"}</small></div>
+        <div className="itemMain"><b style={{ fontSize: 18 }}>{name}</b><small>{email || "Compte de démonstration"}</small>{p.avatar_url && <button className="link" style={{ fontSize: 12 }} onClick={() => saveAvatar(null)}>Retirer la photo</button>}</div>
         <button className="btn sm" onClick={() => setEditName(p.full_name || "")}><Icon name="edit" size={14} />Modifier</button>
       </> : <form className="nameForm" onSubmit={async (e) => { e.preventDefault(); if (!editName.trim()) return; if (await saveName(editName.trim()) !== false) setEditName(null); }}>
         <input className="input" value={editName} onChange={(e) => setEditName(e.target.value)} placeholder="Votre prénom" maxLength={40} autoFocus />

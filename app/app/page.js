@@ -64,6 +64,7 @@ function App() {
       sb.from("debt_payments").select("*").order("date", { ascending: false }),
     ]);
     const pr = profile.data || { plan: "free" };
+    pr.avatar_url = s.session.user.user_metadata?.avatar_url || null;
     // Propriétaire : accès complet. Le serveur l'enregistre dans la base ; l'affichage est débloqué
     // tout de suite pour l'adresse propriétaire confirmée (les routes serveur revérifient de leur côté).
     const u = s.session.user, isOwner = OWNER_EMAILS.includes(String(u.email || "").toLowerCase()) && Boolean(u.email_confirmed_at || u.confirmed_at);
@@ -355,6 +356,13 @@ function App() {
       await erase("budgets", { category });
       setData((d) => ({ ...d, budgets: d.budgets.filter((x) => x.category !== category) }));
       return { message: "Budget supprimé" };
+    },
+    async saveAvatar(image) {
+      if (demo) { setData((d) => ({ ...d, profile: { ...d.profile, avatar_url: image } })); return { message: image ? "Photo ajoutée (démonstration)" : "Photo retirée" }; }
+      const r = await api("/api/compte/photo", image ? { image } : { remove: true });
+      setData((d) => ({ ...d, profile: { ...d.profile, avatar_url: r.url } }));
+      supabaseBrowser().auth.refreshSession().catch(() => {});
+      return { message: image ? "Photo de profil enregistrée" : "Photo retirée" };
     },
     async saveName(full_name) {
       if (!demo) {

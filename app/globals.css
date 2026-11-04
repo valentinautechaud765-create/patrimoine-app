@@ -1231,3 +1231,9 @@ button.budgetRow.tap:hover { background: rgba(255, 255, 255, 0.03); }
 }
 /* …sauf la valeur actuelle réelle en tête du calcul (c'est le patrimoine / les placements d'aujourd'hui) */
 .privacy .projExplain .calcRow.start b { filter: blur(7px) !important; user-select: none; }
+
+/* Photo de profil */
+.avatarImg { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; display: block; }
+.avatarEdit { position: relative; cursor: pointer; flex: none; display: inline-flex; }
+.avatarEdit:hover .avatar.ring { filter: brightness(1.08); }
+.avatarCam { position: absolute; right: -2px; bottom: -2px; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: var(--blue); color: #fff; box-shadow: 0 0 0 2.5px var(--surface); }

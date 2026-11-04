@@ -217,7 +217,7 @@ export default function AppView({ data, demo, embedded, initialTab = "overview",
     budget: <Budget m={m} data={data} limits={limits} openPlans={openPlans} open={open} />,
     ops: <Operations key={opsCat} data={data} query={query} setQuery={setQuery} limits={limits} openPlans={openPlans} open={open} flash={flash} initialCategory={opsCat} />,
     debts: <Debts data={data} open={open} />,
-    settings: <Settings data={data} demo={demo} openPlans={openPlans} managePlan={() => run(actions.managePlan)} logout={() => run(actions.logout)} resetPassword={() => run(actions.resetPassword)} saveName={(n) => run(actions.saveName, n)} importData={() => open("import")} privacy={privacy} setPrivacy={setPrivacy} deleteMe={() => open("deleteMe")} />,
+    settings: <Settings data={data} demo={demo} openPlans={openPlans} managePlan={() => run(actions.managePlan)} logout={() => run(actions.logout)} resetPassword={() => run(actions.resetPassword)} saveName={(n) => run(actions.saveName, n)} saveAvatar={(f) => run(actions.saveAvatar, f)} importData={() => open("import")} privacy={privacy} setPrivacy={setPrivacy} deleteMe={() => open("deleteMe")} />,
   }[tab];
   const viewed = modal?.type === "accountView" ? data.accounts.find((a) => a.id === modal.id) : null;
   const viewedDebt = modal?.type === "debtView" || modal?.type === "debtPay" ? (data.debts || []).find((d) => d.id === modal.id) : null;
@@ -244,7 +244,7 @@ export default function AppView({ data, demo, embedded, initialTab = "overview",
             <div className="bar" style={{ marginTop: 0 }}><i style={{ width: Math.max(4, (1 - trialLeft / TRIAL_DAYS) * 100) + "%", background: "var(--blue)" }} /></div>
           </div> : <div className="planCard quiet"><b>{planById(plan).name}</b><small>Merci de votre confiance.</small></div>}
           <button className="sideUser" onClick={() => go("settings")}>
-            <Avatar name={first || "?"} size={34} />
+            <Avatar name={first || "?"} size={34} src={p.avatar_url} />
             <span className="itemMain navLabel"><b>{first || "Mon compte"}</b><small>{email || (demo ? "Démonstration" : "")}</small></span>
             <Icon name="chevronRight" size={15} className="faint navLabel" />
           </button>
@@ -269,7 +269,7 @@ export default function AppView({ data, demo, embedded, initialTab = "overview",
               <button className="iconBtn" aria-label={privacy ? "Afficher les montants" : "Masquer les montants"} onClick={() => setPrivacy(!privacy)}><Icon name={privacy ? "eyeOff" : "eye"} size={18} /></button>
               <button className={"iconBtn" + (charts ? " active" : "")} aria-label={charts ? "Masquer les courbes" : "Afficher les courbes"} onClick={() => setCharts(!charts)}><Icon name={charts ? "chart" : "chartOff"} size={18} /></button>
               <button className="iconBtn" aria-label="Ajouter une opération" onClick={() => setModal({ type: "tx" })}><Icon name="plus" size={18} /></button>
-              <button className="avatarBtn" aria-label="Réglages" onClick={() => go("settings")}><Avatar name={first || "?"} size={34} /></button>
+              <button className="avatarBtn" aria-label="Réglages" onClick={() => go("settings")}><Avatar name={first || "?"} size={34} src={p.avatar_url} /></button>
             </div>
           </header>
 
