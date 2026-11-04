@@ -102,9 +102,9 @@ function Kpis({ m }) {
 
 export function InsightList({ list }) {
   if (!list.length) return <Empty icon="sparkles" title="Rien à signaler" text="Les observations apparaîtront ici dès qu’il y aura assez d’opérations ce mois-ci." />;
-  const TONE = { ok: "var(--ok)", warn: "var(--warn)", bad: "var(--bad)" };
+  const TONE = { ok: ["var(--okSoft)", "var(--ok)"], warn: ["var(--warnSoft)", "var(--warn)"], bad: ["var(--badSoft)", "var(--bad)"] };
   return <div>{list.map((x) => <div className="insight" key={x.title}>
-    <span className="insightIco" style={{ "--c": TONE[x.tone] || "var(--blue2)" }}><Icon name={x.icon} size={17} /></span>
+    <span className="insightIco" style={{ background: TONE[x.tone][0], color: TONE[x.tone][1] }}><Icon name={x.icon} size={17} /></span>
     <div><b>{x.title}</b><small>{x.text}</small></div>
   </div>)}</div>;
 }
@@ -258,7 +258,7 @@ export default function Overview({ m, data, limits, go, openPlans, list, open, g
     <div className="grid g3">
       <Panel title="Comptes" action={accounts.length ? "Tout voir" : null} onAction={() => go("accounts")} className="span2 fadeIn">
         {accounts.length ? <div className="list">{accounts.slice(0, 5).map((a) => <button className="item hover tap" key={a.id} onClick={() => open("accountView", { id: a.id })}>
-          <InstIcon name={a.institution || a.name} kind={a.kind} manual={!a.institution} />
+          <InstIcon name={a.institution || a.name} />
           <div className="itemMain"><b>{a.name}</b><small>{a.institution ? a.institution + " · " : ""}{KIND_LABEL[a.kind]}</small></div>
           <div className="itemSide"><b>{money(a.balance, a.currency)}</b><small className="faint">{a.powens_account_id ? "Synchro " : "Mis à jour "}{ago(a.updated_at)}</small></div>
         </button>)}</div> : <Empty icon="bank" title="Aucun compte pour l’instant" text="Ajoutez vos comptes à la main, ou connectez votre banque."><button className="btn primary sm" onClick={() => open("account")}><Icon name="plus" size={15} />Ajouter un compte</button></Empty>}

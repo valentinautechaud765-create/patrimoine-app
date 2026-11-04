@@ -54,12 +54,12 @@ export function Accounts({ m, data, connectBank, syncBank, limits, openPlans, op
     {(data.bankErrors || []).map((e) => <div className="msg info" key={e.bank}><b>{e.bank}</b> demande de confirmer votre identité (sécurité de la banque, environ tous les 180 jours). <button className="link" onClick={connectBank}>Reconnecter</button></div>)}
     {groups.length ? groups.map((g, i) => <section key={g.name} className="card panel fadeIn" style={{ animationDelay: 80 + i * 40 + "ms" }}>
       <div className="instHead">
-        <InstIcon name={g.name} manual={g.name === "Saisis à la main"} size={44} />
+        <InstIcon name={g.name} size={44} />
         <div className="itemMain"><b style={{ fontSize: 16 }}>{g.name}</b><small>{g.list.length} compte{g.list.length > 1 ? "s" : ""}</small></div>
         <b className="num money" style={{ fontSize: 17, fontWeight: 500 }}>{money(g.total)}</b>
       </div>
       <div className="list">{g.list.map((a) => <button className={"item hover tap" + (a.hidden ? " paused" : "")} key={a.id} onClick={() => open("accountView", { id: a.id })}>
-        <span className={"kindIco tint k-" + a.kind}><Icon name={a.kind === "epargne" ? "piggy" : a.kind === "investissement" ? "trending" : "card"} size={17} /></span>
+        <span className="kindIco"><Icon name={a.kind === "epargne" ? "piggy" : a.kind === "investissement" ? "trending" : "card"} size={17} /></span>
         <div className="itemMain"><b>{a.name}{a.hidden && <span className="chip" style={{ height: 20, marginLeft: 8, fontSize: 11 }}>Masqué</span>}</b><small>{KIND_LABEL[a.kind]}{a.powens_account_id ? " · synchronisé" : " · manuel"}{a.hidden ? " · non compté dans le patrimoine" : ""}</small></div>
         <div className="itemSide"><b>{money(a.balance, a.currency)}</b><small className="faint">{a.updated_at ? "Mis à jour " + ago(a.updated_at) : ""}</small></div>
         <Icon name="chevronRight" size={16} className="faint" />

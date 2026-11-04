@@ -1149,33 +1149,7 @@ button.budgetRow.tap:hover { background: rgba(255, 255, 255, 0.03); }
   .profileCard { padding: 16px; gap: 12px; }
 }
 
-/* ======================================================================
-   Iconographie : tuiles « verre » cohérentes partout
-   - logos de banques aux couleurs de la marque, reflet discret, badge du type de compte
-   - avatar en anneau dégradé
-   - pastilles d'icônes teintées (analyse, catégories, indicateurs, réglages)
-   ====================================================================== */
-.instIco {
-  --c: #4f7dff; --fg: #fff;
-  position: relative; border-radius: 28%; font-size: 15px; color: var(--fg);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0) 48%),
-    linear-gradient(150deg, color-mix(in srgb, var(--c) 92%, #fff), var(--c) 45%, color-mix(in srgb, var(--c) 70%, #000)) !important;
-  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.22), inset 0 -1px 0 rgba(0, 0, 0, 0.25), 0 6px 16px -8px color-mix(in srgb, var(--c) 80%, #000);
-  isolation: isolate;
-}
-.instIco .instMono { font-weight: 700; letter-spacing: -0.03em; line-height: 1; text-shadow: 0 1px 1px rgba(0, 0, 0, 0.18); }
-.instIco svg { color: var(--fg); opacity: 0.95; }
-.instKind {
-  position: absolute; right: -4px; bottom: -4px; width: 42%; height: 42%; min-width: 16px; min-height: 16px;
-  display: grid; place-items: center; border-radius: 50%; color: #fff;
-  background: var(--kc, #3d7cff); box-shadow: 0 0 0 2.5px var(--surface), 0 2px 6px rgba(0, 0, 0, 0.4);
-}
-.instKind.k-courant { --kc: #3d7cff; }
-.instKind.k-epargne { --kc: #1fbf7f; }
-.instKind.k-investissement { --kc: #8f6bff; }
-.list .item .instIco { margin-right: 2px; }
-
+/* Avatar du profil : monogramme sur verre sombre, anneau dégradé */
 .avatar.ring {
   position: relative; padding: 2px; border-radius: 50%; color: #fff; font-weight: 600; letter-spacing: 0.01em;
   background: conic-gradient(from 210deg, #6ea0ff, #8f6bff, #2ee5c1, #6ea0ff);
@@ -1188,25 +1162,3 @@ button.budgetRow.tap:hover { background: rgba(255, 255, 255, 0.03); }
 }
 .avatarBtn:active .avatar.ring { transform: scale(0.94); }
 
-/* Pastilles d'icônes : même famille partout */
-.catIco, .insightIco, .kpiIco, .kindIco.tint, .planCardIco, .lockIco {
-  --c: var(--blue2);
-  border-radius: 30%; color: var(--c) !important;
-  background: linear-gradient(180deg, color-mix(in srgb, var(--c) 26%, transparent), color-mix(in srgb, var(--c) 10%, transparent)) !important;
-  box-shadow: inset 0 0 0 0.5px color-mix(in srgb, var(--c) 40%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.07);
-}
-.insightIco { width: 36px; height: 36px; }
-.insight { align-items: flex-start; }
-.kindIco.tint.k-courant { --c: #7fa8ff; }
-.kindIco.tint.k-epargne { --c: #2ee59d; }
-.kindIco.tint.k-investissement { --c: #a98bff; }
-.kindIco:not(.tint), .emptyIco {
-  border-radius: 30%;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03));
-  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.06);
-  border: 0;
-}
-.tickerIco { border-radius: 30%; box-shadow: inset 0 0 0 0.5px color-mix(in srgb, currentColor 40%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.06); }
-.actionIco { border-radius: 30%; background: linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.03)); border: 0; box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.08); }
-.actionCard.blue .actionIco { background: linear-gradient(180deg, #5b92ff, #2f63e6); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 10px 24px -10px rgba(61, 124, 255, 0.9); }
-.panelHead h3 svg { color: var(--blue2); }

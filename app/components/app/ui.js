@@ -5,50 +5,11 @@ import { cat, ASSET_COLORS } from "../../../lib/categories.js";
 import { splitMoney } from "../../../lib/format.js";
 
 const INST_COLORS = ["#4f7dff", "#2fbf8f", "#e0679a", "#f0a13a", "#8f6bff", "#2fb3d1", "#e8664a", "#6d8299"];
-export const instColor = (name = "") => (brandOf(name)?.bg) || INST_COLORS[[...String(name)].reduce((n, c) => n + c.charCodeAt(0), 0) % INST_COLORS.length];
+export const instColor = (name = "") => INST_COLORS[[...String(name)].reduce((n, c) => n + c.charCodeAt(0), 0) % INST_COLORS.length];
 
-// Banques connues : couleur de la marque et monogramme (pas leurs logos officiels).
-const BRANDS = [
-  [/revolut/i, { bg: "#0b0c10", fg: "#fff", m: "R" }],
-  [/bourso/i, { bg: "#d4007a", fg: "#fff", m: "B" }],
-  [/cr[ée]dit agricole/i, { bg: "#00775a", fg: "#fff", m: "CA" }],
-  [/cr[ée]dit mutuel/i, { bg: "#0a3d8f", fg: "#fff", m: "CM" }],
-  [/\bcic\b/i, { bg: "#0b5fae", fg: "#fff", m: "CIC" }],
-  [/bnp|hello ?bank/i, { bg: "#00915a", fg: "#fff", m: "BNP" }],
-  [/soci[ée]t[ée] g[ée]n[ée]rale|\bsg\b/i, { bg: "#e60028", fg: "#fff", m: "SG" }],
-  [/\blcl\b/i, { bg: "#0d2b6f", fg: "#ffd200", m: "LCL" }],
-  [/caisse d.?[ée]pargne/i, { bg: "#d6001c", fg: "#fff", m: "CE" }],
-  [/banque populaire/i, { bg: "#0060ae", fg: "#fff", m: "BP" }],
-  [/banque postale/i, { bg: "#003da5", fg: "#ffcc00", m: "LBP" }],
-  [/fortuneo/i, { bg: "#64b42d", fg: "#fff", m: "F" }],
-  [/\bn26\b/i, { bg: "#36a18b", fg: "#fff", m: "N26" }],
-  [/trade republic/i, { bg: "#111", fg: "#fff", m: "TR" }],
-  [/qonto/i, { bg: "#1d1d1b", fg: "#fff", m: "Q" }],
-  [/shine/i, { bg: "#1f8f7a", fg: "#fff", m: "S" }],
-  [/lydia|sumeria/i, { bg: "#2b6bff", fg: "#fff", m: "L" }],
-  [/paypal/i, { bg: "#003087", fg: "#fff", m: "P" }],
-  [/degiro/i, { bg: "#00a3e0", fg: "#fff", m: "D" }],
-  [/binance/i, { bg: "#1e2026", fg: "#f0b90b", m: "B" }],
-  [/coinbase/i, { bg: "#0052ff", fg: "#fff", m: "C" }],
-  [/ing\b/i, { bg: "#ff6200", fg: "#fff", m: "ING" }],
-  [/hsbc/i, { bg: "#db0011", fg: "#fff", m: "H" }],
-];
-function brandOf(name = "") { const b = BRANDS.find(([re]) => re.test(String(name))); return b ? b[1] : null; }
-const monogram = (name = "") => {
-  const w = String(name).replace(/[^\p{L}\p{N} ]/gu, " ").trim().split(/\s+/).filter(Boolean);
-  return ((w[0]?.[0] || "?") + (w.length > 1 && w[1].length > 2 ? w[1][0] : "")).toUpperCase();
-};
-const KIND_GLYPH = { courant: "card", epargne: "piggy", investissement: "trending" };
-
-// Logo de banque : tuile aux couleurs de la banque, reflet discret, et badge du type de compte.
-export function InstIcon({ name, size = 40, kind, manual }) {
-  const b = brandOf(name), c = b?.bg || instColor(name);
-  const m = b?.m || monogram(name), long = m.length > 2;
-  const style = { width: size, height: size, flexBasis: size, "--c": c, "--fg": b?.fg || "#fff", fontSize: Math.round(size * (long ? 0.27 : m.length > 1 ? 0.34 : 0.42)) };
-  return <span className={"instIco" + (b ? " brand" : "")} style={style}>
-    {manual ? <Icon name="edit" size={Math.round(size * 0.42)} /> : <span className="instMono">{m}</span>}
-    {kind && KIND_GLYPH[kind] && <i className={"instKind k-" + kind}><Icon name={KIND_GLYPH[kind]} size={Math.max(9, Math.round(size * 0.24))} stroke={2.2} /></i>}
-  </span>;
+export function InstIcon({ name, size = 40 }) {
+  const c = instColor(name);
+  return <span className="instIco" style={{ width: size, height: size, flexBasis: size, background: `linear-gradient(140deg, ${c}, color-mix(in srgb, ${c} 55%, #000))` }}>{String(name || "?").trim().charAt(0).toUpperCase()}</span>;
 }
 
 // Avatar : monogramme sur verre sombre, entouré d'un anneau dégradé.
