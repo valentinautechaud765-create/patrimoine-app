@@ -638,3 +638,13 @@ input[type="date"].input { color-scheme: dark; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 .phoneScreen .mobileTop { padding-top: 34px; height: 96px; }
+
+/* Inscription : écran « vérifiez votre boîte mail » */
+.mailSent { display: grid; gap: 10px; margin-top: 22px; }
+.mailSent h1 { margin: 6px 0 0 !important; font-size: 26px; font-weight: 600; }
+.mailSent p { margin: 0; color: var(--fg2); font-size: 15px; }
+.mailIco { width: 56px; height: 56px; border-radius: 17px; display: grid; place-items: center; background: var(--blueSoft); color: var(--blue2); border: 1px solid rgba(61, 124, 255, 0.25); }
+.mailSteps { list-style: none; margin: 10px 0 4px; padding: 16px; display: grid; gap: 12px; border-radius: 16px; background: var(--surface); border: 1px solid var(--line); font-size: 14px; color: var(--fg2); }
+.mailSteps li { display: flex; gap: 12px; align-items: flex-start; }
+.mailSteps span { width: 22px; height: 22px; flex: none; border-radius: 50%; display: grid; place-items: center; background: var(--surface3); font-size: 12px; font-weight: 600; color: var(--fg); }
+.msg .link { font-size: 13.5px; text-decoration: underline; }

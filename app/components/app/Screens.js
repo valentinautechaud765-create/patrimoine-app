@@ -184,7 +184,7 @@ export function Settings({ data, demo, openPlans, managePlan, logout, resetPassw
           <small className="muted">{p.plan === "free" ? "Formule gratuite, sans limite de durée." : p.plan_status === "trialing" ? `${p.trial_days_left ?? TRIAL_DAYS} jour${(p.trial_days_left ?? TRIAL_DAYS) > 1 ? "s" : ""} d’essai restant${(p.trial_days_left ?? TRIAL_DAYS) > 1 ? "s" : ""}. Aucun prélèvement avant la fin de l’essai.` : p.current_period_end ? `Renouvellement le ${new Date(p.current_period_end).toLocaleDateString("fr-FR")}.` : "Abonnement actif."}</small></div>
         <div className="subBtns">
           {p.plan !== "pro" && <button className="btn primary sm" onClick={() => openPlans(p.plan === "plus" ? "pro" : "plus")}><Icon name="sparkles" size={15} />{p.plan === "plus" ? "Passer à Pro" : "Passer à Plus"}</button>}
-          {p.plan !== "free" && <button className="btn sm" onClick={managePlan}>Gérer</button>}
+          {p.plan !== "free" && p.stripe_customer_id && <button className="btn sm" onClick={managePlan}>Gérer</button>}
         </div>
       </div>
     </Panel>

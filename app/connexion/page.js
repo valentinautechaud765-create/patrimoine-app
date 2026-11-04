@@ -11,33 +11,47 @@ function AuthForm() {
   const params = useSearchParams(), router = useRouter();
   const [mode, setMode] = useState(params.get("mode") === "inscription" ? "signup" : "login");
   const [email, setEmail] = useState(""), [password, setPassword] = useState(""), [name, setName] = useState(""), [show, setShow] = useState(false);
-  const [busy, setBusy] = useState(false), [error, setError] = useState(""), [info, setInfo] = useState("");
+  const [busy, setBusy] = useState(false), [error, setError] = useState(""), [info, setInfo] = useState(""), [sent, setSent] = useState(""), [unconfirmed, setUnconfirmed] = useState(false);
   const plan = params.get("plan"), billing = params.get("billing") || "yearly";
   const chosen = plan && plan !== "free" ? planById(plan) : null;
 
   // Déjà connecté : direction l'appli.
-  useEffect(() => { supabaseBrowser()?.auth.getSession().then(({ data }) => { if (data.session) router.replace("/app"); }); }, [router]);
+  // Retour du lien de confirmation : Supabase ouvre la session automatiquement.
+  useEffect(() => {
+    const sb = supabaseBrowser(); if (!sb) return;
+    sb.auth.getSession().then(({ data }) => { if (data.session) router.replace(chosen ? `/app?souscrire=${chosen.id}&billing=${billing}` : "/app"); });
+    const { data: sub } = sb.auth.onAuthStateChange((_e, session) => { if (session) router.replace("/app"); });
+    if (params.get("confirme")) setInfo("Adresse confirmée. Vous pouvez vous connecter.");
+    return () => sub.subscription.unsubscribe();
+  }, [router]); // eslint-disable-line
 
   const next = () => router.push(chosen ? `/app?souscrire=${chosen.id}&billing=${billing}` : "/app");
 
   async function submit(e) {
-    e.preventDefault(); setError(""); setInfo("");
+    e.preventDefault(); setError(""); setInfo(""); setUnconfirmed(false);
     const sb = supabaseBrowser();
     if (!sb) { next(); return; } // Mode démo : pas encore de base de données configurée.
     setBusy(true);
     try {
       if (mode === "signup") {
-        const { data, error } = await sb.auth.signUp({ email, password, options: { data: { full_name: name.trim() } } });
+        const { data, error } = await sb.auth.signUp({ email, password, options: { data: { full_name: name.trim() }, emailRedirectTo: redirectTo() } });
         if (error) throw error;
-        if (!data.session) { setInfo("Compte créé. Confirmez votre adresse grâce à l’e-mail que nous venons d’envoyer, puis connectez-vous."); setMode("login"); return; }
+        if (!data.session) { setSent(email); return; }
       } else {
         const { error } = await sb.auth.signInWithPassword({ email, password });
         if (error) throw error;
       }
       next();
     } catch (err) {
-      setError(/invalid login/i.test(err.message) ? "E-mail ou mot de passe incorrect." : /already registered/i.test(err.message) ? "Un compte existe déjà avec cette adresse. Connectez-vous." : err.message);
+      if (/not confirmed/i.test(err.message)) { setUnconfirmed(true); setError("Votre adresse e-mail n’est pas encore confirmée. Ouvrez l’e-mail de confirmation que nous vous avons envoyé (pensez aux spams), puis reconnectez-vous."); return; }
+      setError(/invalid login/i.test(err.message) ? "E-mail ou mot de passe incorrect." : /already registered/i.test(err.message) ? "Un compte existe déjà avec cette adresse. Connectez-vous." : /rate limit/i.test(err.message) ? "Trop de tentatives. Patientez quelques minutes puis réessayez." : /password/i.test(err.message) ? "Mot de passe trop faible : 10 caractères minimum." : err.message);
     } finally { setBusy(false); }
+  }
+  const redirectTo = () => window.location.origin + "/connexion?confirme=1" + (chosen ? `&plan=${chosen.id}&billing=${billing}` : "");
+  async function resend(target) {
+    setError(""); setInfo("");
+    const { error } = await supabaseBrowser().auth.resend({ type: "signup", email: target, options: { emailRedirectTo: redirectTo() } });
+    setInfo(error ? (/rate limit|seconds/i.test(error.message) ? "Un e-mail vient déjà de partir. Patientez une minute avant de redemander." : error.message) : "Nouvel e-mail envoyé. Regardez aussi dans les spams.");
   }
   async function reset() {
     setError(""); setInfo("");
@@ -48,6 +62,31 @@ function AuthForm() {
     setInfo("Si un compte existe pour cette adresse, un e-mail de réinitialisation vient d’être envoyé.");
   }
   const signup = mode === "signup";
+
+  if (sent) return (
+    <main className="authPage">
+      <div className="authForm">
+        <div className="authBox">
+          <Link href="/" aria-label="Accueil"><Brand size={32} /></Link>
+          <div className="mailSent">
+            <span className="mailIco"><Icon name="mail" size={26} /></span>
+            <h1>Vérifiez votre boîte mail</h1>
+            <p>Nous venons d’envoyer un lien de confirmation à <b>{sent}</b>.</p>
+            <ol className="mailSteps">
+              <li><span>1</span><div>Ouvrez l’e-mail de confirmation, envoyé par « Supabase Auth » (regardez aussi dans les <b>spams</b>).</div></li>
+              <li><span>2</span><div>Cliquez sur le lien de confirmation qu’il contient.</div></li>
+              <li><span>3</span><div>Vous arrivez directement dans votre espace {BRAND.name}.</div></li>
+            </ol>
+          </div>
+          {info && <div className="msg info">{info}</div>}
+          <button className="btn primary lg block" onClick={() => { setSent(""); setMode("login"); setInfo(""); }}>J’ai confirmé, me connecter</button>
+          <button className="btn block" onClick={() => resend(sent)}>Renvoyer l’e-mail</button>
+          <p className="legalNote">Mauvaise adresse ? <button type="button" className="link" style={{ fontSize: 12 }} onClick={() => { setSent(""); setInfo(""); }}>Recommencer l’inscription</button></p>
+        </div>
+      </div>
+      <aside className="authSide" />
+    </main>
+  );
 
   return (
     <main className="authPage">
@@ -69,7 +108,7 @@ function AuthForm() {
               <button type="button" className="pwToggle" onClick={() => setShow(!show)} aria-label={show ? "Masquer" : "Afficher"}><Icon name="eye" size={17} /></button>
             </span>
           </label>
-          {error && <div className="msg err">{error}</div>}
+          {error && <div className="msg err">{error}{unconfirmed && email && <> <button type="button" className="link" onClick={() => resend(email)}>Renvoyer l’e-mail</button></>}</div>}
           {info && <div className="msg info">{info}</div>}
           <button className="btn primary lg block" disabled={busy}>{busy ? "Un instant…" : signup ? "Créer mon compte" : "Se connecter"}<Icon name="arrowRight" size={17} /></button>
           <p className="switchMode">{signup ? "Déjà un compte ?" : "Pas encore de compte ?"} <button type="button" className="link" onClick={() => { setMode(signup ? "login" : "signup"); setError(""); setInfo(""); }}>{signup ? "Se connecter" : "Créer un compte"}</button></p>
