@@ -1211,3 +1211,8 @@ button.budgetRow.tap:hover { background: rgba(255, 255, 255, 0.03); }
 .returnIco.bad { background: var(--badSoft); color: var(--bad); }
 .returnSteps { display: grid; gap: 4px; width: 100%; padding: 16px; margin: 6px 0 4px; border-radius: 16px; background: var(--surface); border: 1px solid var(--line2); text-align: left; }
 .returnSteps span { color: var(--muted); font-size: 14px; line-height: 1.45; }
+/* Fenêtres : le contenu suit la largeur de la fenêtre (ordinateur et iPhone) */
+.modal > form, .modalForm { min-width: 0; grid-template-columns: minmax(0, 1fr); }
+.kindPick { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+.kindPick button { min-width: 0; }
+.kindPick button span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
