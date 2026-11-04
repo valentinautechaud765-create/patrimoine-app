@@ -5,6 +5,7 @@ import { AreaChart, Donut, FlowBars } from "../Charts.js";
 import { money, money0, signed, pct, todayISO, dayLabel, monthLabel } from "../../../lib/format.js";
 import { monthlySeries, recurring, advanceDate, buildWealthCurve } from "../../../lib/model.js";
 import { useHistory } from "./Holding.js";
+import { WealthProjection } from "./Projection.js";
 import { cat } from "../../../lib/categories.js";
 import { Amount, CatIcon, InstIcon, Panel, Empty, Locked, ago, KIND_LABEL } from "./ui.js";
 
@@ -288,8 +289,8 @@ export default function Overview({ m, data, limits, go, openPlans, list, open, g
       </Panel>
     </div>
     <Panel title="Projection du patrimoine" icon="layers" className="fadeIn">
-      <Locked on={!limits.projection} plan="Pro" title="Projection jusqu’à 20 ans" text="Voyez où vous mène votre rythme d’épargne actuel." onUnlock={() => openPlans("pro")}>
-        <Projection m={m} data={data} />
+      <Locked on={!limits.projection} plan="Pro" title="Projection jusqu’à 30 ans" text="Voyez où vous mène votre rythme d’épargne actuel." onUnlock={() => openPlans("pro")}>
+        <WealthProjection m={m} data={data} />
       </Locked>
     </Panel>
   </>;

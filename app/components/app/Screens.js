@@ -8,6 +8,7 @@ import { budgetSuggestions, FREQ_LABEL, perMonth } from "../../../lib/model.js";
 import { planById, TRIAL_DAYS, BRAND } from "../../../lib/config.js";
 import { Amount, CatIcon, InstIcon, TickerIcon, Panel, Empty, Locked, ago, KIND_LABEL } from "./ui.js";
 import { BudgetRow, TxRow, Upcoming } from "./Overview.js";
+import { InvestProjection } from "./Projection.js";
 
 /* ---------------- Comptes ---------------- */
 export function Accounts({ m, data, connectBank, limits, openPlans, open }) {
@@ -101,6 +102,11 @@ export function Investments({ m, data, limits, openPlans, open, liveInfo, curve 
         })}</tbody>
       </table></div> : <Empty icon="trending" title="Aucune position" text="Ajoutez vos actions, ETF et cryptos pour suivre vos plus-values."><button className="btn primary sm" onClick={() => open("holding")}><Icon name="plus" size={15} />Ajouter une position</button></Empty>}
       {holdings.length > 0 && <p className="finePrint" style={{ justifyContent: "flex-start", margin: "10px 0 4px" }}><Icon name="info" size={13} />{liveInfo ? "Les lignes avec un symbole boursier suivent le cours en direct (Tradegate, Yahoo Finance). Touchez une ligne pour voir sa courbe, acheter, vendre ou ajouter un dividende." : "Ajoutez le symbole boursier d’une ligne (ex. VWCE, AAPL) pour suivre son cours en direct. Touchez une ligne pour voir sa courbe, acheter, vendre ou ajouter un dividende."}</p>}
+    </Panel>
+    <Panel title="Simulation d’investissement" icon="layers">
+      <Locked on={!limits.projection} plan="Pro" title="Simulez vos investissements" text="Apport mensuel, durée, rendement : voyez ce que deviennent vos placements." onUnlock={() => openPlans("pro")}>
+        <InvestProjection holdings={holdings} total={m.hValue} />
+      </Locked>
     </Panel>
   </>;
   if (limits.investments) return content;
