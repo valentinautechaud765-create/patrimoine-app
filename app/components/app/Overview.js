@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import Icon from "../Icon.js";
 import { AreaChart, Donut, FlowBars } from "../Charts.js";
 import { money, money0, signed, pct, todayISO, dayLabel, monthLabel } from "../../../lib/format.js";
-import { monthlySeries, recurring, advanceDate, buildWealthCurve, balanceHistory } from "../../../lib/model.js";
+import { monthlySeries, upcomingItems, buildWealthCurve, balanceHistory } from "../../../lib/model.js";
 import { useHistory } from "./Holding.js";
 import { WealthProjection } from "./Projection.js";
 import { cat, distinctColors } from "../../../lib/categories.js";
@@ -95,7 +95,7 @@ function Kpis({ m }) {
     { icon: "card", label: "Dépensé ce mois", value: money0(m.spent), sub: diff === null ? "Premier mois suivi" : <><span className={diff <= 0 ? "ok" : "bad"}>{pct(diff, 0)}</span> <span className="muted">vs. même date le mois dernier</span></> },
     { icon: "briefcase", label: "Revenus du mois", value: money0(m.income), sub: <span className="muted">{m.income > 0 ? "Encaissés depuis le 1er" : "Aucun revenu pour l’instant"}</span> },
     { icon: "piggy", label: "Taux d’épargne", value: m.savingsRate === null ? "—" : Math.round(m.savingsRate) + " %", sub: <span className="muted">{m.saved > 0 ? `${money0(m.saved)} mis de côté` : "Revenus moins dépenses"}</span> },
-    { icon: "calendar", label: "Disponible par jour", value: money0(m.perDay), sub: <span className="muted">Pendant {m.daysLeft} jour{m.daysLeft > 1 ? "s" : ""}, jusqu’à la fin du mois</span> },
+    { icon: "calendar", label: "Disponible par jour", value: money0(m.perDay), sub: <span className="muted">{m.dueLeft > 0 || m.incomingLeft > 0 ? <>Charges à venir déduites{m.dueLeft > 0 ? ` (−${money0(m.dueLeft)})` : ""}{m.incomingLeft > 0 ? `, rentrées comptées (+${money0(m.incomingLeft)})` : ""} · {m.daysLeft} j</> : <>Pendant {m.daysLeft} jour{m.daysLeft > 1 ? "s" : ""}, jusqu’à la fin du mois</>}</span> },
   ];
   return <div className="grid g4">
     {items.map((k, i) => <div key={k.label} className="card kpi fadeIn" style={{ animationDelay: 40 + i * 40 + "ms" }}>
@@ -225,15 +225,7 @@ function CategoryPanel({ m, goOps }) {
 
 export function Upcoming({ data, compact }) {
   // Opérations automatiques programmées d'abord, puis celles détectées dans l'historique (sans doublon)
-  const items = useMemo(() => {
-    const today = todayISO(), horizon = new Date(Date.now() + 45 * 864e5).toISOString().slice(0, 10), planned = [];
-    (data.recurrences || []).filter((r) => r.active).forEach((r) => {
-      let d = r.next_date, g = 0;
-      while (d <= horizon && (!r.end_date || d <= r.end_date) && g++ < 10) { if (d >= today) planned.push({ label: r.label, category: r.category, amount: Number(r.amount), next: d, planned: true }); d = advanceDate(d, r.frequency, r.day); }
-    });
-    const names = new Set(planned.map((p) => p.label.toLowerCase().trim()));
-    return [...planned, ...recurring(data.transactions).filter((r) => !names.has(String(r.label).toLowerCase().trim()))].sort((a, b) => a.next.localeCompare(b.next));
-  }, [data.transactions, data.recurrences]);
+  const items = useMemo(() => upcomingItems(data), [data.transactions, data.recurrences]); // eslint-disable-line
   const month = todayISO().slice(0, 7), rest = items.filter((r) => r.next.startsWith(month));
   const due = -rest.filter((r) => r.amount < 0).reduce((s, r) => s + r.amount, 0), incoming = rest.filter((r) => r.amount > 0).reduce((s, r) => s + r.amount, 0);
   if (!items.length) return <Empty icon="repeat" title="Rien de prévu pour l’instant" text="Créez vos opérations automatiques (salaire, loyer…) dans Opérations → Automatiques. Elles sont aussi détectées après deux mois d’historique." />;
