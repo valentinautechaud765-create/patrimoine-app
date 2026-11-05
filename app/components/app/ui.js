@@ -43,9 +43,17 @@ export function CatIcon({ category, size = 40, color }) {
   return <span className="catIco" style={{ "--c": color || c.color, width: size, height: size, flexBasis: size }}><Icon name={c.icon} size={Math.round(size * 0.45)} /></span>;
 }
 
+// Pastille d'un placement : couleur propre à chaque valeur (toujours la même), sigle ajusté à la place,
+// petit point de la classe d'actif (ETF, action, crypto…) en bas à droite.
+const TICKER_HUES = [220, 262, 192, 340, 28, 152, 288, 205, 12, 172, 48, 236];
 export function TickerIcon({ holding }) {
-  const c = ASSET_COLORS[holding.asset_class] || "#7fa8ff";
-  return <span className="tickerIco" style={{ background: `color-mix(in srgb, ${c} 16%, transparent)`, color: c }}>{String(holding.ticker || holding.name || "?").slice(0, 4).toUpperCase()}</span>;
+  const raw = String(holding.ticker || holding.name || "?").toUpperCase().replace(/\.[A-Z]{1,3}$/, "").replace(/[^A-Z0-9]/g, "");
+  const label = (raw || "?").slice(0, 4);
+  let h = 0; for (const ch of raw || "?") h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  const hue = TICKER_HUES[h % TICKER_HUES.length], dot = ASSET_COLORS[holding.asset_class] || "#7fa8ff";
+  return <span className={"tickerIco len" + label.length} style={{ "--h": hue, "--dot": dot }} title={holding.asset_class || ""}>
+    <span className="tickerTxt">{label}</span><i className="tickerDot" aria-hidden="true" />
+  </span>;
 }
 
 // Grand montant avec centimes plus discrets

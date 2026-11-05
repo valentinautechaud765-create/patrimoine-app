@@ -1322,3 +1322,23 @@ button.budgetRow.tap:hover { background: rgba(255, 255, 255, 0.03); }
   * { -webkit-tap-highlight-color: transparent; }
 }
 @container app (max-width: 860px) { .budgetSum { font-size: 14px; line-height: 1.45; max-width: 290px; margin-inline: auto !important; } }
+
+/* Pastilles des placements : dégradé propre à chaque valeur, reflet, sigle ajusté, point de classe d'actif */
+.tickerIco {
+  position: relative; overflow: visible; color: #fff; font-weight: 700; letter-spacing: -0.01em; line-height: 1;
+  background:
+    radial-gradient(120% 90% at 20% 0%, hsla(var(--h), 95%, 72%, 0.55), transparent 60%),
+    linear-gradient(145deg, hsl(var(--h), 70%, 46%), hsl(calc(var(--h) + 24), 72%, 28%));
+  border: 1px solid hsla(var(--h), 90%, 75%, 0.28);
+  box-shadow: 0 8px 18px -10px hsla(var(--h), 90%, 50%, 0.9), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+.tickerTxt { display: block; font-size: 13px; line-height: 1; transform: translateY(0.5px); }
+.tickerIco.len1 .tickerTxt, .tickerIco.len2 .tickerTxt { font-size: 15px; }
+.tickerIco.len3 .tickerTxt { font-size: 12.5px; }
+.tickerIco.len4 .tickerTxt { font-size: 10.5px; letter-spacing: -0.02em; }
+.tickerDot { position: absolute; right: -2px; bottom: -2px; width: 11px; height: 11px; border-radius: 50%; background: var(--dot); border: 2px solid var(--surface, #0f1218); }
+.podium .tickerIco.len4 .tickerTxt, .assetPick .tickerIco.len4 .tickerTxt { font-size: 9px; }
+.podium .tickerIco .tickerTxt, .assetPick .tickerIco .tickerTxt { font-size: 10.5px; }
+.podium .tickerDot, .assetPick .tickerDot { width: 9px; height: 9px; }
+.privacy .tickerIco { filter: none; }
