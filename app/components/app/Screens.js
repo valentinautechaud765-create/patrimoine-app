@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import Icon from "../Icon.js";
 import { Donut, Ring } from "../Charts.js";
 import { money, money0, signed, pct, dayTitle, monthLabel, todayISO } from "../../../lib/format.js";
-import { ASSET_COLORS } from "../../../lib/categories.js";
+import { ASSET_COLORS, NEUTRAL } from "../../../lib/categories.js";
 import { budgetSuggestions, FREQ_LABEL, perMonth } from "../../../lib/model.js";
 import { planById, TRIAL_DAYS, BRAND } from "../../../lib/config.js";
 import { Amount, Avatar, squarePhoto, CatIcon, InstIcon, TickerIcon, Panel, Empty, Locked, ago, KIND_LABEL } from "./ui.js";
@@ -222,7 +222,9 @@ export function Operations({ data, query, setQuery, limits, openPlans, open, fla
     list.slice(0, 400).forEach((t) => { if (!cur || cur.date !== t.date) g.push(cur = { date: t.date, items: [], total: 0 }); cur.items.push(t); cur.total += Number(t.amount); });
     return g;
   }, [list]);
-  const inSum = list.filter((t) => t.amount > 0).reduce((n, t) => n + Number(t.amount), 0), outSum = -list.filter((t) => t.amount < 0).reduce((n, t) => n + Number(t.amount), 0);
+  // Les virements entre ses propres comptes (et l'épargne) ne sont ni des revenus ni des dépenses : on ne les compte pas.
+  const counted = list.filter((t) => !NEUTRAL.has(t.category));
+  const inSum = counted.filter((t) => t.amount > 0).reduce((n, t) => n + Number(t.amount), 0), outSum = -counted.filter((t) => t.amount < 0).reduce((n, t) => n + Number(t.amount), 0);
   const cats = [...new Set(data.transactions.map((t) => t.category))].sort();
   const filtered = kind !== "all" || category || month || query;
   function exportCsv() {
