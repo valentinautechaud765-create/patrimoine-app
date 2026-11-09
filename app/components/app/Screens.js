@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Icon from "../Icon.js";
 import { Donut, Ring } from "../Charts.js";
 import { money, money0, signed, pct, dayTitle, monthLabel, todayISO } from "../../../lib/format.js";
@@ -262,6 +262,96 @@ export function Operations({ data, query, setQuery, limits, openPlans, open, fla
   </>;
 }
 
+function urlBase64ToUint8Array(value) {
+  const padding = "=".repeat((4 - value.length % 4) % 4);
+  const raw = atob((value + padding).replace(/-/g, "+").replace(/_/g, "/"));
+  return Uint8Array.from([...raw].map((ch) => ch.charCodeAt(0)));
+}
+function NotificationsPanel({ data }) {
+  const token = data.session?.access_token;
+  const [subscription, setSubscription] = useState(null), [prefs, setPrefs] = useState({ budget: true, bills: true, bank: true, investments: true, weekly: true });
+  const [permission, setPermission] = useState(typeof window !== "undefined" && "Notification" in window ? Notification.permission : "unsupported");
+  const [busy, setBusy] = useState(false), [message, setMessage] = useState("");
+  useEffect(() => {
+    if (!token || !("serviceWorker" in navigator) || !("PushManager" in window)) return;
+    let active = true;
+    navigator.serviceWorker.register("/sw.js").then((reg) => reg.pushManager.getSubscription()).then(async (sub) => {
+      if (!active || !sub) return;
+      setSubscription(sub);
+      const r = await fetch("/api/notifications/subscribe?endpoint=" + encodeURIComponent(sub.endpoint), { headers: { Authorization: "Bearer " + token } });
+      const j = await r.json();
+      if (active && j.preferences) setPrefs(j.preferences);
+    }).catch(() => {});
+    return () => { active = false; };
+  }, [token]);
+  const auth = { Authorization: "Bearer " + token, "Content-Type": "application/json" };
+  async function enable() {
+    if (!token) { setMessage("Connecte-toi pour activer les notifications."); return; }
+    if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) { setMessage("Les notifications push ne sont pas prises en charge par ce navigateur. Sur iPhone, ajoute Patrimo à l’écran d’accueil et ouvre-le depuis son icône."); return; }
+    setBusy(true); setMessage("");
+    try {
+      const result = await Notification.requestPermission();
+      setPermission(result);
+      if (result !== "granted") throw new Error("Autorisation refusée. Tu peux l’activer dans les réglages de ton iPhone.");
+      const reg = await navigator.serviceWorker.register("/sw.js");
+      let sub = await reg.pushManager.getSubscription();
+      if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY) });
+      const r = await fetch("/api/notifications/subscribe", { method: "POST", headers: auth, body: JSON.stringify({ subscription: sub.toJSON(), preferences: prefs }) });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Enregistrement impossible.");
+      setSubscription(sub); setMessage("Notifications activées sur cet appareil.");
+    } catch (e) { setMessage(e.message || "Impossible d’activer les notifications."); }
+    setBusy(false);
+  }
+  async function disable() {
+    if (!subscription) return;
+    setBusy(true);
+    try {
+      await fetch("/api/notifications/subscribe", { method: "DELETE", headers: auth, body: JSON.stringify({ endpoint: subscription.endpoint }) });
+      await subscription.unsubscribe(); setSubscription(null); setMessage("Notifications désactivées sur cet appareil.");
+    } catch (e) { setMessage(e.message || "Désactivation impossible."); }
+    setBusy(false);
+  }
+  async function change(key, value) {
+    const next = { ...prefs, [key]: value }; setPrefs(next);
+    if (!subscription) return;
+    const r = await fetch("/api/notifications/subscribe", { method: "PATCH", headers: auth, body: JSON.stringify({ endpoint: subscription.endpoint, preferences: next }) });
+    const j = await r.json();
+    if (!r.ok) setMessage(j.error || "Impossible d’enregistrer les préférences.");
+  }
+  async function test() {
+    setBusy(true); setMessage("");
+    try {
+      const r = await fetch("/api/notifications/test", { method: "POST", headers: auth, body: JSON.stringify({ endpoint: subscription.endpoint }) });
+      const j = await r.json(); if (!r.ok) throw new Error(j.error || "Envoi impossible.");
+      setMessage("Notification de test envoyée.");
+    } catch (e) { setMessage(e.message); }
+    setBusy(false);
+  }
+  const choices = [
+    ["budget", "Alertes de budget", "Dépassement ou rythme de dépenses trop élevé."],
+    ["bills", "Échéances à venir", "Factures et prélèvements prévus dans les 3 jours."],
+    ["bank", "Activité des comptes", "Nouvelles opérations enregistrées."],
+    ["investments", "Placements", "Point sur les plus-values et moins-values."],
+    ["weekly", "Bilan hebdomadaire", "Résumé chaque lundi de tes revenus, dépenses et disponible quotidien."],
+  ];
+  return <Panel title="Notifications" icon="bell">
+    <div className="list">
+      <div className="item">
+        <span className="kindIco"><Icon name="bell" size={17} /></span>
+        <div className="itemMain"><b>{subscription ? "Notifications activées" : "Notifications sur cet appareil"}</b><small>{permission === "denied" ? "Autorisation refusée dans les réglages du navigateur." : "Reçois les alertes même lorsque Patrimo est fermé (si iOS autorise les notifications en arrière-plan)."}</small></div>
+        {subscription ? <button className="btn sm" disabled={busy} onClick={disable}>Désactiver</button> : <button className="btn primary sm" disabled={busy} onClick={enable}>{busy ? "Activation…" : "Activer"}</button>}
+      </div>
+      {subscription && <div className="item"><div className="itemMain"><b>Vérifier la réception</b><small>Envoie une notification de test sur cet appareil.</small></div><button className="btn sm" disabled={busy} onClick={test}>Tester</button></div>}
+      {choices.map(([key, title, desc]) => <label className="item switchRow" key={key}>
+        <span className="itemMain"><b>{title}</b><small>{desc}</small></span>
+        <input type="checkbox" className="switch" checked={prefs[key] !== false} disabled={!subscription || busy} onChange={(e) => change(key, e.target.checked)} />
+      </label>)}
+      {message && <small className="muted" style={{ display: "block", padding: "8px 2px" }}>{message}</small>}
+    </div>
+  </Panel>;
+}
+
 /* ---------------- Réglages ---------------- */
 export function Settings({ data, demo, openPlans, managePlan, logout, resetPassword, saveName, saveAvatar, deleteCategory, privacy, setPrivacy, deleteMe, importData }) {
   const p = data.profile, plan = planById(p.plan || "free"), email = data.session?.user?.email;
@@ -310,6 +400,7 @@ export function Settings({ data, demo, openPlans, managePlan, logout, resetPassw
           <input type="checkbox" className="switch" checked={privacy} onChange={(e) => setPrivacy(e.target.checked)} /></label>
       </div>
     </Panel>
+    <NotificationsPanel data={data} />
     <Panel title="Sécurité" icon="shield">
       <div className="list">
         <div className="item"><span className="kindIco"><Icon name="lock" size={17} /></span><div className="itemMain"><b>Mot de passe</b><small>Recevez un lien par e-mail pour le changer.</small></div><button className="btn sm" onClick={resetPassword}>Changer</button></div>
