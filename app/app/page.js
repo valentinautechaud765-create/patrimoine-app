@@ -660,6 +660,41 @@ function App() {
     },
   };
 
+  // Synchronisation bancaire générale : après chargement, au retour dans l'application et toutes les 30 minutes.
+  // La route serveur applique elle-même une fenêtre anti-surcharge de 30 minutes.
+  const backgroundBankSync = useRef(false);
+  useEffect(() => {
+    if (demo || !data?.session?.user?.id) return;
+    let active = true;
+    const run = async () => {
+      if (document.hidden || backgroundBankSync.current || bankBusy.current) return;
+      backgroundBankSync.current = true;
+      try {
+        const r = await api("/api/powens/sync", { force: false });
+        if (!active || !r.linked || r.skipped) return;
+        await load();
+        if (!active) return;
+        setData((d) => d && ({ ...d, bankErrors: r.errors || [], lastSync: r.at }));
+        if (r.errors?.length) setBankNotice({ text: `${r.errors[0].bank} nécessite une reconnexion pour reprendre la synchronisation.`, tone: "bad" });
+        else if (r.transactions > 0) setBankNotice({ text: `${r.transactions} nouvelle${r.transactions > 1 ? "s" : ""} opération${r.transactions > 1 ? "s" : ""} bancaire${r.transactions > 1 ? "s" : ""} synchronisée${r.transactions > 1 ? "s" : ""}.`, tone: "ok" });
+      } catch (e) {
+        if (active) setBankNotice({ text: "Synchronisation bancaire impossible : " + e.message, tone: "bad" });
+      } finally {
+        backgroundBankSync.current = false;
+      }
+    };
+    run();
+    const onWake = () => { if (!document.hidden) run(); };
+    const timer = window.setInterval(run, 30 * 60 * 1000);
+    document.addEventListener("visibilitychange", onWake);
+    window.addEventListener("focus", onWake);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", onWake);
+      window.removeEventListener("focus", onWake);
+    };
+  }, [demo, data?.session?.user?.id, load]);
   // Retour de la page d'inscription avec une formule choisie : on ouvre directement le choix de paiement.
   const wanted = params.get("souscrire");
   const initialModal = wanted === "plus" || wanted === "pro" ? { type: "plans", plan: wanted } : null;
