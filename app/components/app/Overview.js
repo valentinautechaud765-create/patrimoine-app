@@ -262,9 +262,7 @@ export default function Overview({ m, data, limits, go, openPlans, list, open, g
         </button>)}</div> : <Empty icon="bank" title="Aucun compte pour l’instant" text="Ajoutez vos comptes à la main, ou connectez votre banque."><button className="btn primary sm" onClick={() => open("account")}><Icon name="plus" size={15} />Ajouter un compte</button></Empty>}
       </Panel>
       <Panel title="Analyse du mois" icon="sparkles" className="fadeIn">
-        <Locked on={!limits.insights} title="Analyse automatique" text="Repérez les dépenses qui dérapent avant la fin du mois." onUnlock={() => openPlans("plus")}>
-          <InsightList list={list} />
-        </Locked>
+        <InsightList list={list} />
       </Panel>
     </div>
     <div className="grid g3">
