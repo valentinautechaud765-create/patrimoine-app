@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 560" role="img" aria-label="Patrimo">
+  <defs>
+    <linearGradient id="blueA" x1="300" y1="70" x2="610" y2="330" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#D7F6FF"/><stop offset="1" stop-color="#79CDEB"/>
+    </linearGradient>
+    <linearGradient id="blueB" x1="180" y1="180" x2="690" y2="390" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#A6E8F7"/><stop offset="1" stop-color="#3A9DCE"/>
+    </linearGradient>
+    <linearGradient id="blueC" x1="220" y1="300" x2="670" y2="430" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#65BFE0"/><stop offset="1" stop-color="#176FA9"/>
+    </linearGradient>
+  </defs>
+  <path d="M338 262C369 188 440 115 576 74C577 144 546 191 491 217C442 240 385 246 338 262Z" fill="url(#blueA)"/>
+  <path d="M190 394C281 294 403 235 690 204C662 278 614 323 522 344C391 374 292 382 190 394Z" fill="url(#blueB)"/>
+  <path d="M211 426C309 399 423 359 675 321C633 383 578 421 479 437C393 455 292 448 211 426Z" fill="url(#blueC)"/>
+  <text x="450" y="530" text-anchor="middle" fill="#123B5B" font-family="Avenir Next, Inter, Helvetica, Arial, sans-serif" font-size="94" font-weight="500" letter-spacing="-3">Patrimo</text>
+</svg>
