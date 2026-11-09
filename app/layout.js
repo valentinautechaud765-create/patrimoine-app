@@ -14,8 +14,8 @@ export default function RootLayout({ children }) {
     <html lang="fr">
       <head>
         <link rel="manifest" href="/manifest.webmanifest" />
-        <link rel="icon" href="/icon.svg" type="image/svg+xml" />
-        <link rel="apple-touch-icon" href="/icon.svg" />
+        <link rel="icon" href="/icon" type="image/png" sizes="512x512" />
+        <link rel="apple-touch-icon" href="/apple-icon" />
         <meta name="theme-color" content="#084B7B" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
