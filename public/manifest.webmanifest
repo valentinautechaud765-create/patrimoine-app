@@ -1,0 +1,10 @@
+{
+  "name": "Patrimo",
+  "short_name": "Patrimo",
+  "description": "Tout votre patrimoine. Un seul écran.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#07080b",
+  "theme_color": "#07080b",
+  "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+}
