@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Brand from "./components/Brand.js";
 import Icon from "./components/Icon.js";
@@ -8,6 +9,7 @@ import { AreaChart, Donut } from "./components/Charts.js";
 import { InstIcon } from "./components/app/ui.js";
 import { BRAND, PLANS, TRIAL_DAYS, formatPrice } from "../lib/config.js";
 import { demoData } from "../lib/demo.js";
+import { supabaseBrowser, supabaseConfigured } from "../lib/supabase.js";
 
 const FAQ = [
   ["Mes données bancaires sont-elles en sécurité ?", "La connexion à vos banques passe par Powens, prestataire agréé par l’ACPR (Banque de France). Nous ne voyons jamais vos identifiants bancaires et l’accès est en lecture seule : aucun virement n’est possible depuis l’appli."],
@@ -45,10 +47,28 @@ function useCurve(n = 120, seed = 5, drift = 0.46) {
 }
 
 export default function Landing() {
+  const router = useRouter();
   const [yearly, setYearly] = useState(true);
   const [demo, setDemo] = useState(null);
-  useEffect(() => { setDemo({ ...demoData(), session: null }); }, []);
+  const [checkingSession, setCheckingSession] = useState(supabaseConfigured);
+  useEffect(() => {
+    setDemo({ ...demoData(), session: null });
+    if (!supabaseConfigured) return;
+    const sb = supabaseBrowser();
+    let active = true;
+    sb.auth.getSession().then(({ data }) => {
+      if (!active) return;
+      if (data.session) router.replace("/app");
+      else setCheckingSession(false);
+    }).catch(() => { if (active) setCheckingSession(false); });
+    const { data: auth } = sb.auth.onAuthStateChange((_event, session) => {
+      if (session) router.replace("/app");
+    });
+    return () => { active = false; auth.subscription.unsubscribe(); };
+  }, [router]);
   const curve = useCurve(), proj = useCurve(60, 9, 0.3);
+
+  if (checkingSession) return <main className="authPage"><div className="authForm"><div className="skeleton" style={{ minHeight: 220 }} /></div></main>;
 
   return (
     <main className="site">
