@@ -18,7 +18,7 @@ self.addEventListener("push", (event) => {
 
   const options = {
     body,
-    icon: "/icon.svg",
+    icon: "/icon",
     badge: "/notification-badge.svg",
     tag: data.tag || (isTestNotice ? "patrimo-notifications-enabled" : "patrimo"),
     data: { url: data.url || "/" },
