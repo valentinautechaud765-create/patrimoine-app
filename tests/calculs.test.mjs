@@ -86,3 +86,12 @@ test("modèle : total = comptes + épargne + placements", () => {
   assert.equal(m.total, 600);
   assert.equal(m.hValue - m.cost, 50);
 });
+
+
+test("disponible par jour : jours calendaires restants et arrondi prudent au centime", () => {
+  const m = computeModel({ accounts: [], holdings: [], transactions: [], budgets: [], debts: [], debtPayments: [], recurrences: [] });
+  assert.equal(m.daysLeft, m.daysInMonth - m.dayOfMonth + 1); // aujourd'hui inclus
+  const expected = m.daysLeft > 0 ? Math.floor((Math.max(0, m.available) / m.daysLeft) * 100) / 100 : 0;
+  assert.equal(m.perDay, expected);
+  assert.ok(m.perDay <= (m.daysLeft > 0 ? Math.max(0, m.available) / m.daysLeft : 0)); // jamais au-dessus du budget réel
+});
