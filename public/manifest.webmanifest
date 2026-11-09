@@ -4,7 +4,9 @@
   "description": "Tout votre patrimoine. Un seul écran.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#07080b",
-  "theme_color": "#07080b",
-  "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+  "background_color": "#08264D",
+  "theme_color": "#084B7B",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
 }

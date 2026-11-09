@@ -1,4 +1,4 @@
-// Notifications web push de Patrimo — sobres, utiles et cohérentes avec l'identité visuelle.
+// Notifications web push de Patrimo — identité bleue, contenu sobre.
 self.addEventListener("push", (event) => {
   let data = {};
   try { data = event.data ? event.data.json() : {}; } catch {}
@@ -8,7 +8,6 @@ self.addEventListener("push", (event) => {
   const isTestNotice = /^(patrimo|patrimoine)$/i.test(rawTitle)
     && /notifications sont bien activées/i.test(rawBody);
 
-  // Évite le titre générique « Patrimo » pour le message de confirmation d'activation.
   const title = isTestNotice
     ? "Notifications activées"
     : rawTitle || "Votre patrimoine";
