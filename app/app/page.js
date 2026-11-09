@@ -667,7 +667,7 @@ function App() {
     if (demo || !data?.session?.user?.id) return;
     let active = true;
     const run = async () => {
-      if (document.hidden || backgroundBankSync.current) return;
+      if (document.hidden || backgroundBankSync.current || bankBusy.current) return;
       backgroundBankSync.current = true;
       try {
         const r = await api("/api/powens/sync", { force: false });
