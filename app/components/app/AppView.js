@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Icon from "../Icon.js";
 import { BrandMark } from "../Brand.js";
 import { computeModel, insights } from "../../../lib/model.js";
-import { BRAND, PLANS, TRIAL_DAYS, formatPrice, planById, limitsFor } from "../../../lib/config.js";
+import { BRAND, PLANS, TRIAL_DAYS, formatPrice, planById, limitsFor, accessFor } from "../../../lib/config.js";
 import Overview from "./Overview.js";
 import { Accounts, Investments, Budget, Operations, Settings } from "./Screens.js";
 import { InsightList } from "./Overview.js";
@@ -52,12 +52,11 @@ function ScopePicker({ accounts, holdings = [], scope, setScope }) {
 }
 
 /* ---------------- Formules ---------------- */
-function PlansModal({ current, initial, trialUsed, onClose, onChoose }) {
+function PlanPicker({ current, initial, onChoose }) {
   const [plan, setPlan] = useState(initial === "pro" ? "pro" : "plus"), [billing, setBilling] = useState("yearly"), [busy, setBusy] = useState(false);
-  const opts = PLANS.filter((p) => p.id !== "free");
-  const sel = planById(plan), trial = plan === "plus" && !trialUsed && current !== "plus";
-  return <Modal onClose={onClose}>
-    <Head title="Choisir une formule" sub="Sans engagement. Annulable en deux clics." onClose={onClose} />
+  const opts = PLANS.filter((p) => !p.hidden);
+  const sel = planById(plan);
+  return <>
     <div className="seg billingSeg"><button className={billing === "monthly" ? "on" : ""} onClick={() => setBilling("monthly")}>Mensuel</button><button className={billing === "yearly" ? "on" : ""} onClick={() => setBilling("yearly")}>Annuel <span className="save">−30 %</span></button></div>
     <div className="planOpts">{opts.map((p) => {
       const price = billing === "monthly" ? p.monthly : p.yearly / 12;
@@ -70,10 +69,36 @@ function PlansModal({ current, initial, trialUsed, onClose, onChoose }) {
     })}</div>
     <ul className="modalFeatures">{sel.features.map((f) => <li key={f}><Icon name="check" size={15} stroke={2.4} />{f}</li>)}</ul>
     <button className="btn primary lg block" disabled={busy || current === plan} onClick={async () => { setBusy(true); await onChoose(plan, billing); setBusy(false); }}>
-      {busy ? "Redirection…" : current === plan ? "Vous avez déjà cette formule" : trial ? `Commencer l’essai gratuit de ${TRIAL_DAYS} jours` : `Passer à ${sel.name}`}
+      {busy ? "Redirection vers le paiement…" : current === plan ? "Vous avez déjà cette formule" : `Continuer avec ${sel.name}`}
     </button>
-    <p className="finePrint"><Icon name="lock" size={13} />Paiement sécurisé par Stripe.{trial ? ` Rien n’est prélevé pendant ${TRIAL_DAYS} jours, et vous recevez un rappel avant la fin de l’essai.` : ""}</p>
+    <p className="finePrint"><Icon name="lock" size={13} />Paiement sécurisé par Stripe (carte, Apple Pay, Google Pay). Sans engagement : résiliable en deux clics.</p>
+  </>;
+}
+function PlansModal({ current, initial, trial, onClose, onChoose }) {
+  return <Modal onClose={onClose}>
+    <Head title="Choisir une formule" sub={trial ? `Essai gratuit : encore ${trial.daysLeft > 1 ? trial.daysLeft + " jours" : trial.hoursLeft + " h"}. Abonnez-vous maintenant pour ne rien perdre.` : "Sans engagement. Annulable en deux clics."} onClose={onClose} />
+    <PlanPicker current={current} initial={initial} onChoose={onChoose} />
   </Modal>;
+}
+
+// Essai terminé : l'appli reste derrière cet écran tant qu'aucune formule n'est choisie. Les données sont gardées.
+function Paywall({ data, m, onChoose, logout, deleteMe }) {
+  const accounts = data.accounts.filter((a) => !a.hidden).length, ops = data.transactions.length, banks = data.accounts.some((a) => a.powens_account_id);
+  return <div className="paywall">
+    <div className="paywallCard">
+      <div className="paywallBrand"><BrandMark size={34} /><b>{BRAND.name}</b></div>
+      <h1>Votre essai gratuit est terminé</h1>
+      <p className="muted">Tout est gardé en sécurité et vous attend : choisissez une formule pour retrouver votre tableau de bord.</p>
+      <div className="paywallStats">
+        <div><small>Patrimoine net</small><b className="paywallBlur">{formatPrice(Math.round(m.total))}</b></div>
+        <div><small>Comptes</small><b>{accounts}</b></div>
+        <div><small>Opérations</small><b>{ops}</b></div>
+      </div>
+      {banks && <p className="formHint"><Icon name="bank" size={14} />Vos banques continuent d’être suivies : vous retrouvez tout à jour dès l’abonnement.</p>}
+      <PlanPicker current="free" initial="plus" onChoose={onChoose} />
+      <div className="paywallFoot"><button className="link" onClick={logout}>Se déconnecter</button><button className="link dangerLink" onClick={deleteMe}>Supprimer mon compte</button></div>
+    </div>
+  </div>;
 }
 
 /* ---------------- Coque de l'appli ---------------- */
@@ -85,7 +110,7 @@ export default function AppView({ data, demo, embedded, initialTab = "overview",
   const setCharts = (v) => { setChartsState(v); try { localStorage.setItem("patrimo.charts", v ? "1" : "0"); } catch {} };
   const setPrivacy = (v) => { setPrivacyState(v); try { localStorage.setItem("patrimo.privacy", v ? "1" : "0"); } catch {} };
   const toastTimer = useRef(0), searchRef = useRef(null), scroller = useRef(null);
-  const p0 = data.profile || { plan: "free" }, limits0 = limitsFor(p0.plan || "free");
+  const p0 = data.profile || { plan: "free" }, limits0 = limitsFor((p0.access || accessFor(p0)).plan);
   // ---------- Cours en direct : rafraîchis toutes les 10 s, courbe du jour toutes les 5 min ----------
   const [market, setMarket] = useState({ quotes: {}, eurPerUsd: null, intraday: {}, at: null });
   const symbols = useMemo(() => [...new Set(data.holdings.filter((h) => h.ticker && Number(h.quantity) > 0).map((h) => String(h.ticker).toUpperCase()))].sort(), [data.holdings]);
@@ -178,7 +203,7 @@ export default function AppView({ data, demo, embedded, initialTab = "overview",
 
   const m = useMemo(() => computeModel(liveData), [liveData]);
   const list = useMemo(() => insights(m), [m]);
-  const p = data.profile || { plan: "free" }, plan = p.plan || "free", limits = limitsFor(plan);
+  const p = data.profile || { plan: "free" }, access = demo ? { plan: p.plan || "plus", paid: true } : (p.access || accessFor(p)), plan = access.plan, limits = limitsFor(plan);
   const email = data.session?.user?.email, name = p.full_name || (email ? email.split("@")[0] : "");
   const first = name ? name.charAt(0).toUpperCase() + name.slice(1) : "";
 
@@ -208,7 +233,7 @@ export default function AppView({ data, demo, embedded, initialTab = "overview",
   };
   const title = tab === "overview" ? (first ? `Bonjour, ${first}` : "Vue d’ensemble") : NAV.find((n) => n.id === tab).label;
   const today = new Intl.DateTimeFormat("fr-FR", { weekday: "long", day: "numeric", month: "long" }).format(new Date());
-  const trialing = p.plan_status === "trialing", trialLeft = p.trial_days_left ?? TRIAL_DAYS;
+  const trialing = Boolean(access.trial), trialLeft = access.daysLeft ?? TRIAL_DAYS;
 
   const screen = {
     overview: <Overview m={m} data={liveData} dayCurve={liveData.scoped ? null : dayCurve} liveInfo={liveInfo} showChart={charts} fetchHistory={limits.investments ? actions.fetchHistory : null} eurPerUsd={market.eurPerUsd} limits={limits} go={go} openPlans={openPlans} list={list} open={open} goOps={goOps} />,
@@ -225,6 +250,11 @@ export default function AppView({ data, demo, embedded, initialTab = "overview",
   const viewedH = modal?.type === "holdingView" || modal?.type === "trade" ? holdingOf(modal.id) : null;
   const tradesOf = (id) => (data.trades || []).filter((t) => t.holding_id === id);
 
+  if (access.locked && !demo && !embedded) return <>
+    <Paywall data={data} m={m} onChoose={(pl, b) => run(actions.checkout, pl, b)} logout={() => run(actions.logout)} deleteMe={() => open("deleteMe")} />
+    {modal?.type === "deleteMe" && <DeleteMeModal onClose={close} onConfirm={() => run(actions.deleteAccountForever)} />}
+    {toast && <div className={"toast " + toast.tone}>{toast.text}</div>}
+  </>;
   return (
     <div className={"appRoot" + (embedded ? " embedded" : "") + (privacy ? " privacy" : "")}>
       <div className="shell" ref={scroller} onScroll={embedded ? undefined : (e) => setScrolled(e.currentTarget.scrollTop > 4)}>
@@ -234,14 +264,11 @@ export default function AppView({ data, demo, embedded, initialTab = "overview",
             const lock = n.id === "invest" && !limits.investments;
             return <button key={n.id} className={"navItem" + (tab === n.id ? " on" : "")} onClick={() => go(n.id)}><Icon name={n.icon} size={18} /><span className="navLabel">{n.label}</span>{lock && <Icon name="lock" size={13} className="lockBadge" />}</button>;
           })}
-          {plan === "free" ? <div className="planCard">
-            <span className="planCardIco"><Icon name="sparkles" size={16} /></span>
-            <b>Passez à Plus</b><small>Comptes illimités, investissements et analyse automatique. {TRIAL_DAYS} jours offerts.</small>
-            <button className="btn primary sm block" onClick={() => openPlans("plus")}>Essayer gratuitement</button>
-          </div> : trialing ? <div className="planCard">
+          {trialing ? <div className="planCard">
             <span className="planCardIco"><Icon name="star" size={16} /></span>
-            <b>Essai {planById(plan).name}</b><small>{trialLeft} jour{trialLeft > 1 ? "s" : ""} restant{trialLeft > 1 ? "s" : ""}</small>
-            <div className="bar" style={{ marginTop: 0 }}><i style={{ width: Math.max(4, (1 - trialLeft / TRIAL_DAYS) * 100) + "%", background: "var(--blue)" }} /></div>
+            <b>Essai gratuit</b><small>{trialLeft > 1 ? `${trialLeft} jours restants` : `Dernières ${access.hoursLeft} h`} · tout est débloqué</small>
+            <div className="bar" style={{ marginTop: 0 }}><i style={{ width: Math.max(4, (1 - access.msLeft / (TRIAL_DAYS * 864e5)) * 100) + "%", background: "var(--blue)" }} /></div>
+            <button className="btn primary sm block" onClick={() => openPlans("plus")}>Choisir ma formule</button>
           </div> : <div className="planCard quiet"><b>{planById(plan).name}</b><small>Merci de votre confiance.</small></div>}
           <button className="sideUser" onClick={() => go("settings")}>
             <Avatar name={first || "?"} size={34} src={p.avatar_url} />
@@ -274,6 +301,7 @@ export default function AppView({ data, demo, embedded, initialTab = "overview",
           </header>
 
           <div className="content" key={tab}>
+            {trialing && !embedded && <button className="trialBanner" onClick={() => openPlans("plus")}><Icon name="star" size={15} /><span><b>Essai gratuit</b> · {trialLeft > 1 ? `encore ${trialLeft} jours` : `plus que ${access.hoursLeft} h`}<span className="trialMore">, tout est débloqué</span></span><span className="trialCta">Choisir ma formule<Icon name="chevronRight" size={14} /></span></button>}
             {demo && !embedded && <div className="demoBanner"><Icon name="info" size={16} /><span><b>Démonstration</b> · tous les montants affichés sont fictifs.</span><a className="btn sm light" href="/connexion?mode=inscription">Créer mon compte</a></div>}
             {["overview", "invest", "budget", "ops"].includes(tab) && (data.accounts.filter((a) => !a.hidden).length + data.holdings.length) > 1 && <ScopePicker accounts={data.accounts.filter((a) => !a.hidden)} holdings={data.holdings.filter((h) => Number(h.quantity) > 0 || Number(h.value) > 0)} scope={liveData.scopeIds || []} setScope={setScope} />}
             {screen}
@@ -285,7 +313,7 @@ export default function AppView({ data, demo, embedded, initialTab = "overview",
         </nav>
       </div>
 
-      {modal?.type === "plans" && <PlansModal current={plan} initial={modal.plan} trialUsed={p.trial_used} onClose={() => setModal(null)} onChoose={(pl, b) => run(actions.checkout, pl, b)} />}
+      {modal?.type === "plans" && <PlansModal current={access.paid ? plan : null} initial={modal.plan} trial={trialing ? access : null} onClose={() => setModal(null)} onChoose={(pl, b) => run(actions.checkout, pl, b)} />}
       {modal?.type === "tx" && <TxForm tx={modal.tx} defaultAccount={modal.account_id} accounts={data.accounts} onClose={close} onSave={(t, f) => run(actions.saveTransaction, t, f)} onDelete={(t) => run(actions.deleteTransaction, t)} onAddCategory={(c) => run(actions.addCategory, c)} />}
       {modal?.type === "account" && <AccountForm account={modal.account} onClose={close} onSave={(a) => run(actions.saveAccount, a)} onDelete={(a) => run(actions.deleteAccount, a)} />}
       {viewed && <AccountSheet account={viewed} transactions={data.transactions} onClose={close} onEdit={() => open("account", { account: viewed })} onAddTx={() => open("tx", { account_id: viewed.id })} onOpenTx={(t) => open("tx", { tx: t })} />}

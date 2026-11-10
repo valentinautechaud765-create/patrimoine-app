@@ -5,7 +5,7 @@ import AppView from "../components/app/AppView.js";
 import { BrandMark } from "../components/Brand.js";
 import { supabaseBrowser, supabaseConfigured } from "../../lib/supabase.js";
 import { demoData } from "../../lib/demo.js";
-import { OWNER_EMAILS } from "../../lib/config.js";
+import { OWNER_EMAILS, accessFor } from "../../lib/config.js";
 import { computeModel, positionFromTrades, advanceDate, firstDate } from "../../lib/model.js";
 import { CATEGORIES, customCategories, setCustomCategories } from "../../lib/categories.js";
 
@@ -77,7 +77,7 @@ function App() {
         .then((r) => r.json()).then((j) => { if (!j.owner) console.warn("[compte]", j.error || j.reason); })
         .catch((e) => console.warn("[compte]", e.message));
     }
-    if (pr.plan_status === "trialing" && pr.current_period_end) pr.trial_days_left = Math.max(0, Math.ceil((new Date(pr.current_period_end) - Date.now()) / 864e5));
+    pr.access = accessFor(pr);
     const num = (rows, keys) => (rows || []).map((r) => { const o = { ...r }; keys.forEach((k) => { o[k] = Number(o[k]) || 0; }); return o; });
     setData({
       profile: pr,
@@ -665,7 +665,8 @@ function App() {
   const initialModal = wanted === "plus" || wanted === "pro" ? { type: "plans", plan: wanted } : null;
 
   if (!data) return <Boot />;
-  return <AppView data={data} demo={demo} actions={actions} initialModal={initialModal} />;
+  const vue = params.get("vue");
+  return <AppView data={data} demo={demo} actions={actions} initialModal={initialModal} initialTab={["overview", "accounts", "invest", "budget", "ops", "debts", "settings"].includes(vue) ? vue : "overview"} />;
 }
 
 export default function Page() { return <Suspense fallback={<Boot />}><App /></Suspense>; }

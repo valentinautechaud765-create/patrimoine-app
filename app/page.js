@@ -13,8 +13,8 @@ import { supabaseBrowser, supabaseConfigured } from "../lib/supabase.js";
 
 const FAQ = [
   ["Mes données bancaires sont-elles en sécurité ?", "La connexion à vos banques passe par Powens, prestataire agréé par l’ACPR (Banque de France). Nous ne voyons jamais vos identifiants bancaires et l’accès est en lecture seule : aucun virement n’est possible depuis l’appli."],
-  ["Puis-je résilier à tout moment ?", "Oui, en deux clics depuis l’appli, sans engagement ni justification. Vous gardez l’accès jusqu’à la fin de la période payée, puis vous repassez sur la formule gratuite."],
-  ["Que se passe-t-il après l’essai gratuit ?", `L’essai de Plus dure ${TRIAL_DAYS} jours et rien n’est prélevé pendant cette période. Vous recevez un rappel avant la fin ; vous pouvez annuler à tout moment avant.`],
+  ["Puis-je résilier à tout moment ?", "Oui, en deux clics depuis l’appli, sans engagement ni justification. Vous gardez l’accès jusqu’à la fin de la période payée, et vos données restent gardées si vous revenez."],
+  ["Comment fonctionne l’essai gratuit ?", `À l’inscription, tout est débloqué pendant ${TRIAL_DAYS} jours, sans carte bancaire. Ensuite, choisissez Plus ou Pro pour continuer : rien n’est prélevé tant que vous n’avez pas choisi, et vos données restent gardées.`],
   ["Quelles banques sont compatibles ?", "La grande majorité des banques françaises et de nombreux établissements européens : banques traditionnelles, néobanques, livrets, PEA et comptes-titres. La liste complète s’affiche au moment de connecter votre banque."],
   ["Est-ce que vous vendez mes données ?", `Non. ${BRAND.name} est financé uniquement par les abonnements. Vos données ne sont ni revendues, ni utilisées pour de la publicité.`],
   ["Ça marche sur iPhone et Android ?", "Oui. L’appli s’ouvre dans le navigateur et s’ajoute à l’écran d’accueil comme une appli classique. Elle fonctionne aussi sur ordinateur, avec un affichage pensé pour les grands écrans."],
@@ -80,15 +80,15 @@ export default function Landing() {
 
       <section className="hero">
         <div className="container">
-          <a className="announce" href="#tarifs">Essai gratuit de {TRIAL_DAYS} jours sur Plus <span>Voir les tarifs<Icon name="arrowRight" size={12} /></span></a>
+          <a className="announce" href="#tarifs">{TRIAL_DAYS} jours gratuits, tout débloqué <span>Voir les tarifs<Icon name="arrowRight" size={12} /></span></a>
           <h1 className="heroTitle">Tout votre patrimoine.<br /><span className="grad">Un seul écran.</span></h1>
           <p className="lead">Comptes courants, livrets, actions, ETF et crypto réunis automatiquement. Sachez à chaque instant combien vous possédez, où part votre argent, et où vous allez.</p>
           <div className="heroCtas">
-            <Link className="btn primary lg" href="/connexion?mode=inscription">Créer mon compte gratuit<Icon name="arrowRight" size={17} /></Link>
+            <Link className="btn primary lg" href="/connexion?mode=inscription">Essayer gratuitement<Icon name="arrowRight" size={17} /></Link>
             <Link className="btn lg" href="/app">Explorer la démo</Link>
           </div>
           <div className="heroTrust">
-            <span><Icon name="check" size={15} stroke={2.4} />Formule gratuite sans limite de durée</span>
+            <span><Icon name="check" size={15} stroke={2.4} />{TRIAL_DAYS} jours gratuits, sans carte bancaire</span>
             <span><Icon name="check" size={15} stroke={2.4} />Accès bancaire en lecture seule</span>
             <span><Icon name="check" size={15} stroke={2.4} />Sans engagement</span>
           </div>
@@ -173,7 +173,7 @@ export default function Landing() {
           <h2>Prêt en trois minutes.</h2>
         </div>
         <div className="steps">
-          {[["Créez votre compte", "Une adresse e-mail et un mot de passe. La formule Essentiel est gratuite, sans limite de durée."],
+          {[["Créez votre compte", `Une adresse e-mail et un mot de passe. Tout est débloqué gratuitement pendant ${TRIAL_DAYS} jours, sans carte bancaire.`],
             ["Connectez vos banques", "Choisissez votre banque et identifiez-vous sur la page sécurisée de notre partenaire agréé. Vos comptes arrivent tout seuls."],
             ["Pilotez", "Fixez vos budgets, suivez vos placements, et laissez l’appli vous prévenir quand quelque chose mérite votre attention."]].map(([t, d], i) =>
             <div className="step" key={t}><span className="stepNum">0{i + 1}</span><h3>{t}</h3><p>{d}</p></div>)}
@@ -207,14 +207,14 @@ export default function Landing() {
         <div className="sectionHead center">
           <span className="eyebrow">Tarifs</span>
           <h2>Simple et transparent.</h2>
-          <p>Commencez gratuitement. Passez à Plus quand vous voulez tout voir : {TRIAL_DAYS} jours offerts, sans engagement.</p>
+          <p>Essayez tout gratuitement pendant {TRIAL_DAYS} jours, sans carte bancaire. Ensuite, choisissez la formule qui vous va. Sans engagement.</p>
         </div>
         <div className="billing">
           <button className={!yearly ? "on" : ""} onClick={() => setYearly(false)}>Mensuel</button>
           <button className={yearly ? "on" : ""} onClick={() => setYearly(true)}>Annuel <span className="save">−30 %</span></button>
         </div>
         <div className="plans">
-          {PLANS.map((p) => {
+          {PLANS.filter((p) => !p.hidden).map((p) => {
             const price = p.monthly === 0 ? 0 : yearly ? Math.round((p.yearly / 12) * 100) / 100 : p.monthly;
             const href = p.id === "free" ? "/connexion?mode=inscription" : `/connexion?mode=inscription&plan=${p.id}&billing=${yearly ? "yearly" : "monthly"}`;
             return <div key={p.id} className={"plan" + (p.highlight ? " hl" : "")}>
@@ -233,8 +233,8 @@ export default function Landing() {
         </div>
         <div className="compare card">
           <table>
-            <thead><tr><th>Comparer les formules</th>{PLANS.map((p) => <th key={p.id}>{p.name}</th>)}</tr></thead>
-            <tbody>{COMPARE.map(([label, ...vals]) => <tr key={label}><td>{label}</td>{vals.map((v, i) => <td key={i}><Cell v={v} /></td>)}</tr>)}</tbody>
+            <thead><tr><th>Comparer les formules</th>{PLANS.filter((p) => !p.hidden).map((p) => <th key={p.id}>{p.name}</th>)}</tr></thead>
+            <tbody>{COMPARE.map(([label, ...vals]) => <tr key={label}><td>{label}</td>{vals.slice(1).map((v, i) => <td key={i}><Cell v={v} /></td>)}</tr>)}</tbody>
           </table>
         </div>
       </div></section>
@@ -247,7 +247,7 @@ export default function Landing() {
       <div className="container">
         <section className="cta">
           <h2>Reprenez la main sur votre argent.</h2>
-          <p>Créez votre compte en une minute. C’est gratuit pour commencer.</p>
+          <p>Créez votre compte en une minute. {TRIAL_DAYS} jours gratuits, sans carte bancaire.</p>
           <div className="heroCtas">
             <Link className="btn light lg" href="/connexion?mode=inscription">Créer mon compte<Icon name="arrowRight" size={17} /></Link>
             <Link className="btn lg" href="/app">Explorer la démo</Link>

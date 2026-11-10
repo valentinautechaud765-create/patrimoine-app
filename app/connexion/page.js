@@ -95,7 +95,7 @@ function AuthForm() {
           <Link href="/" aria-label="Accueil"><Brand size={32} /></Link>
           <div>
             <h1>{signup ? "Créer votre compte" : "Bon retour"}</h1>
-            <p className="muted" style={{ margin: "6px 0 0" }}>{signup ? (chosen ? `Puis activez ${chosen.name}${chosen.id === "plus" ? ` : ${TRIAL_DAYS} jours offerts` : ""}.` : "Gratuit, sans carte bancaire.") : `Connectez-vous pour retrouver votre patrimoine.`}</p>
+            <p className="muted" style={{ margin: "6px 0 0" }}>{signup ? `${TRIAL_DAYS} jours pour tout essayer, sans carte bancaire.` : `Connectez-vous pour retrouver votre patrimoine.`}</p>
           </div>
           {chosen && signup && <div className="chosenPlan"><Icon name="sparkles" size={16} /><span>Formule choisie : <b>{chosen.name}</b> · {billing === "monthly" ? "mensuel" : "annuel"}</span></div>}
           {!supabaseConfigured && <div className="msg info">Mode démonstration : la base de données n’est pas encore branchée. Continuez sans rien remplir pour découvrir l’appli.</div>}

@@ -1343,3 +1343,25 @@ button.budgetRow.tap:hover { background: rgba(255, 255, 255, 0.03); }
 /* « Meilleure / moins bonne ligne » : la règle générale des lignes ne doit pas décentrer le sigle */
 .podium span.tickerIco { display: grid; place-items: center; gap: 0; }
 .podium span.tickerTxt { display: block; }
+
+/* Essai gratuit : bandeau discret en haut de l'appli */
+.trialBanner { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 14px; border-radius: 14px; border: 1px solid color-mix(in srgb, var(--blue) 40%, var(--line)); background: linear-gradient(90deg, rgba(61, 124, 255, 0.16), rgba(61, 124, 255, 0.05)); color: var(--fg2); font: inherit; font-size: 13.5px; text-align: left; cursor: pointer; }
+.trialBanner > svg { color: var(--blue2); flex: none; }
+.trialBanner > span:first-of-type { flex: 1; min-width: 0; }
+.trialBanner b { color: var(--fg); font-weight: 600; }
+.trialCta { flex: none; display: inline-flex; align-items: center; gap: 2px; color: var(--blue2); font-weight: 600; white-space: nowrap; }
+@container app (max-width: 520px) { .trialMore { display: none; } .trialBanner { font-size: 13px; padding: 10px 12px; } }
+
+/* Essai terminé : écran d'abonnement */
+.paywall { min-height: 100vh; min-height: 100dvh; display: grid; place-items: center; padding: calc(24px + env(safe-area-inset-top)) 16px calc(24px + env(safe-area-inset-bottom)); background: radial-gradient(ellipse 70% 45% at 50% -10%, rgba(61, 124, 255, 0.18), transparent 60%), var(--bg); }
+.paywallCard { width: 100%; max-width: 480px; display: grid; gap: 14px; padding: 26px 22px; border-radius: 24px; border: 1px solid var(--line2); background: rgba(15, 18, 24, 0.92); box-shadow: 0 30px 80px -30px rgba(0, 0, 0, 0.9); }
+.paywallBrand { display: flex; align-items: center; gap: 10px; font-size: 18px; }
+.paywallCard h1 { margin: 4px 0 0; font-size: 26px; letter-spacing: -0.02em; line-height: 1.15; }
+.paywallCard > p { margin: 0; font-size: 14.5px; line-height: 1.5; }
+.paywallStats { display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 8px; }
+.paywallStats > div { padding: 12px; border-radius: 14px; background: var(--surface2); border: 1px solid var(--line); min-width: 0; }
+.paywallStats small { display: block; font-size: 11.5px; color: var(--muted); margin-bottom: 4px; }
+.paywallStats b { font-size: 17px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.paywallBlur { filter: blur(6px); user-select: none; }
+.paywallFoot { display: flex; justify-content: center; gap: 18px; flex-wrap: wrap; font-size: 13px; }
+

@@ -5,7 +5,7 @@ import { Donut, Ring } from "../Charts.js";
 import { money, money0, signed, pct, dayTitle, monthLabel, todayISO } from "../../../lib/format.js";
 import { ASSET_COLORS, NEUTRAL } from "../../../lib/categories.js";
 import { budgetSuggestions, FREQ_LABEL, perMonth } from "../../../lib/model.js";
-import { planById, TRIAL_DAYS, BRAND } from "../../../lib/config.js";
+import { planById, TRIAL_DAYS, BRAND, accessFor } from "../../../lib/config.js";
 import { Amount, Avatar, squarePhoto, CatIcon, InstIcon, TickerIcon, Panel, Empty, Locked, ago, KIND_LABEL } from "./ui.js";
 import { BudgetRow, TxRow, Upcoming } from "./Overview.js";
 import { InvestProjection } from "./Projection.js";
@@ -354,10 +354,10 @@ function NotificationsPanel({ data }) {
 
 /* ---------------- Réglages ---------------- */
 export function Settings({ data, demo, openPlans, managePlan, logout, resetPassword, saveName, saveAvatar, deleteCategory, privacy, setPrivacy, deleteMe, importData }) {
-  const p = data.profile, plan = planById(p.plan || "free"), email = data.session?.user?.email;
+  const p = data.profile, access = demo ? { plan: p.plan, paid: true } : (p.access || accessFor(p)), plan = access.trial ? { name: "Essai gratuit" } : planById(p.plan || "free"), email = data.session?.user?.email;
   const name = p.full_name || (email ? email.split("@")[0] : "Mon compte");
   const [editName, setEditName] = useState(null), [photoBusy, setPhotoBusy] = useState(false);
-  const trialLeft = p.trial_days_left ?? TRIAL_DAYS;
+  const trialLeft = access.daysLeft ?? TRIAL_DAYS;
   return <div className="settings">
     <section className="card panel profileCard fadeIn">
       <label className="avatarEdit" title="Changer la photo de profil">
@@ -376,10 +376,10 @@ export function Settings({ data, demo, openPlans, managePlan, logout, resetPassw
     </section>
     <Panel title="Abonnement" icon="star">
       <div className="subRow">
-        <div><div className="subPlan">{plan.name}{p.plan_status === "trialing" && <span className="chip blue">Essai gratuit</span>}{p.plan_status === "past_due" && <span className="chip warn">Paiement en attente</span>}</div>
-          <small className="muted">{p.plan === "free" ? "Formule gratuite, sans limite de durée." : p.plan_status === "trialing" ? `${trialLeft} jour${trialLeft > 1 ? "s" : ""} d’essai restant${trialLeft > 1 ? "s" : ""}. Aucun prélèvement avant la fin de l’essai.` : p.current_period_end ? `Renouvellement le ${new Date(p.current_period_end).toLocaleDateString("fr-FR")}.` : "Accès complet actif."}</small></div>
+        <div><div className="subPlan">{plan.name}{access.trial && <span className="chip blue">Tout débloqué</span>}{p.plan_status === "past_due" && <span className="chip warn">Paiement en attente</span>}</div>
+          <small className="muted">{access.trial ? `${trialLeft > 1 ? `${trialLeft} jours restants` : `Dernières ${access.hoursLeft} h`} pour tout essayer. Ensuite, une formule est nécessaire pour continuer (vos données restent gardées).` : p.current_period_end ? `Renouvellement le ${new Date(p.current_period_end).toLocaleDateString("fr-FR")}.` : "Accès complet actif."}</small></div>
         <div className="subBtns">
-          {p.plan !== "pro" && <button className="btn primary sm" onClick={() => openPlans(p.plan === "plus" ? "pro" : "plus")}><Icon name="sparkles" size={15} />{p.plan === "plus" ? "Passer à Pro" : "Passer à Plus"}</button>}
+          {(access.trial || p.plan !== "pro") && <button className="btn primary sm" onClick={() => openPlans(access.paid && p.plan === "plus" ? "pro" : "plus")}><Icon name="sparkles" size={15} />{access.trial ? "Choisir ma formule" : p.plan === "plus" ? "Passer à Pro" : "Passer à Plus"}</button>}
           {p.plan !== "free" && p.stripe_customer_id && <button className="btn sm" onClick={managePlan}>Gérer</button>}
         </div>
       </div>

@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { stripe, priceId, siteUrl } from "../../../../lib/stripe.js";
 import { supabaseAdmin, userFromRequest } from "../../../../lib/supabase.js";
-import { TRIAL_DAYS } from "../../../../lib/config.js";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// Crée une page de paiement Stripe pour la formule choisie (essai gratuit sur Plus, une seule fois par compte).
+// Crée une page de paiement Stripe pour la formule choisie. L'essai gratuit est déjà donné par l'appli
+// (3 jours après l'inscription, sans carte) : l'abonnement démarre donc tout de suite.
 export async function POST(request) {
   try {
     const user = await userFromRequest(request);
@@ -25,7 +25,7 @@ export async function POST(request) {
       customer,
       client_reference_id: user.id,
       line_items: [{ price: priceId(plan, billing), quantity: 1 }],
-      subscription_data: { metadata: { user_id: user.id }, ...(plan === "plus" && !profile?.trial_used ? { trial_period_days: TRIAL_DAYS } : {}) },
+      subscription_data: { metadata: { user_id: user.id } },
       allow_promotion_codes: true,
       billing_address_collection: "auto",
       locale: "fr",
