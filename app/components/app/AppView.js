@@ -71,7 +71,7 @@ function PlanPicker({ current, initial, onChoose }) {
     <button className="btn primary lg block" disabled={busy || current === plan} onClick={async () => { setBusy(true); await onChoose(plan, billing); setBusy(false); }}>
       {busy ? "Redirection vers le paiement…" : current === plan ? "Vous avez déjà cette formule" : `Continuer avec ${sel.name}`}
     </button>
-    <p className="finePrint"><Icon name="lock" size={13} />Paiement sécurisé par Stripe (carte, Apple Pay, Google Pay). Sans engagement : résiliable en deux clics.</p>
+    <p className="finePrint"><Icon name="lock" size={13} />Paiement sécurisé par carte bancaire. Sans engagement : résiliable en deux clics.</p>
   </>;
 }
 function PlansModal({ current, initial, trial, onClose, onChoose }) {

@@ -98,6 +98,14 @@ function App() {
   }, [demo, router]);
 
   useEffect(() => { load(); }, [load]);
+  // Retour du paiement : la confirmation de Lemon Squeezy / Stripe peut arriver quelques secondes après.
+  // Tant que l'abonnement n'est pas encore enregistré, on recharge le profil (au plus ~30 s).
+  const payTries = useRef(0);
+  useEffect(() => {
+    if (demo || params.get("paiement") !== "ok" || !data?.profile || data.profile.access?.paid || payTries.current >= 10) return;
+    const t = setTimeout(() => { payTries.current += 1; load(); }, 3000);
+    return () => clearTimeout(t);
+  }, [data, demo, params, load]);
   // Session tenue à jour toute seule : jeton renouvelé, retour sur l'appli après une longue pause.
   useEffect(() => {
     if (demo) return;
@@ -272,12 +280,12 @@ function App() {
   const actions = {
     notice: bankNotice || notice,
     async checkout(plan, billing) {
-      if (demo) return { message: "Démonstration : le paiement s’activera une fois Stripe branché." };
+      if (demo) return { message: "Démonstration : créez un compte pour vous abonner." };
       const { url } = await api("/api/stripe/checkout", { plan, billing });
       window.location.href = url;
     },
     async managePlan() {
-      if (demo) return { message: "Démonstration : l’espace de facturation s’ouvrira avec Stripe." };
+      if (demo) return { message: "Démonstration : l’espace de facturation s’ouvre avec un vrai compte." };
       const { url } = await api("/api/stripe/portal");
       window.location.href = url;
     },

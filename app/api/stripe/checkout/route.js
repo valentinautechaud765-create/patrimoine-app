@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { stripe, priceId, siteUrl } from "../../../../lib/stripe.js";
 import { supabaseAdmin, userFromRequest } from "../../../../lib/supabase.js";
+import { lemonCheckout, lemonConfigured } from "../../../../lib/lemon.js";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
@@ -12,6 +13,8 @@ export async function POST(request) {
     if (!user) return NextResponse.json({ error: "Session expirée. Reconnecte-toi." }, { status: 401 });
     const { plan, billing } = await request.json();
     if (!["plus", "pro"].includes(plan)) return NextResponse.json({ error: "Formule inconnue." }, { status: 400 });
+    // Lemon Squeezy en priorité s'il est configuré (pas besoin de SIRET), sinon Stripe.
+    if (lemonConfigured()) return NextResponse.json({ url: await lemonCheckout({ user, plan, billing, redirectUrl: `${siteUrl(request)}/app?paiement=ok` }) });
     const db = supabaseAdmin(), s = stripe();
     const { data: profile } = await db.from("profiles").select("*").eq("id", user.id).maybeSingle();
     let customer = profile?.stripe_customer_id;
