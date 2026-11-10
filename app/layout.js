@@ -3,7 +3,7 @@ import { BRAND } from "../lib/config.js";
 
 export const metadata = {
   title: `${BRAND.name} — ${BRAND.tagline}`,
-  description: "Comptes bancaires, épargne, actions et ETF réunis dans une seule appli. Courbe du patrimoine, budgets et analyse automatique. Formule gratuite, essai Plus 14 jours.",
+  description: "Comptes bancaires, épargne, actions et ETF réunis dans une seule appli. Courbe du patrimoine, budgets et analyse automatique. 3 jours gratuits, sans carte bancaire.",
   applicationName: BRAND.name,
   appleWebApp: { capable: true, title: BRAND.name, statusBarStyle: "default" },
 };
