@@ -32,3 +32,12 @@ test("résilié : accès jusqu'à la fin de la période payée, puis verrouillé
 test("expiré ou impayé : verrouillé", () => {
   for (const status of ["expired", "unpaid", "paused"]) assert.equal(profileFromSubscription({ status, variant_id: 101 }).plan, "free");
 });
+
+const { planFromName, billingOf } = await import("../lib/lemon.js");
+test("formule retrouvée d'après le nom du produit et la durée", () => {
+  assert.equal(planFromName("Patrimo Plus"), "plus"); assert.equal(planFromName("Patrimo Pro"), "pro"); assert.equal(planFromName("Patrimo"), null);
+  assert.equal(billingOf({ interval: "month", interval_count: 1 }), "monthly");
+  assert.equal(billingOf({ interval: "year", interval_count: 1 }), "yearly");
+  assert.equal(billingOf({ interval: "month", interval_count: 12 }), "yearly");
+  assert.equal(profileFromSubscription({ status: "active", variant_id: 555, product_name: "Patrimo Pro" }).plan, "pro");
+});
