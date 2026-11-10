@@ -377,7 +377,7 @@ export function Settings({ data, demo, openPlans, managePlan, logout, resetPassw
     <Panel title="Abonnement" icon="star">
       <div className="subRow">
         <div><div className="subPlan">{plan.name}{access.trial && <span className="chip blue">Tout débloqué</span>}{p.plan_status === "past_due" && <span className="chip warn">Paiement en attente</span>}</div>
-          <small className="muted">{access.trial ? `${trialLeft > 1 ? `${trialLeft} jours restants` : `Dernières ${access.hoursLeft} h`} pour tout essayer. Ensuite, une formule est nécessaire pour continuer (vos données restent gardées).` : p.current_period_end ? `Renouvellement le ${new Date(p.current_period_end).toLocaleDateString("fr-FR")}.` : "Accès complet actif."}</small></div>
+          <small className="muted">{access.trial ? `${trialLeft > 1 ? `${trialLeft} jours restants` : `Dernières ${access.hoursLeft} h`} pour tout essayer. Ensuite, une formule est nécessaire pour continuer (vos données restent gardées).` : access.virement ? `Réglé par virement jusqu’au ${new Date(access.periodEnd).toLocaleDateString("fr-FR")}. Pour prolonger, refaites un virement avec le même code.` : p.current_period_end ? `Renouvellement le ${new Date(p.current_period_end).toLocaleDateString("fr-FR")}.` : "Accès complet actif."}</small></div>
         <div className="subBtns">
           {(access.trial || p.plan !== "pro") && <button className="btn primary sm" onClick={() => openPlans(access.paid && p.plan === "plus" ? "pro" : "plus")}><Icon name="sparkles" size={15} />{access.trial ? "Choisir ma formule" : p.plan === "plus" ? "Passer à Pro" : "Passer à Plus"}</button>}
           {p.plan !== "free" && p.stripe_customer_id && <button className="btn sm" onClick={managePlan}>Gérer</button>}

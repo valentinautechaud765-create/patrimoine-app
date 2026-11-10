@@ -52,8 +52,10 @@ function ScopePicker({ accounts, holdings = [], scope, setScope }) {
 }
 
 /* ---------------- Formules ---------------- */
-function PlanPicker({ current, initial, onChoose }) {
+function PlanPicker({ current, initial, onChoose, virement }) {
   const [plan, setPlan] = useState(initial === "pro" ? "pro" : "plus"), [billing, setBilling] = useState("yearly"), [busy, setBusy] = useState(false);
+  const [vir, setVir] = useState(null), [showVir, setShowVir] = useState(false);
+  useEffect(() => { virement?.info().then((i) => { setVir(i); if (i && !i.carte) setShowVir(true); }).catch(() => {}); }, []); // eslint-disable-line
   const opts = PLANS.filter((p) => !p.hidden);
   const sel = planById(plan);
   return <>
@@ -68,21 +70,50 @@ function PlanPicker({ current, initial, onChoose }) {
       </button>;
     })}</div>
     <ul className="modalFeatures">{sel.features.map((f) => <li key={f}><Icon name="check" size={15} stroke={2.4} />{f}</li>)}</ul>
-    <button className="btn primary lg block" disabled={busy || current === plan} onClick={async () => { setBusy(true); await onChoose(plan, billing); setBusy(false); }}>
-      {busy ? "Redirection vers le paiement…" : current === plan ? "Vous avez déjà cette formule" : `Continuer avec ${sel.name}`}
-    </button>
-    <p className="finePrint"><Icon name="lock" size={13} />Paiement sécurisé par carte bancaire. Sans engagement : résiliable en deux clics.</p>
+    {!showVir && <>
+      <button className="btn primary lg block" disabled={busy || current === plan} onClick={async () => { setBusy(true); await onChoose(plan, billing); setBusy(false); }}>
+        {busy ? "Redirection vers le paiement…" : current === plan ? "Vous avez déjà cette formule" : `Continuer avec ${sel.name}`}
+      </button>
+      <p className="finePrint"><Icon name="lock" size={13} />Paiement sécurisé par carte bancaire. Sans engagement : résiliable en deux clics.</p>
+    </>}
+    {vir && !vir.error && (showVir ? <VirementBox info={vir} amount={billing === "monthly" ? sel.monthly : sel.yearly} label={`${sel.name} · ${billing === "monthly" ? "1 mois" : "1 an"}`} verify={virement.verify} onBack={vir.carte ? () => setShowVir(false) : null} />
+      : <button type="button" className="link virLink" onClick={() => setShowVir(true)}><Icon name="bank" size={14} />Pas de carte ? Payer par virement bancaire</button>)}
   </>;
 }
-function PlansModal({ current, initial, trial, onClose, onChoose }) {
+
+// Paiement par virement : IBAN, montant et code unique à mettre en motif ; Patrimo vérifie la réception tout seul.
+function VirementBox({ info, amount, label, verify, onBack }) {
+  const [state, setState] = useState(null), [busy, setBusy] = useState(false);
+  const copy = async (t, e) => { try { await navigator.clipboard.writeText(t); const b = e.currentTarget; const old = b.textContent; b.textContent = "Copié ✓"; setTimeout(() => { b.textContent = old; }, 1500); } catch {} };
+  const check = async () => {
+    setBusy(true); setState(null);
+    try { const r = await verify(); setState(r.active ? { tone: "ok", text: `Paiement reçu, merci ! Accès débloqué jusqu’au ${new Date(r.end).toLocaleDateString("fr-FR")}.` } : r.demo ? { tone: "info", text: "Démonstration : avec un vrai compte, l’accès se débloque dès que le virement est reçu." } : { tone: "info", text: "Pas encore reçu. Un virement instantané arrive en quelques minutes, un virement classique en 1 jour ouvré : réessayez un peu plus tard." }); }
+    catch (e) { setState({ tone: "bad", text: e.message }); }
+    setBusy(false);
+  };
+  const row = (k, v, copyVal) => <div className="virRow"><small>{k}</small><b>{v}</b>{copyVal && <button type="button" className="btn sm ghost" onClick={(e) => copy(copyVal, e)}>Copier</button>}</div>;
+  return <div className="virBox">
+    <div className="virHead"><b>Payer par virement</b><span className="muted">{label}</span></div>
+    {row("Montant", formatPrice(amount), String(amount).replace(".", ","))}
+    {row("Motif (obligatoire)", <span className="virRef">{info.ref}</span>, info.ref)}
+    {row("IBAN", <span className="mono">{info.iban}</span>, info.iban.replace(/\s+/g, ""))}
+    {info.titulaire && row("Bénéficiaire", info.titulaire)}
+    {info.bic && row("BIC", <span className="mono">{info.bic}</span>, info.bic)}
+    <p className="formHint"><Icon name="info" size={14} /><span>Mettez bien le code <b>{info.ref}</b> en motif, sinon le paiement ne peut pas être reconnu. Choisissez « virement instantané » pour un accès en quelques minutes. Pour renouveler, refaites un virement avec le même code.</span></p>
+    {state && <div className={"msg " + (state.tone === "ok" ? "ok" : state.tone === "bad" ? "err" : "info")}>{state.text}</div>}
+    <button className="btn primary lg block" disabled={busy} onClick={check}>{busy ? "Vérification auprès de la banque…" : "J’ai fait le virement, vérifier"}</button>
+    {onBack && <button type="button" className="link virLink" onClick={onBack}>← Payer plutôt par carte</button>}
+  </div>;
+}
+function PlansModal({ current, initial, trial, onClose, onChoose, virement }) {
   return <Modal onClose={onClose}>
     <Head title="Choisir une formule" sub={trial ? `Essai gratuit : encore ${trial.daysLeft > 1 ? trial.daysLeft + " jours" : trial.hoursLeft + " h"}. Abonnez-vous maintenant pour ne rien perdre.` : "Sans engagement. Annulable en deux clics."} onClose={onClose} />
-    <PlanPicker current={current} initial={initial} onChoose={onChoose} />
+    <PlanPicker current={current} initial={initial} onChoose={onChoose} virement={virement} />
   </Modal>;
 }
 
 // Essai terminé : l'appli reste derrière cet écran tant qu'aucune formule n'est choisie. Les données sont gardées.
-function Paywall({ data, m, onChoose, logout, deleteMe }) {
+function Paywall({ data, m, onChoose, logout, deleteMe, virement }) {
   const accounts = data.accounts.filter((a) => !a.hidden).length, ops = data.transactions.length, banks = data.accounts.some((a) => a.powens_account_id);
   return <div className="paywall">
     <div className="paywallCard">
@@ -95,7 +126,7 @@ function Paywall({ data, m, onChoose, logout, deleteMe }) {
         <div><small>Opérations</small><b>{ops}</b></div>
       </div>
       {banks && <p className="formHint"><Icon name="bank" size={14} />Vos banques continuent d’être suivies : vous retrouvez tout à jour dès l’abonnement.</p>}
-      <PlanPicker current="free" initial="plus" onChoose={onChoose} />
+      <PlanPicker current="free" initial="plus" onChoose={onChoose} virement={virement} />
       <div className="paywallFoot"><button className="link" onClick={logout}>Se déconnecter</button><button className="link dangerLink" onClick={deleteMe}>Supprimer mon compte</button></div>
     </div>
   </div>;
@@ -234,6 +265,8 @@ export default function AppView({ data, demo, embedded, initialTab = "overview",
   const title = tab === "overview" ? (first ? `Bonjour, ${first}` : "Vue d’ensemble") : NAV.find((n) => n.id === tab).label;
   const today = new Intl.DateTimeFormat("fr-FR", { weekday: "long", day: "numeric", month: "long" }).format(new Date());
   const trialing = Boolean(access.trial), trialLeft = access.daysLeft ?? TRIAL_DAYS;
+  const virementApi = { info: () => actions.virementInfo?.(), verify: () => actions.virementVerify?.() };
+  const renewSoon = Boolean(access.virement && access.daysLeft <= 5);
 
   const screen = {
     overview: <Overview m={m} data={liveData} dayCurve={liveData.scoped ? null : dayCurve} liveInfo={liveInfo} showChart={charts} fetchHistory={limits.investments ? actions.fetchHistory : null} eurPerUsd={market.eurPerUsd} limits={limits} go={go} openPlans={openPlans} list={list} open={open} goOps={goOps} />,
@@ -251,7 +284,7 @@ export default function AppView({ data, demo, embedded, initialTab = "overview",
   const tradesOf = (id) => (data.trades || []).filter((t) => t.holding_id === id);
 
   if (access.locked && !demo && !embedded) return <>
-    <Paywall data={data} m={m} onChoose={(pl, b) => run(actions.checkout, pl, b)} logout={() => run(actions.logout)} deleteMe={() => open("deleteMe")} />
+    <Paywall data={data} m={m} onChoose={(pl, b) => run(actions.checkout, pl, b)} logout={() => run(actions.logout)} deleteMe={() => open("deleteMe")} virement={virementApi} />
     {modal?.type === "deleteMe" && <DeleteMeModal onClose={close} onConfirm={() => run(actions.deleteAccountForever)} />}
     {toast && <div className={"toast " + toast.tone}>{toast.text}</div>}
   </>;
@@ -301,6 +334,7 @@ export default function AppView({ data, demo, embedded, initialTab = "overview",
           </header>
 
           <div className="content" key={tab}>
+            {renewSoon && !embedded && <button className="trialBanner" onClick={() => openPlans(plan)}><Icon name="calendar" size={15} /><span><b>Votre accès se termine {access.daysLeft > 1 ? `dans ${access.daysLeft} jours` : "demain"}</b><span className="trialMore"> · renouvelez par virement avec le même code</span></span><span className="trialCta">Renouveler<Icon name="chevronRight" size={14} /></span></button>}
             {trialing && !embedded && <button className="trialBanner" onClick={() => openPlans("plus")}><Icon name="star" size={15} /><span><b>Essai gratuit</b> · {trialLeft > 1 ? `encore ${trialLeft} jours` : `plus que ${access.hoursLeft} h`}<span className="trialMore">, tout est débloqué</span></span><span className="trialCta">Choisir ma formule<Icon name="chevronRight" size={14} /></span></button>}
             {demo && !embedded && <div className="demoBanner"><Icon name="info" size={16} /><span><b>Démonstration</b> · tous les montants affichés sont fictifs.</span><a className="btn sm light" href="/connexion?mode=inscription">Créer mon compte</a></div>}
             {["overview", "invest", "budget", "ops"].includes(tab) && (data.accounts.filter((a) => !a.hidden).length + data.holdings.length) > 1 && <ScopePicker accounts={data.accounts.filter((a) => !a.hidden)} holdings={data.holdings.filter((h) => Number(h.quantity) > 0 || Number(h.value) > 0)} scope={liveData.scopeIds || []} setScope={setScope} />}
@@ -313,7 +347,7 @@ export default function AppView({ data, demo, embedded, initialTab = "overview",
         </nav>
       </div>
 
-      {modal?.type === "plans" && <PlansModal current={access.paid ? plan : null} initial={modal.plan} trial={trialing ? access : null} onClose={() => setModal(null)} onChoose={(pl, b) => run(actions.checkout, pl, b)} />}
+      {modal?.type === "plans" && <PlansModal current={access.paid ? plan : null} initial={modal.plan} trial={trialing ? access : null} onClose={() => setModal(null)} onChoose={(pl, b) => run(actions.checkout, pl, b)} virement={virementApi} />}
       {modal?.type === "tx" && <TxForm tx={modal.tx} defaultAccount={modal.account_id} accounts={data.accounts} onClose={close} onSave={(t, f) => run(actions.saveTransaction, t, f)} onDelete={(t) => run(actions.deleteTransaction, t)} onAddCategory={(c) => run(actions.addCategory, c)} />}
       {modal?.type === "account" && <AccountForm account={modal.account} onClose={close} onSave={(a) => run(actions.saveAccount, a)} onDelete={(a) => run(actions.deleteAccount, a)} />}
       {viewed && <AccountSheet account={viewed} transactions={data.transactions} onClose={close} onEdit={() => open("account", { account: viewed })} onAddTx={() => open("tx", { account_id: viewed.id })} onOpenTx={(t) => open("tx", { tx: t })} />}

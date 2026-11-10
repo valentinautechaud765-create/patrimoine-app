@@ -279,6 +279,16 @@ function App() {
 
   const actions = {
     notice: bankNotice || notice,
+    async virementInfo() {
+      if (demo) return { iban: "FR76 0000 0000 0000 0000 0000 000", titulaire: "Patrimo (démonstration)", bic: "", ref: "PATDEMO1", carte: true, demo: true };
+      return api("/api/paiement/virement", { action: "info" });
+    },
+    async virementVerify() {
+      if (demo) return { found: false, demo: true };
+      const r = await api("/api/paiement/virement", { action: "verifier" });
+      if (r.active) await load();
+      return r;
+    },
     async checkout(plan, billing) {
       if (demo) return { message: "Démonstration : créez un compte pour vous abonner." };
       const { url } = await api("/api/stripe/checkout", { plan, billing });
