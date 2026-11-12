@@ -46,6 +46,7 @@ function App() {
   const [data, setData] = useState(null);
   const demo = !supabaseConfigured;
 
+  const autoChecked = useRef(false);
   const load = useCallback(async () => {
     if (demo) { setData({ ...demoData(), trades: [], recurrences: [], debts: [], debtPayments: [], session: null }); return; }
     const sb = supabaseBrowser();
@@ -78,6 +79,13 @@ function App() {
         .catch((e) => console.warn("[compte]", e.message));
     }
     pr.access = accessFor(pr);
+    pr.paiementAuto = s.session.user.user_metadata?.paiement_auto ?? null;
+    // Payé par virement et fin d'accès proche (ou passée) : on regarde tout seul si le virement suivant est arrivé.
+    if (pr.plan_status === "virement" && pr.current_period_end && new Date(pr.current_period_end).getTime() - Date.now() < 3 * 864e5 && !autoChecked.current) {
+      autoChecked.current = true;
+      fetch("/api/paiement/virement", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + s.session.access_token }, body: JSON.stringify({ action: "verifier", leger: true }) })
+        .then((r) => r.json()).then((j) => { if (j.active && j.end && j.end !== pr.current_period_end) load(); }).catch(() => {});
+    }
     const num = (rows, keys) => (rows || []).map((r) => { const o = { ...r }; keys.forEach((k) => { o[k] = Number(o[k]) || 0; }); return o; });
     setData({
       profile: pr,
@@ -279,6 +287,14 @@ function App() {
 
   const actions = {
     notice: bankNotice || notice,
+    async savePaymentPref(auto) {
+      if (!demo) {
+        const { error } = await supabaseBrowser().auth.updateUser({ data: { paiement_auto: auto, paiement_auto_le: new Date().toISOString() } });
+        if (error) throw new Error("Enregistrement impossible : " + error.message);
+      }
+      setData((d) => ({ ...d, profile: { ...d.profile, paiementAuto: auto } }));
+      return true;
+    },
     async virementInfo() {
       if (demo) return { iban: "FR76 0000 0000 0000 0000 0000 000", titulaire: "Patrimo (démonstration)", bic: "", ref: "PATDEMO1", carte: true, demo: true };
       return api("/api/paiement/virement", { action: "info" });

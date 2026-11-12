@@ -76,32 +76,55 @@ function PlanPicker({ current, initial, onChoose, virement }) {
       </button>
       <p className="finePrint"><Icon name="lock" size={13} />Paiement sécurisé par carte bancaire. Sans engagement : résiliable en deux clics.</p>
     </>}
-    {vir && !vir.error && (showVir ? <VirementBox info={vir} amount={billing === "monthly" ? sel.monthly : sel.yearly} label={`${sel.name} · ${billing === "monthly" ? "1 mois" : "1 an"}`} verify={virement.verify} onBack={vir.carte ? () => setShowVir(false) : null} />
+    {vir && !vir.error && (showVir ? <VirementBox info={vir} amount={billing === "monthly" ? sel.monthly : sel.yearly} monthly={billing === "monthly"} label={`${sel.name} · ${billing === "monthly" ? "1 mois" : "1 an"}`} verify={virement.verify} savePref={virement.savePref} pref={virement.pref} onBack={vir.carte ? () => setShowVir(false) : null} />
       : <button type="button" className="link virLink" onClick={() => setShowVir(true)}><Icon name="bank" size={14} />Pas de carte ? Payer par virement bancaire</button>)}
   </>;
 }
 
 // Paiement par virement : IBAN, montant et code unique à mettre en motif ; Patrimo vérifie la réception tout seul.
-function VirementBox({ info, amount, label, verify, onBack }) {
+function VirementBox({ info, amount, label, monthly, verify, onBack, savePref, pref }) {
   const [state, setState] = useState(null), [busy, setBusy] = useState(false);
+  const [mode, setMode] = useState(pref === false ? "manuel" : pref === true ? "auto" : null), [ok, setOk] = useState(pref === true);
   const copy = async (t, e) => { try { await navigator.clipboard.writeText(t); const b = e.currentTarget; const old = b.textContent; b.textContent = "Copié ✓"; setTimeout(() => { b.textContent = old; }, 1500); } catch {} };
+  const freq = monthly ? "chaque mois" : "chaque année";
   const check = async () => {
     setBusy(true); setState(null);
-    try { const r = await verify(); setState(r.active ? { tone: "ok", text: `Paiement reçu, merci ! Accès débloqué jusqu’au ${new Date(r.end).toLocaleDateString("fr-FR")}.` } : r.demo ? { tone: "info", text: "Démonstration : avec un vrai compte, l’accès se débloque dès que le virement est reçu." } : { tone: "info", text: "Pas encore reçu. Un virement instantané arrive en quelques minutes, un virement classique en 1 jour ouvré : réessayez un peu plus tard." }); }
-    catch (e) { setState({ tone: "bad", text: e.message }); }
+    try {
+      await savePref?.(mode === "auto");
+      const r = await verify();
+      setState(r.active ? { tone: "ok", text: `Paiement reçu, merci ! Accès débloqué jusqu’au ${new Date(r.end).toLocaleDateString("fr-FR")}.` } : r.demo ? { tone: "info", text: "Démonstration : avec un vrai compte, l’accès se débloque dès que le virement est reçu." } : { tone: "info", text: "Pas encore reçu. Un virement instantané arrive en quelques minutes, un virement classique en 1 jour ouvré : réessayez un peu plus tard." });
+    } catch (e) { setState({ tone: "bad", text: e.message }); }
     setBusy(false);
   };
   const row = (k, v, copyVal) => <div className="virRow"><small>{k}</small><b>{v}</b>{copyVal && <button type="button" className="btn sm ghost" onClick={(e) => copy(copyVal, e)}>Copier</button>}</div>;
+  const ready = mode === "manuel" || (mode === "auto" && ok);
   return <div className="virBox">
     <div className="virHead"><b>Payer par virement</b><span className="muted">{label}</span></div>
-    {row("Montant", formatPrice(amount), String(amount).replace(".", ","))}
-    {row("Motif (obligatoire)", <span className="virRef">{info.ref}</span>, info.ref)}
-    {row("IBAN", <span className="mono">{info.iban}</span>, info.iban.replace(/\s+/g, ""))}
-    {info.titulaire && row("Bénéficiaire", info.titulaire)}
-    {info.bic && row("BIC", <span className="mono">{info.bic}</span>, info.bic)}
-    <p className="formHint"><Icon name="info" size={14} /><span>Mettez bien le code <b>{info.ref}</b> en motif, sinon le paiement ne peut pas être reconnu. Choisissez « virement instantané » pour un accès en quelques minutes. Pour renouveler, refaites un virement avec le même code.</span></p>
-    {state && <div className={"msg " + (state.tone === "ok" ? "ok" : state.tone === "bad" ? "err" : "info")}>{state.text}</div>}
-    <button className="btn primary lg block" disabled={busy} onClick={check}>{busy ? "Vérification auprès de la banque…" : "J’ai fait le virement, vérifier"}</button>
+    <div className="virModes" role="radiogroup" aria-label="Mode de paiement">
+      <button type="button" role="radio" aria-checked={mode === "auto"} className={"virMode" + (mode === "auto" ? " on" : "")} onClick={() => setMode("auto")}>
+        <span className="radio" /><span><b>Automatique</b><small>Je programme un virement permanent dans ma banque, {freq}. Je n’ai plus rien à faire.</small></span><span className="chip blue">Conseillé</span>
+      </button>
+      <button type="button" role="radio" aria-checked={mode === "manuel"} className={"virMode" + (mode === "manuel" ? " on" : "")} onClick={() => setMode("manuel")}>
+        <span className="radio" /><span><b>Je paie moi-même</b><small>Un virement maintenant, puis {freq} quand Patrimo me le rappelle (5 jours avant).</small></span>
+      </button>
+    </div>
+    {mode && <>
+      {row("Montant", formatPrice(amount), String(amount).replace(".", ","))}
+      {row("Motif (obligatoire)", <span className="virRef">{info.ref}</span>, info.ref)}
+      {row("IBAN", <span className="mono">{info.iban}</span>, info.iban.replace(/\s+/g, ""))}
+      {info.titulaire && row("Bénéficiaire", info.titulaire)}
+      {info.bic && row("BIC", <span className="mono">{info.bic}</span>, info.bic)}
+      {mode === "auto" ? <>
+        <ol className="virSteps">
+          <li>Dans l’appli de votre banque : <b>Virements</b> → <b>virement permanent</b> (ou « programmé », « récurrent »).</li>
+          <li>Bénéficiaire : l’IBAN ci-dessus. Montant : <b>{formatPrice(amount)}</b>. Fréquence : <b>{monthly ? "mensuelle" : "annuelle"}</b>, à partir d’aujourd’hui.</li>
+          <li>Motif : <b>{info.ref}</b>, exactement.</li>
+        </ol>
+        <label className="virConsent"><input type="checkbox" checked={ok} onChange={(e) => setOk(e.target.checked)} /><span>J’accepte de programmer un virement permanent de <b>{formatPrice(amount)}</b> {freq} vers Patrimo, avec le motif <b>{info.ref}</b>. Je peux l’arrêter à tout moment depuis ma banque ; l’accès s’arrête alors à la fin de la période payée.</span></label>
+      </> : <p className="formHint"><Icon name="info" size={14} /><span>Mettez bien le code <b>{info.ref}</b> en motif, sinon le paiement ne peut pas être reconnu. Choisissez « virement instantané » pour un accès en quelques minutes. Sans nouveau virement, l’accès s’arrête à la fin de la période payée.</span></p>}
+      {state && <div className={"msg " + (state.tone === "ok" ? "ok" : state.tone === "bad" ? "err" : "info")}>{state.text}</div>}
+      <button className="btn primary lg block" disabled={busy || !ready} onClick={check}>{busy ? "Vérification auprès de la banque…" : mode === "auto" ? "C’est programmé, vérifier le 1er virement" : "J’ai fait le virement, vérifier"}</button>
+    </>}
     {onBack && <button type="button" className="link virLink" onClick={onBack}>← Payer plutôt par carte</button>}
   </div>;
 }
@@ -265,7 +288,7 @@ export default function AppView({ data, demo, embedded, initialTab = "overview",
   const title = tab === "overview" ? (first ? `Bonjour, ${first}` : "Vue d’ensemble") : NAV.find((n) => n.id === tab).label;
   const today = new Intl.DateTimeFormat("fr-FR", { weekday: "long", day: "numeric", month: "long" }).format(new Date());
   const trialing = Boolean(access.trial), trialLeft = access.daysLeft ?? TRIAL_DAYS;
-  const virementApi = { info: () => actions.virementInfo?.(), verify: () => actions.virementVerify?.() };
+  const virementApi = { info: () => actions.virementInfo?.(), verify: () => actions.virementVerify?.(), savePref: (a) => actions.savePaymentPref?.(a), pref: p.paiementAuto };
   const renewSoon = Boolean(access.virement && access.daysLeft <= 5);
 
   const screen = {
@@ -334,7 +357,7 @@ export default function AppView({ data, demo, embedded, initialTab = "overview",
           </header>
 
           <div className="content" key={tab}>
-            {renewSoon && !embedded && <button className="trialBanner" onClick={() => openPlans(plan)}><Icon name="calendar" size={15} /><span><b>Votre accès se termine {access.daysLeft > 1 ? `dans ${access.daysLeft} jours` : "demain"}</b><span className="trialMore"> · renouvelez par virement avec le même code</span></span><span className="trialCta">Renouveler<Icon name="chevronRight" size={14} /></span></button>}
+            {renewSoon && !embedded && <button className="trialBanner" onClick={() => openPlans(plan)}><Icon name="calendar" size={15} /><span><b>Votre accès se termine {access.daysLeft > 1 ? `dans ${access.daysLeft} jours` : "demain"}</b><span className="trialMore">{p.paiementAuto ? " · votre virement permanent sera vérifié automatiquement" : " · renouvelez par virement avec le même code"}</span></span><span className="trialCta">Renouveler<Icon name="chevronRight" size={14} /></span></button>}
             {trialing && !embedded && <button className="trialBanner" onClick={() => openPlans("plus")}><Icon name="star" size={15} /><span><b>Essai gratuit</b> · {trialLeft > 1 ? `encore ${trialLeft} jours` : `plus que ${access.hoursLeft} h`}<span className="trialMore">, tout est débloqué</span></span><span className="trialCta">Choisir ma formule<Icon name="chevronRight" size={14} /></span></button>}
             {demo && !embedded && <div className="demoBanner"><Icon name="info" size={16} /><span><b>Démonstration</b> · tous les montants affichés sont fictifs.</span><a className="btn sm light" href="/connexion?mode=inscription">Créer mon compte</a></div>}
             {["overview", "invest", "budget", "ops"].includes(tab) && (data.accounts.filter((a) => !a.hidden).length + data.holdings.length) > 1 && <ScopePicker accounts={data.accounts.filter((a) => !a.hidden)} holdings={data.holdings.filter((h) => Number(h.quantity) > 0 || Number(h.value) > 0)} scope={liveData.scopeIds || []} setScope={setScope} />}

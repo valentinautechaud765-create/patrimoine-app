@@ -56,7 +56,7 @@ globalThis.fetch = async (url, opts = {}) => {
   CALLS.push((opts.method || "GET") + " " + path.split("?")[0]);
   const body = path.startsWith("/users/me/connections") ? { connections: BANK.connections }
     : path.startsWith("/users/me/accounts") ? { accounts: BANK.accounts }
-    : path.startsWith("/users/me/transactions") ? { transactions: BANK.transactions } : {};
+    : path.startsWith("/users/me/transactions") ? { transactions: BANK.transactions.filter((t) => !/min_date=/.test(path) || t.date >= path.match(/min_date=([\d-]+)/)[1]) } : {}; // comme Powens : rien avant min_date
   return { ok: true, status: 200, json: async () => body, text: async () => JSON.stringify(body) };
 };
 

@@ -1378,3 +1378,13 @@ button.budgetRow.tap:hover { background: rgba(255, 255, 255, 0.03); }
 .virRow .btn { grid-area: btn; }
 .virRef { color: var(--blue2); letter-spacing: 0.06em; font-size: 16px; }
 .virRow .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; letter-spacing: 0.02em; }
+.virModes { display: grid; gap: 8px; }
+.virMode { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: start; gap: 10px; padding: 12px; border-radius: 14px; border: 1px solid var(--line2); background: var(--surface); color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.virMode.on { border-color: var(--blue); background: color-mix(in srgb, var(--blue) 10%, var(--surface)); }
+.virMode .radio { margin-top: 3px; }
+.virMode b { display: block; font-size: 14.5px; }
+.virMode small { display: block; font-size: 12.5px; color: var(--muted); line-height: 1.4; margin-top: 2px; }
+.virSteps { margin: 0; padding-left: 20px; display: grid; gap: 6px; font-size: 13.5px; line-height: 1.45; color: var(--fg2); }
+.virConsent { display: flex; gap: 10px; align-items: flex-start; font-size: 13px; line-height: 1.45; color: var(--fg2); padding: 10px 12px; border-radius: 12px; border: 1px solid var(--line2); background: var(--surface); cursor: pointer; }
+.virConsent input { margin-top: 2px; width: 18px; height: 18px; flex: none; accent-color: var(--blue); }
+.virMode.on .radio { border: 6px solid var(--blue); }
