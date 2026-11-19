@@ -1392,3 +1392,28 @@ button.budgetRow.tap:hover { background: rgba(255, 255, 255, 0.03); }
 /* Patrimoine immobilier */
 .propertyList{display:grid;gap:12px}.propertyCard{display:flex;gap:14px;align-items:flex-start;padding:18px;border:1px solid var(--line);border-radius:16px;background:var(--card)}.propertyIcon{width:44px;height:44px;display:grid;place-items:center;border-radius:12px;background:var(--soft);color:var(--blue);flex:none}.propertyMain{flex:1;min-width:0}.propertyTitle{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.propertyTitle h3{margin:0;font-size:16px}.propertyMain>p{margin:6px 0 12px;font-size:12px}.propertyMetrics{display:flex;gap:18px;flex-wrap:wrap;font-size:12px;color:var(--muted)}.propertyMetrics span{display:grid;gap:3px}.propertyMetrics b{font-size:14px;color:var(--text)}.propertyActions{display:flex;gap:6px}.propertyModal{width:min(760px,calc(100vw - 28px));max-height:88vh;overflow:auto}.formGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.formGrid .field{display:grid;gap:6px;font-size:12px;color:var(--muted)}.formGrid .field input,.formGrid .field select,.formGrid .field textarea{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--text);font:inherit}.formGrid .field:has(textarea){grid-column:1/-1}.propertyModal .modalHead,.propertyModal .modalFoot{display:flex;justify-content:space-between;align-items:center;gap:12px}.propertyModal .modalHead{margin-bottom:18px}.propertyModal .modalHead h2{margin:0}.propertyModal .modalHead p{font-size:12px;margin:5px 0 0}.propertyModal .modalFoot{justify-content:flex-end;margin-top:18px}.statGrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:20px 0}.statCard{padding:17px;border:1px solid var(--line);border-radius:14px;background:var(--card);display:grid;gap:7px}.statCard small{color:var(--muted);font-size:12px}.statCard strong{font-size:22px}.statCard span{font-size:11px;color:var(--muted)}.screenHead{display:flex;justify-content:space-between;align-items:center;gap:14px}.screenHead h2{margin:0}.screenHead p{margin:5px 0}.sectionHead{display:flex;justify-content:space-between;align-items:center;margin:24px 0 12px}.sectionHead h3{margin:0}.emptyState{text-align:center;padding:42px 20px;border:1px dashed var(--line);border-radius:16px;color:var(--muted)}.emptyState h3{color:var(--text)}.emptyState p{font-size:13px}.formError{color:var(--red)}@media(max-width:800px){.statGrid{grid-template-columns:repeat(2,minmax(0,1fr))}.propertyCard{flex-wrap:wrap}.propertyActions{width:100%;justify-content:flex-end}}@media(max-width:520px){.formGrid{grid-template-columns:1fr}.screenHead{align-items:flex-start;flex-direction:column}.statCard strong{font-size:18px}.propertyMetrics{gap:12px}}
 .propertyHeaderActions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}@media(max-width:520px){.propertyHeaderActions{width:100%}.propertyHeaderActions .btn{flex:1}}
+
+
+/* Patrimoine immobilier — intégration au design natif Patrimo */
+.modalBackdrop{position:fixed;inset:0;z-index:120;display:grid;place-items:center;padding:20px;background:rgba(3,4,6,.72);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);animation:fadeOnly .2s ease both}
+.propertyModal{width:min(760px,calc(100vw - 32px));max-height:min(88vh,900px);overflow:auto;padding:24px;background:var(--surface);border:1px solid var(--line2);border-radius:22px;box-shadow:0 40px 100px -20px rgba(0,0,0,.8);color:var(--fg)}
+.propertyModal .modalHead p{line-height:1.5}
+.formGrid .field{color:var(--fg2);font-size:13px;font-weight:500}
+.formGrid .field input,.formGrid .field select,.formGrid .field textarea{background:var(--surface2);border:1px solid var(--line2);color:var(--fg);border-radius:11px;min-height:44px;outline:none}
+.formGrid .field input:focus,.formGrid .field select:focus,.formGrid .field textarea:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(61,124,255,.14)}
+.propertyCard{background:var(--surface);border-color:var(--line2);border-radius:18px;box-shadow:var(--shadow)}
+.propertyIcon{background:var(--blueSoft);color:var(--blue2)}
+.propertyMetrics b{color:var(--fg)}
+.statCard{background:var(--surface);border-color:var(--line2)}
+.statCard strong{font-variant-numeric:tabular-nums}
+.propertyExplain{padding:18px 20px;border:1px solid rgba(255,180,84,.22);border-radius:18px;background:linear-gradient(145deg,rgba(255,180,84,.07),rgba(15,18,24,.92));display:grid;gap:14px}
+.propertyExplainHead{display:flex;gap:11px;align-items:flex-start;color:var(--warn)}
+.propertyExplainHead b{display:block;color:var(--fg);font-size:14.5px}
+.propertyExplainHead p{margin:3px 0 0;color:var(--fg2);font-size:13px;line-height:1.45}
+.propertyExplainGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.propertyExplainGrid>div{padding:12px;border:1px solid var(--line);border-radius:13px;background:rgba(6,7,10,.32);display:grid;gap:5px;min-width:0}
+.propertyExplainGrid small{color:var(--muted);font-size:11.5px}
+.propertyExplainGrid strong{font-size:19px;font-weight:600;font-variant-numeric:tabular-nums}
+.propertyExplainGrid span,.propertyExplainFoot{font-size:11.5px;color:var(--muted);line-height:1.45}
+.propertyExplainFoot{margin:0;padding-top:10px;border-top:1px solid var(--line)}
+@media(max-width:760px){.propertyExplainGrid{grid-template-columns:1fr}.propertyModal{padding:18px}.formGrid{grid-template-columns:1fr}}
