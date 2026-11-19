@@ -28,6 +28,10 @@ create policy "properties: propriétaire" on public.properties for all using (au
 -- Inclure la quote-part immobilière dans les photos quotidiennes du patrimoine.
 alter table public.properties add column if not exists valuation_status text not null default 'À vérifier' check (valuation_status in ('À vérifier','À actualiser','Confirmé'));
 
+
+-- Suivi administratif des biens issus d'une succession.
+alter table public.properties add column if not exists succession_status text not null default 'Sans objet' check (succession_status in ('Sans objet','En cours','À confirmer chez le notaire','Clôturée'));
+
 create or replace function public.take_net_worth_snapshots() returns void language sql security definer set search_path = public as $$
   insert into public.net_worth_snapshots (user_id, date, total)
   select u.id, current_date,
