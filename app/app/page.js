@@ -581,6 +581,7 @@ function App() {
     },
     // Achats / ventes / dividendes : la position (quantité, prix de revient) est recalculée à chaque fois
     async saveTrade(t) {
+      const { account_id, ...tradePayload } = t;
       if (live.current.tradesMissing) throw new Error("Mise à jour de la base nécessaire : relance le script supabase/schema.sql dans Supabase (SQL Editor → Run).");
       // Première transaction sur une position déjà détenue : on enregistre d'abord ce qui était déjà là
       // comme position de départ, pour ne pas perdre les parts ni le prix de revient existants.
@@ -591,13 +592,20 @@ function App() {
         const opening = await write("trades", { holding_id: h.id, type: "Achat", quantity: q, price: q > 0 ? Math.round((cost / q) * 1e6) / 1e6 : 0, fees: 0, amount: cost, currency: "EUR", date: t.date < todayStr() ? t.date : todayStr() });
         base = [...base, { holding_id: h.id, type: "Achat", quantity: q, amount: cost, date: opening.date, ...opening, created_at: opening.created_at || new Date(Date.now() - 1000).toISOString() }];
       }
-      const saved = await write("trades", t);
-      const trades = [...base.filter((x) => x.id !== saved.id), { ...t, ...saved, created_at: saved.created_at || new Date().toISOString() }];
+      const saved = await write("trades", tradePayload);
+      const trades = [...base.filter((x) => x.id !== saved.id), { ...tradePayload, ...saved, created_at: saved.created_at || new Date().toISOString() }];
+      const existingCashTx = live.current.transactions.find((x) => x.trade_id === saved.id);
+      const cashAmount = Math.round(Number(saved.amount || tradePayload.amount) * (tradePayload.type === "Achat" ? -1 : 1) * 100) / 100;
+      const holding = live.current.holdings.find((x) => x.id === tradePayload.holding_id);
+      const cashTx = { ...(existingCashTx ? { id: existingCashTx.id } : {}), trade_id: saved.id, account_id: account_id || existingCashTx?.account_id || null, date: tradePayload.date, label: `${tradePayload.type === "Achat" ? "Achat" : tradePayload.type === "Vente" ? "Vente" : "Dividende"} · ${holding?.name || "Placement"}`, amount: cashAmount, category: "Investissements" };
+      if (cashTx.account_id) await actions.saveTransaction(cashTx);
       setData((d) => ({ ...d, trades }));
       await applyTrades(t.holding_id, trades);
       return { message: t.id ? "Transaction modifiée" : t.type === "Dividende" ? "Dividende ajouté" : t.type === "Achat" ? "Achat enregistré" : "Vente enregistrée" };
     },
     async deleteTrade(t) {
+      const linkedCashTx = live.current.transactions.find((x) => x.trade_id === t.id);
+      if (linkedCashTx) await actions.deleteTransaction(linkedCashTx);
       await erase("trades", { id: t.id });
       const trades = live.current.trades.filter((x) => x.id !== t.id);
       setData((d) => ({ ...d, trades }));
