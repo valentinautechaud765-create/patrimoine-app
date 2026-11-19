@@ -41,7 +41,7 @@ create or replace function public.take_net_worth_snapshots() returns void langua
         and not exists (select 1 from public.holdings h where h.account_id = a.id)), 0)
     - coalesce((select sum(remaining) from public.debts d where d.user_id = u.id and d.kind in ('je_dois','credit')), 0)
     + coalesce((select sum(remaining) from public.debts d where d.user_id = u.id and d.kind = 'on_me_doit'), 0)
-    + coalesce((select sum((p.value - p.mortgage_remaining) * p.ownership_share / 100) from public.properties p where p.user_id = u.id and p.valuation_status = 'Confirmé'), 0)
+    + coalesce((select sum(((case when p.market_value > 0 then p.market_value when p.valuation_status = 'Confirmé' then p.value else 0 end) - p.mortgage_remaining) * p.ownership_share / 100) from public.properties p where p.user_id = u.id and (p.market_value > 0 or p.valuation_status = 'Confirmé')), 0)
   from auth.users u
   on conflict (user_id, date) do update set total = excluded.total;
 $$;
