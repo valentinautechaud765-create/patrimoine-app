@@ -67,6 +67,7 @@ function App() {
       sb.from("properties").select("*").order("created_at", { ascending: false }),
     ]);
     const pr = profile.data || { plan: "free" };
+    pr.email = String(s.session.user.email || "").toLowerCase();
     pr.avatar_url = s.session.user.user_metadata?.avatar_url || null;
     pr.categories = Array.isArray(s.session.user.user_metadata?.custom_categories) ? s.session.user.user_metadata.custom_categories : [];
     setCustomCategories(pr.categories);
