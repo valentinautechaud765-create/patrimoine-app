@@ -48,12 +48,12 @@ function App() {
 
   const autoChecked = useRef(false);
   const load = useCallback(async () => {
-    if (demo) { setData({ ...demoData(), trades: [], recurrences: [], debts: [], debtPayments: [], session: null }); return; }
+    if (demo) { setData({ ...demoData(), trades: [], recurrences: [], debts: [], debtPayments: [], properties: [], session: null }); return; }
     const sb = supabaseBrowser();
     const { data: s } = await sb.auth.getSession();
     if (!s.session) { router.replace("/connexion"); return; }
     // Chaque requête ne renvoie que les lignes de l'utilisateur connecté (règles RLS côté base).
-    const [profile, accounts, holdings, transactions, budgets, snapshots, trades, recurrences, debts, debtPayments] = await Promise.all([
+    const [profile, accounts, holdings, transactions, budgets, snapshots, trades, recurrences, debts, debtPayments, properties] = await Promise.all([
       sb.from("profiles").select("*").eq("id", s.session.user.id).maybeSingle(),
       sb.from("accounts").select("*").order("created_at"),
       sb.from("holdings").select("*").order("value", { ascending: false }),
@@ -64,6 +64,7 @@ function App() {
       sb.from("recurrences").select("*").order("next_date"),
       sb.from("debts").select("*").order("created_at"),
       sb.from("debt_payments").select("*").order("date", { ascending: false }),
+      sb.from("properties").select("*").order("created_at", { ascending: false }),
     ]);
     const pr = profile.data || { plan: "free" };
     pr.avatar_url = s.session.user.user_metadata?.avatar_url || null;
@@ -99,6 +100,7 @@ function App() {
       recurrences: num(recurrences.data, ["amount"]),
       recurrencesMissing: Boolean(recurrences.error),
       debts: num(debts.data, ["initial_amount", "remaining"]),
+      properties: num(properties.data, ["purchase_price", "value", "ownership_share", "mortgage_remaining", "monthly_rent", "monthly_charges", "property_tax"]),
       debtPayments: num(debtPayments.data, ["amount"]),
       debtsMissing: Boolean(debts.error),
       session: s.session,
@@ -286,6 +288,16 @@ function App() {
   }, [data?.session, data?.accounts]); // eslint-disable-line
 
   const actions = {
+    async saveProperty(row) {
+      const saved = await write("properties", row);
+      setData((d) => ({ ...d, properties: [ ...(d.properties || []).filter((x) => x.id !== saved.id), saved ] }));
+      return { message: "Bien immobilier enregistré." };
+    },
+    async deleteProperty(id) {
+      await erase("properties", { id });
+      setData((d) => ({ ...d, properties: (d.properties || []).filter((x) => x.id !== id) }));
+      return { message: "Bien immobilier supprimé." };
+    },
     notice: bankNotice || notice,
     async savePaymentPref(auto) {
       if (!demo) {
