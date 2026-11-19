@@ -720,7 +720,7 @@ function App() {
 
   if (!data) return <Boot />;
   const vue = params.get("vue");
-  return <AppView data={data} demo={demo} actions={actions} initialModal={initialModal} initialTab={["overview", "accounts", "invest", "budget", "ops", "debts", "settings"].includes(vue) ? vue : "overview"} />;
+  return <AppView data={data} demo={demo} actions={actions} initialModal={initialModal} initialTab={["overview", "accounts", "invest", "realestate", "budget", "ops", "debts", "settings"].includes(vue) ? vue : "overview"} />;
 }
 
 export default function Page() { return <Suspense fallback={<Boot />}><App /></Suspense>; }
