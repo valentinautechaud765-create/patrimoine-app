@@ -251,6 +251,7 @@ export default function Overview({ m, data, limits, go, openPlans, list, open, g
   }, [data.transactions]);
   return <>
     <NetWorth m={m} data={data} limits={limits} openPlans={openPlans} dayCurve={dayCurve} liveInfo={liveInfo} showChart={showChart} fetchHistory={fetchHistory} eurPerUsd={eurPerUsd} />
+    {!data.scoped && (m.realEstateHistoricalIndicative > 0 || m.realEstateToVerifyCount > 0) && <section className="card panel fadeIn" style={{ marginTop: 14, padding: 16 }}><div className="eyebrow">Immobilier · valeurs de référence</div><div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginTop: 6 }}><div><b style={{ fontSize: 22 }}>{money0(m.realEstateHistoricalIndicative)}</b><div className="finePrint">Valeur indicative de tes parts, d’après les valeurs de référence enregistrées</div></div><div style={{ textAlign: "right" }}><b>{m.realEstateToVerifyCount}</b><div className="finePrint">bien(s) à actualiser ou vérifier</div></div></div><div className="finePrint" style={{ marginTop: 8 }}>Montant historique indicatif, non intégré au patrimoine net confirmé. Les biens sans valeur renseignée restent exclus de ce montant.</div></section>}
     {!data.scoped && <GettingStarted data={data} open={open} go={go} />}
     <Kpis m={m} />
     <div className="grid g3">
