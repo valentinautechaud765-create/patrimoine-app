@@ -81,7 +81,7 @@ create table if not exists public.trades (
   date date not null default current_date,
   created_at timestamptz not null default now()
 );
-create index if not exists trades_holding_date on public.trades (holding_id, date);
+create index if not exists trades_holding_date on public.trades (holding_id, date);\n\n-- Lie chaque achat / vente / dividende à son mouvement de trésorerie pour le retrouver dans Opérations.\nalter table public.transactions add column if not exists trade_id uuid unique references public.trades(id) on delete cascade;\ncreate index if not exists transactions_trade_id on public.transactions (trade_id);
 
 -- Opérations automatiques (salaire, loyer, abonnements, virements…).
 -- next_date = prochaine échéance à créer ; l'appli crée les opérations dues à chaque ouverture.
