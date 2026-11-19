@@ -13,7 +13,7 @@ const fields = [
   ["mortgage_remaining","Crédit immobilier restant (€)","number"],["monthly_rent","Loyer mensuel (€)","number"],
   ["monthly_charges","Charges mensuelles (€)","number"],["property_tax","Taxe foncière annuelle (€)","number"],["note","Notes (indivision, héritiers, estimation…)","textarea"]
 ];
-export default function RealEstate({ properties=[], onSave, onDelete }) {
+export default function RealEstate({ properties=[], onSave, onDelete, isOwner=false }) {
   const [editing,setEditing]=useState(null), [form,setForm]=useState(blank), [busy,setBusy]=useState(false), [error,setError]=useState("");
   const confirmed=properties.filter(p=>p.valuation_status==="Confirmé");
   const pending=properties.filter(p=>p.valuation_status!=="Confirmé");
