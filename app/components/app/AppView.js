@@ -9,6 +9,7 @@ import { Accounts, Investments, Budget, Operations, Settings } from "./Screens.j
 import { InsightList } from "./Overview.js";
 import { HoldingSheet, TradeForm, PortfolioCurve } from "./Holding.js";
 import { Debts, DebtForm, DebtSheet, PaymentForm } from "./Debts.js";
+import RealEstate from "./RealEstate.js";
 import { RecurrenceForm } from "./Forms.js";
 import { Avatar } from "./ui.js";
 import { Modal, Head, TxForm, AccountForm, AccountSheet, BudgetForm, HoldingForm, DeleteMeModal, ImportModal } from "./Forms.js";
@@ -17,6 +18,7 @@ export const NAV = [
   { id: "overview", label: "Vue d’ensemble", short: "Accueil", icon: "home" },
   { id: "accounts", label: "Comptes", short: "Comptes", icon: "wallet" },
   { id: "invest", label: "Investissements", short: "Placements", icon: "trending" },
+  { id: "realestate", label: "Patrimoine immobilier", short: "Immobilier", icon: "home" },
   { id: "budget", label: "Budget", short: "Budget", icon: "target" },
   { id: "ops", label: "Opérations", short: "Opérations", icon: "list" },
   { id: "debts", label: "Dettes", short: "Dettes", icon: "coins" },
@@ -298,6 +300,7 @@ export default function AppView({ data, demo, embedded, initialTab = "overview",
     budget: <Budget m={m} data={data} limits={limits} openPlans={openPlans} open={open} />,
     ops: <Operations key={opsCat} data={data} query={query} setQuery={setQuery} limits={limits} openPlans={openPlans} open={open} flash={flash} initialCategory={opsCat} />,
     debts: <Debts data={data} open={open} />,
+    realestate: <RealEstate properties={data.properties || []} onSave={(row) => run(actions.saveProperty, row)} onDelete={(id) => run(actions.deleteProperty, id)} />,
     settings: <Settings data={data} demo={demo} openPlans={openPlans} managePlan={() => run(actions.managePlan)} logout={() => run(actions.logout)} resetPassword={() => run(actions.resetPassword)} saveName={(n) => run(actions.saveName, n)} saveAvatar={(f) => run(actions.saveAvatar, f)} deleteCategory={(n) => run(actions.deleteCategory, n)} importData={() => open("import")} privacy={privacy} setPrivacy={setPrivacy} deleteMe={() => open("deleteMe")} />,
   }[tab];
   const viewed = modal?.type === "accountView" ? data.accounts.find((a) => a.id === modal.id) : null;
