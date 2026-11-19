@@ -52,3 +52,9 @@ revoke execute on function public.take_net_worth_snapshots() from public, anon, 
 alter table public.properties
   add column if not exists co_owners text;
 
+
+
+-- Estimation de marché distincte de la valeur de référence notariale.
+alter table public.properties add column if not exists market_value numeric(14,2);
+alter table public.properties add column if not exists market_estimate_date date;
+alter table public.properties add column if not exists market_estimate_source text;
