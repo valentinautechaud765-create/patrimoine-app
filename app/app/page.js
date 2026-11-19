@@ -237,7 +237,7 @@ function App() {
       const total = Math.round(computeModel(live.current).total * 100) / 100, date = new Date().toISOString().slice(0, 10);
       supabaseBrowser().from("net_worth_snapshots").upsert({ user_id: user, date, total }).then(() => {});
     }, 1500);
-  }, [data?.accounts, data?.holdings, demo, user]); // eslint-disable-line
+  }, [data?.accounts, data?.holdings, data?.properties, demo, user]); // eslint-disable-line
 
   // Opérations automatiques : à chaque ouverture, on crée les échéances arrivées (une seule fois chacune,
   // grâce au lien recurrence_id + date). Le solde des comptes saisis à la main suit.
