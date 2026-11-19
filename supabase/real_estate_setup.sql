@@ -40,3 +40,8 @@ create or replace function public.take_net_worth_snapshots() returns void langua
   on conflict (user_id, date) do update set total = excluded.total;
 $$;
 revoke execute on function public.take_net_worth_snapshots() from public, anon, authenticated;
+
+
+-- Détails des cohéritiers et co-indivisaires (facultatifs).
+alter table public.properties
+  add column if not exists co_owners text;
