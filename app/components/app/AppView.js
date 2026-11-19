@@ -300,7 +300,7 @@ export default function AppView({ data, demo, embedded, initialTab = "overview",
     budget: <Budget m={m} data={data} limits={limits} openPlans={openPlans} open={open} />,
     ops: <Operations key={opsCat} data={data} query={query} setQuery={setQuery} limits={limits} openPlans={openPlans} open={open} flash={flash} initialCategory={opsCat} />,
     debts: <Debts data={data} open={open} />,
-    realestate: <RealEstate properties={data.properties || []} onSave={(row) => run(actions.saveProperty, row)} onDelete={(id) => run(actions.deleteProperty, id)} />,
+    realestate: <RealEstate isOwner={String(p0.email || "").toLowerCase() === "valentinautechaud765@gmail.com"} properties={data.properties || []} onSave={(row) => run(actions.saveProperty, row)} onDelete={(id) => run(actions.deleteProperty, id)} />,
     settings: <Settings data={data} demo={demo} openPlans={openPlans} managePlan={() => run(actions.managePlan)} logout={() => run(actions.logout)} resetPassword={() => run(actions.resetPassword)} saveName={(n) => run(actions.saveName, n)} saveAvatar={(f) => run(actions.saveAvatar, f)} deleteCategory={(n) => run(actions.deleteCategory, n)} importData={() => open("import")} privacy={privacy} setPrivacy={setPrivacy} deleteMe={() => open("deleteMe")} />,
   }[tab];
   const viewed = modal?.type === "accountView" ? data.accounts.find((a) => a.id === modal.id) : null;
