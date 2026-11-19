@@ -46,6 +46,3 @@ revoke execute on function public.take_net_worth_snapshots() from public, anon, 
 alter table public.properties
   add column if not exists co_owners text;
 
-
--- Statut de vérification des valeurs : seuls les biens confirmés entrent dans le patrimoine global.
-alter table public.properties add column if not exists valuation_status text not null default 'À vérifier' check (valuation_status in ('À vérifier','À actualiser','Confirmé'));
