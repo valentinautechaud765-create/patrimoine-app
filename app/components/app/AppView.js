@@ -304,7 +304,7 @@ export default function AppView({ data, demo, embedded, initialTab = "overview",
   const viewedDebt = modal?.type === "debtView" || modal?.type === "debtPay" ? (data.debts || []).find((d) => d.id === modal.id) : null;
   const holdingOf = (id) => liveData.holdings.find((h) => h.id === id);
   const viewedH = modal?.type === "holdingView" || modal?.type === "trade" ? holdingOf(modal.id) : null;
-  const tradesOf = (id) => (data.trades || []).filter((t) => t.holding_id === id);
+  const tradesOf = (id) => (data.trades || []).filter((t) => t.holding_id === id).map((t) => ({ ...t, account_id: data.transactions.find((x) => x.trade_id === t.id)?.account_id || "" }));
 
   if (access.locked && !demo && !embedded) return <>
     <Paywall data={data} m={m} onChoose={(pl, b) => run(actions.checkout, pl, b)} logout={() => run(actions.logout)} deleteMe={() => open("deleteMe")} virement={virementApi} />
@@ -378,7 +378,7 @@ export default function AppView({ data, demo, embedded, initialTab = "overview",
       {modal?.type === "holding" && <HoldingForm holding={modal.holding} onClose={close} onSave={(h) => run(actions.saveHolding, h)} onDelete={(h) => run(actions.deleteHolding, h)} />}
       {modal?.type === "import" && <ImportModal email={email} onClose={close} onImport={(f) => run(actions.importMonPatrimoine, f)} />}
       {modal?.type === "holdingView" && viewedH && <HoldingSheet holding={viewedH} trades={tradesOf(viewedH.id)} tradesMissing={data.tradesMissing} fetchHistory={actions.fetchHistory} onClose={close} onEdit={() => open("holding", { holding: data.holdings.find((h) => h.id === viewedH.id) })} onTrade={(type) => open("trade", { id: viewedH.id, tradeType: type })} onOpenTrade={(t) => open("trade", { id: viewedH.id, trade: t })} />}
-      {modal?.type === "trade" && viewedH && <TradeForm holding={viewedH} trade={modal.trade} initialType={modal.tradeType} eurPerUsd={market.eurPerUsd} onClose={() => open("holdingView", { id: viewedH.id })} onSave={(t) => run(actions.saveTrade, t)} onDelete={(t) => run(actions.deleteTrade, t)} />}
+      {modal?.type === "trade" && viewedH && <TradeForm holding={viewedH} trade={modal.trade} initialType={modal.tradeType} eurPerUsd={market.eurPerUsd} accounts={data.accounts.filter((a) => !a.hidden)} onClose={() => open("holdingView", { id: viewedH.id })} onSave={(t) => run(actions.saveTrade, t)} onDelete={(t) => run(actions.deleteTrade, t)} />}
       {modal?.type === "recurrence" && <RecurrenceForm rec={modal.rec} accounts={data.accounts} missing={data.recurrencesMissing} onClose={close} onSave={(r) => run(actions.saveRecurrence, r)} onDelete={(r) => run(actions.deleteRecurrence, r)} onAddCategory={(c) => run(actions.addCategory, c)} />}
       {modal?.type === "debt" && <DebtForm debt={modal.debt} onClose={close} onSave={(d) => run(actions.saveDebt, d)} onDelete={(d) => run(actions.deleteDebt, d)} />}
       {modal?.type === "debtView" && viewedDebt && <DebtSheet debt={viewedDebt} payments={(data.debtPayments || []).filter((p) => p.debt_id === viewedDebt.id)} onClose={close} onEdit={() => open("debt", { debt: viewedDebt })} onPay={() => open("debtPay", { id: viewedDebt.id })} onDeletePayment={(p) => run(actions.deleteDebtPayment, p)} />}
