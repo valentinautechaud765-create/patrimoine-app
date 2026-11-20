@@ -23,9 +23,24 @@ export function AreaChart({ points, height = 200, children, color: forced, fade,
       return { value, y: yFor(value) };
     }) : [];
     const zeroY = scaleLabels && lo <= 0 && hi >= 0 ? yFor(0) : null;
-    // Segments directs : la courbe suit exactement les valeurs mesurées, sans overshoot de lissage.
-    const d = xy.map(([x, y], i) => `${i ? "L" : "M"}${x.toFixed(1)},${y.toFixed(2)}`).join(" ");
-    return { pts, xy, line: d, fill: d + " L" + (plotLeft + plotWidth) + ",104 L" + plotLeft + ",104 Z", scaleTicks, zeroY, plotLeft };
+    // Courbe cubique monotone : arrondit les changements de direction sans créer de
+    // dépassement au-dessus / en dessous des points réellement mesurés.
+    const slopes = xy.slice(0, -1).map((point, i) => point[0] === xy[i + 1][0] ? 0 : (xy[i + 1][1] - point[1]) / (xy[i + 1][0] - point[0]));
+    const tangents = xy.map((_, i) => {
+      if (i === 0) return slopes[0] || 0;
+      if (i === xy.length - 1) return slopes[slopes.length - 1] || 0;
+      const prev = slopes[i - 1], next = slopes[i];
+      if (!prev || !next || Math.sign(prev) !== Math.sign(next)) return 0;
+      return 2 * prev * next / (prev + next);
+    });
+    const d = xy.map(([x, y], i) => {
+      if (!i) return `M${x.toFixed(1)},${y.toFixed(2)}`;
+      const [px, py] = xy[i - 1], dx = x - px;
+      const c1y = py + tangents[i - 1] * dx / 3;
+      const c2y = y - tangents[i] * dx / 3;
+      return `C${(px + dx / 3).toFixed(1)},${c1y.toFixed(2)} ${(x - dx / 3).toFixed(1)},${c2y.toFixed(2)} ${x.toFixed(1)},${y.toFixed(2)}`;
+    }).join(" ");
+    return { pts, xy, tangents, line: d, fill: d + " L" + (plotLeft + plotWidth) + ",104 L" + plotLeft + ",104 Z", scaleTicks, zeroY, plotLeft };
   }, [points]);
   const up = geo.pts.length < 2 || geo.pts[geo.pts.length - 1].value >= geo.pts[0].value;
   const color = forced || (up ? "#3d7cff" : "#ff6b7a");
@@ -46,7 +61,11 @@ export function AreaChart({ points, height = 200, children, color: forced, fade,
   };
   const activePoint = a ? { ...a, ...Object.fromEntries(Object.keys(a).filter((key) => typeof a[key] === "number" && typeof b?.[key] === "number").map((key) => [key, Number(a[key]) + (Number(b[key]) - Number(a[key])) * t])), value: Number(a.value) + (Number(b?.value ?? a.value) - Number(a.value)) * t, date: interpolateDate() } : null;
   const pa = geo.xy[i], pb = geo.xy[j];
-  const p = pa && pb ? [pa[0] + (pb[0] - pa[0]) * t, pa[1] + (pb[1] - pa[1]) * t] : pa;
+  const p = pa && pb ? (() => {
+    const dx = pb[0] - pa[0], u = t, m0 = geo.tangents?.[i] || 0, m1 = geo.tangents?.[j] || 0;
+    const c1 = pa[1] + m0 * dx / 3, c2 = pb[1] - m1 * dx / 3, v = 1 - u;
+    return [pa[0] + dx * u, v * v * v * pa[1] + 3 * v * v * u * c1 + 3 * v * u * u * c2 + u * u * u * pb[1]];
+  })() : pa;
   return <>
     {children && children(activePoint || geo.pts[i], geo.pts[0], hover != null)}
     <div className={"area" + (fade ? " fade" : "")} ref={box} style={{ height }} onPointerDown={pick} onPointerMove={(e) => (e.pointerType === "mouse" || e.buttons) && pick(e)} onPointerLeave={(e) => e.pointerType === "mouse" && setHover(null)} onPointerUp={(e) => { if (e.pointerType !== "mouse") timer.current = setTimeout(() => setHover(null), 2200); }}>
