@@ -70,6 +70,10 @@ function NetWorth({ m, data, limits, openPlans, dayCurve, liveInfo, showChart = 
           return <button key={l} className={l === current[0] ? "on" : ""} onClick={() => lock ? openPlans("plus") : setLabel(l)}>{l === "1J" && <i className="liveDot" />}{l}{lock && <Icon name="lock" size={11} style={{ marginLeft: 4, opacity: 0.6 }} />}</button>;
         })}
       </div>
+      {(barParts.length > 0 || m.owed > 0 || m.due > 0) && <div className="mix">
+        <div className="mixBar">{barParts.map((p) => <i key={p.label} style={{ width: (p.value / sumParts) * 100 + "%", background: p.color }} />)}</div>
+        <div className="mixLegend">{parts.map((p) => <span key={p.label}><i className="dot" style={{ background: p.color }} />{p.label}<b className={p.value < 0 ? "bad" : ""}>{p.value < 0 ? "−" + money0(-p.value) : money0(p.value)}</b></span>)}{m.owed > 0 && <span><i className="dot" style={{ background: "var(--bad)" }} />Dettes<b>−{money0(m.owed)}</b></span>}{m.due > 0 && <span><i className="dot" style={{ background: "var(--ok)" }} />On me doit<b>{money0(m.due)}</b></span>}</div>
+      </div>}
     </section>
   );
 }
