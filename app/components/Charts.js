@@ -2,7 +2,7 @@
 import { useId, useMemo, useRef, useState } from "react";
 
 // Courbe principale : l'en-tête (render prop) reçoit le point survolé.
-export function AreaChart({ points, height = 200, children, color: forced, fade, scaleLabels = false, markers = [] }) {
+export function AreaChart({ points, height = 200, children, color: forced, fade, scaleLabels = false, markers = [], onMarkerClick }) {
   const [hover, setHover] = useState(null);
   const gid = "ag" + useId().replace(/:/g, "");
   const box = useRef(null), raf = useRef(0), timer = useRef(0);
@@ -93,8 +93,8 @@ export function AreaChart({ points, height = 200, children, color: forced, fade,
         });
         const sameDay = markers.slice(0, mi).filter((m) => String(m.date).slice(0, 10) === String(marker.date).slice(0, 10)).length;
         const markerColor = marker.type === "Achat" ? "#2ee59d" : marker.type === "Vente" ? "#ff6b7a" : "#ffb454";
-        return <span key={marker.id || mi} title={marker.title} aria-label={marker.title}
-          style={{ position: "absolute", zIndex: 5, left: (nearest / (geo.pts.length - 1) * 100) + "%", top: (geo.xy[nearest][1] / 104 * 100 + (sameDay % 3) * 2) + "%", transform: "translate(-50%, -50%)", width: 9, height: 9, borderRadius: "50%", background: markerColor, border: "2px solid #101827", boxShadow: "0 0 0 1px " + markerColor, pointerEvents: "auto" }} />;
+        return <button type="button" key={marker.id || mi} title={marker.title} aria-label={marker.title} onClick={() => onMarkerClick?.(marker)}
+          style={{ position: "absolute", zIndex: 6, cursor: "pointer", padding: 0, left: (nearest / (geo.pts.length - 1) * 100) + "%", top: (geo.xy[nearest][1] / 104 * 100 + (sameDay % 3) * 2) + "%", transform: "translate(-50%, -50%)", width: 12, height: 12, borderRadius: "50%", background: markerColor, border: "2px solid #101827", boxShadow: "0 0 0 1px " + markerColor, pointerEvents: "auto" }} />;
       })}
       {p && (hover != null || !fade) && <span className={"areaDot" + (hover == null ? " live" : "")} style={{ left: p[0] / 10 + "%", top: (p[1] / 104) * 100 + "%", "--c": color }} />}
       {hover != null && p && <span className="areaRule" style={{ left: p[0] / 10 + "%" }} />}
