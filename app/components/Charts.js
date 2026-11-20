@@ -37,8 +37,11 @@ export function AreaChart({ points, height = 200, children, color: forced, fade 
     <div className={"area" + (fade ? " fade" : "")} ref={box} style={{ height }} onPointerDown={pick} onPointerMove={(e) => (e.pointerType === "mouse" || e.buttons) && pick(e)} onPointerLeave={(e) => e.pointerType === "mouse" && setHover(null)} onPointerUp={(e) => { if (e.pointerType !== "mouse") timer.current = setTimeout(() => setHover(null), 2200); }}>
       <svg viewBox="0 0 1000 104" preserveAspectRatio="none" role="img" aria-label="Évolution">
         <defs><linearGradient id={gid} x1="0" x2="0" y1="0" y2="1"><stop offset="0" stopColor={color} stopOpacity={fade ? ".2" : ".32"} /><stop offset=".75" stopColor={color} stopOpacity={fade ? ".02" : ".04"} /><stop offset="1" stopColor={color} stopOpacity="0" /></linearGradient></defs>
+        <pattern id={gid + "grid"} width="1000" height="26" patternUnits="userSpaceOnUse"><path d="M0 25.5H1000" stroke="rgba(255,255,255,.10)" strokeWidth="1" vectorEffect="non-scaling-stroke" /></pattern>
+        <path d="M0 0H1000V104H0Z" fill={`url(#${gid}grid)`} />
         <path d={geo.fill} fill={`url(#${gid})`} />
-        <path d={geo.line} fill="none" stroke={color} strokeWidth="2.2" vectorEffect="non-scaling-stroke" strokeLinecap="round" />
+        <path d={geo.line} fill="none" stroke={color} strokeWidth="7" opacity=".16" vectorEffect="non-scaling-stroke" strokeLinecap="round" />
+        <path d={geo.line} fill="none" stroke={color} strokeWidth="3" vectorEffect="non-scaling-stroke" strokeLinecap="round" />
       </svg>
       {p && (hover != null || !fade) && <span className={"areaDot" + (hover == null ? " live" : "")} style={{ left: p[0] / 10 + "%", top: (p[1] / 104) * 100 + "%", "--c": color }} />}
       {hover != null && p && <span className="areaRule" style={{ left: p[0] / 10 + "%" }} />}
