@@ -44,7 +44,7 @@ function NetWorth({ m, data, limits, openPlans, dayCurve, liveInfo, showChart = 
   const axis = points.length > 1 ? [points[0], points[Math.floor((points.length - 1) / 2)], points[points.length - 1]].map((p) => axisLabel(p.date)) : null;
   return (
     <section className="netWorth heroOpen fadeIn">
-      <AreaChart points={points} height={showChart ? 200 : 0} fade>
+      <AreaChart points={points} height={showChart ? 250 : 0} fade>
         {(pt, first, hovering) => {
           const delta = pt.value - first.value, rel = first.value ? (delta / Math.abs(first.value)) * 100 : 0;
           return <div className="nwTop">
