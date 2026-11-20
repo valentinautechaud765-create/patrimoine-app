@@ -346,7 +346,7 @@ export function PortfolioCurve({ holdings, trades = [], intraday, eurPerUsd, fet
     {periodsBar}
     {events.length > 0 && <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginTop: 12 }}>
       <span className="finePrint" style={{ margin: "2px 5px 0 0" }}>Transactions :</span>
-      {events.slice(-10).reverse().map((t) => <button type="button" key={t.id} title={t.title} onClick={() => { setSelectedTradeId(t.id); setSelectedTradePosition({ x: 72, y: 42 }); }} className="chip" style={{ fontSize: 11, border: "1px solid " + (t.type === "Achat" ? "rgba(46,229,157,.35)" : t.type === "Vente" ? "rgba(255,107,122,.35)" : "rgba(255,180,84,.35)"), color: t.type === "Achat" ? "#2ee59d" : t.type === "Vente" ? "#ff6b7a" : "#ffb454" }}>
+      {events.slice(-3).reverse().map((t) => <button type="button" key={t.id} title={t.title} onClick={() => { setSelectedTradeId(t.id); setSelectedTradePosition({ x: 72, y: 42 }); }} className="chip" style={{ fontSize: 11, border: "1px solid " + (t.type === "Achat" ? "rgba(46,229,157,.35)" : t.type === "Vente" ? "rgba(255,107,122,.35)" : "rgba(255,180,84,.35)"), color: t.type === "Achat" ? "#2ee59d" : t.type === "Vente" ? "#ff6b7a" : "#ffb454" }}>
         {t.type} · {t.holdingName} · {String(t.date).slice(5).split("-").reverse().join("/")} · {money(Math.abs(Number(t.amount) || 0), "EUR")}
       </button>)}
     </div>}
