@@ -45,6 +45,10 @@ create table if not exists public.holdings (
   currency text not null default 'EUR',
   updated_at timestamptz not null default now()
 );
+-- Écarts de rapprochement courtier : séparés des transactions historiques, sans inventer d'achat/vente.
+alter table public.holdings add column if not exists quantity_adjustment numeric(20,8) not null default 0;
+alter table public.holdings add column if not exists cost_basis_adjustment numeric(14,2) not null default 0;
+alter table public.holdings add column if not exists realized_adjustment numeric(14,2) not null default 0;
 
 create table if not exists public.transactions (
   id uuid primary key default gen_random_uuid(),
