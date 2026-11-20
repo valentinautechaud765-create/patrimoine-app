@@ -113,7 +113,8 @@ export function TradeForm({ holding: h, trade, initialType = "Achat", eurPerUsd,
   const [type, setType] = useState(trade?.type || initialType);
   const [quantity, setQuantity] = useState(str(trade?.quantity)), [manualQuantity, setManualQuantity] = useState(false);
   const [price, setPrice] = useState(str(trade?.price ?? h.live?.price ?? (Number(h.quantity) > 0 ? Math.round((h.value / h.quantity) * 10000) / 10000 : ""))), [fees, setFees] = useState(str(trade?.fees ?? 0));
-  const [amount, setAmount] = useState(str(trade?.settlement_amount ?? trade?.amount)), [date, setDate] = useState(trade?.date || todayISO()), [busy, setBusy] = useState(false);
+  const [amount, setAmount] = useState(str(trade?.settlement_amount ?? trade?.amount)), [amountEdited, setAmountEdited] = useState(false);
+  const [date, setDate] = useState(trade?.date || todayISO()), [busy, setBusy] = useState(false);
   const [accountId, setAccountId] = useState(trade?.account_id || "");
   const p = num(price), f = num(fees) || 0, enteredAmount = num(amount), held = Number(h.quantity) + (editing && trade.type === "Vente" ? Number(trade.quantity) : 0) - (editing && trade.type === "Achat" ? Number(trade.quantity) : 0);
   // Le montant saisi suit la devise de règlement ; le montant comptable reste normalisé en euros.
@@ -121,11 +122,14 @@ export function TradeForm({ holding: h, trade, initialType = "Achat", eurPerUsd,
   const calculatedQuantity = p > 0 && fx && enteredEur !== null
     ? Math.max(0, (enteredEur - (type === "Achat" ? f : -f)) / (p * fx)) : 0;
   const q = type === "Dividende" ? 0 : manualQuantity ? num(quantity) : calculatedQuantity;
-  const eur = type === "Dividende" ? enteredEur : manualQuantity
-    ? (fx ? Math.round((q * p * fx + (type === "Achat" ? f : -f)) * 100) / 100 : null)
+  // En édition, corriger la quantité ne doit jamais réécrire le montant payé
+  // ni le prix unitaire : les trois valeurs peuvent différer légèrement
+  // à cause des arrondis du courtier (fraction d'action).
+  const eur = type === "Dividende" ? enteredEur
+    : editing && !amountEdited ? Number(trade.amount)
     : enteredEur;
-  const displayedAmount = manualQuantity && eur !== null && settlementFx ? eur / settlementFx : amount;
-  const settlementAmount = eur !== null && settlementFx ? eur / settlementFx : null;
+  const displayedAmount = amount;
+  const settlementAmount = editing && !amountEdited ? Number(trade.settlement_amount ?? enteredAmount) : enteredAmount;
   const tooMuch = type === "Vente" && q > held + 1e-8;
   const ok = type === "Dividende" ? eur > 0 : q > 0 && p > 0 && eur > 0 && !tooMuch;
   return <Modal onClose={onClose}>
@@ -140,8 +144,8 @@ export function TradeForm({ holding: h, trade, initialType = "Achat", eurPerUsd,
         <label className="amountField"><span className="ok">+</span><input inputMode="decimal" placeholder="0,00" value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^\d.,]/g, ""))} autoFocus aria-label="Montant reçu" /><span>{settlementCurrency === "USD" ? "$" : "€"}</span></label>
         <p className="formHint"><Icon name="info" size={14} />Montant net reçu sur votre compte.</p>
       </> : <>
-        <label className="amountField"><span>{type === "Achat" ? "−" : "+"}</span><input inputMode="decimal" placeholder="0,00" value={String(displayedAmount ?? "").replace(".", ",")} onChange={(e) => { setAmount(e.target.value.replace(/[^\d.,]/g, "")); setManualQuantity(false); }} autoFocus aria-label="Montant" /><span>{settlementCurrency === "USD" ? "$" : "€"}</span></label>
-        <label className="label">Quantité de parts (modifiable)<input className="input" inputMode="decimal" value={manualQuantity ? quantity : (q > 0 ? String(Number(q.toFixed(8))) : quantity)} onChange={(e) => { setQuantity(e.target.value.replace(/[^\d.,]/g, "")); setManualQuantity(true); }} aria-label="Quantité de parts" /><small className="muted">Calculée automatiquement à partir du montant et du cours. Tu peux la corriger : le montant sera alors recalculé.</small></label>
+        <label className="amountField"><span>{type === "Achat" ? "−" : "+"}</span><input inputMode="decimal" placeholder="0,00" value={String(displayedAmount ?? "").replace(".", ",")} onChange={(e) => { setAmount(e.target.value.replace(/[^\d.,]/g, "")); setAmountEdited(true); setManualQuantity(false); }} autoFocus aria-label="Montant" /><span>{settlementCurrency === "USD" ? "$" : "€"}</span></label>
+        <label className="label">Quantité de parts (modifiable)<input className="input" inputMode="decimal" value={manualQuantity ? quantity : (q > 0 ? String(Number(q.toFixed(8))) : quantity)} onChange={(e) => { setQuantity(e.target.value.replace(/[^\d.,]/g, "")); setManualQuantity(true); }} aria-label="Quantité de parts" /><small className="muted">{editing ? "Tu peux corriger la quantité sans modifier le montant payé ni le prix unitaire d'origine." : "Calculée automatiquement à partir du montant et du cours. Tu peux aussi la corriger sans changer le montant saisi."}</small></label>
         <label className="label">Devise du règlement<select className="input" value={settlementCurrency} onChange={(e) => { setSettlementCurrency(e.target.value); setManualQuantity(false); }}><option value="EUR">Euro (€)</option><option value="USD">Dollar américain ($)</option></select></label>
         {settlementCurrency === "USD" && !settlementFx && <p className="formHint"><Icon name="info" size={14} />Taux EUR/USD indisponible : impossible de convertir ce règlement sans inventer de montant.</p>}
         <div className="grid g2" style={{ gap: 12 }}>
@@ -150,7 +154,7 @@ export function TradeForm({ holding: h, trade, initialType = "Achat", eurPerUsd,
         </div>
         {eur !== null && settlementCurrency === "USD" && <p className="formHint"><Icon name="info" size={14} />Équivalent comptabilisé : {money(eur)}. Le cours de l’action reste coté en {currency}.</p>}
         {currency === "USD" && !fx && <p className="formHint"><Icon name="info" size={14} />Cours de conversion EUR/USD indisponible : quantité et contre-valeur non calculées.</p>}
-        {q > 0 && <p className="formHint"><Icon name="info" size={14} />{manualQuantity ? `Montant recalculé : ${money(displayedAmount, settlementCurrency)} frais compris.` : `Soit ${q.toLocaleString("fr-FR", { maximumFractionDigits: 8 })} part(s).`}</p>}
+        {q > 0 && <p className="formHint"><Icon name="info" size={14} />{manualQuantity ? `Quantité corrigée : ${q.toLocaleString("fr-FR", { maximumFractionDigits: 8 })} part(s). Montant conservé : ${money(displayedAmount, settlementCurrency)}.` : `Soit ${q.toLocaleString("fr-FR", { maximumFractionDigits: 8 })} part(s).`}</p>}
         {tooMuch && <div className="msg err">Vous ne pouvez pas vendre plus que les {held.toLocaleString("fr-FR", { maximumFractionDigits: 8 })} part(s) détenues.</div>}
       </>}
       <label className="label">Compte bancaire de règlement <span className="muted">(facultatif)</span><select className="input" value={accountId} onChange={(e) => setAccountId(e.target.value)}><option value="">Aucun compte — ne pas rattacher</option>{accounts.map((a) => <option key={a.id} value={a.id}>{a.name}{a.institution ? " · " + a.institution : ""}</option>)}</select></label>
