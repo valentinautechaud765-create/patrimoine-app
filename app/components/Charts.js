@@ -23,14 +23,9 @@ export function AreaChart({ points, height = 200, children, color: forced, fade,
       return { value, y: yFor(value) };
     }) : [];
     const zeroY = scaleLabels && lo <= 0 && hi >= 0 ? yFor(0) : null;
-    // Courbe lissée (Catmull-Rom → Bézier)
-    let d = `M${xy[0][0]},${xy[0][1]}`;
-    for (let i = 0; i < xy.length - 1; i++) {
-      const p0 = xy[i - 1] || xy[i], p1 = xy[i], p2 = xy[i + 1], p3 = xy[i + 2] || p2;
-      const c1 = [p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6], c2 = [p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6];
-      d += ` C${c1[0].toFixed(1)},${c1[1].toFixed(2)} ${c2[0].toFixed(1)},${c2[1].toFixed(2)} ${p2[0].toFixed(1)},${p2[1].toFixed(2)}`;
-    }
-    return { pts, xy, line: d, fill: d + " L1000,104 L" + plotLeft + ",104 Z", scaleTicks, zeroY, plotLeft };
+    // Segments directs : la courbe suit exactement les valeurs mesurées, sans overshoot de lissage.
+    const d = xy.map(([x, y], i) => `${i ? "L" : "M"}${x.toFixed(1)},${y.toFixed(2)}`).join(" ");
+    return { pts, xy, line: d, fill: d + " L" + (plotLeft + plotWidth) + ",104 L" + plotLeft + ",104 Z", scaleTicks, zeroY, plotLeft };
   }, [points]);
   const up = geo.pts.length < 2 || geo.pts[geo.pts.length - 1].value >= geo.pts[0].value;
   const color = forced || (up ? "#3d7cff" : "#ff6b7a");
@@ -53,13 +48,14 @@ export function AreaChart({ points, height = 200, children, color: forced, fade,
   const pa = geo.xy[i], pb = geo.xy[j];
   const p = pa && pb ? [pa[0] + (pb[0] - pa[0]) * t, pa[1] + (pb[1] - pa[1]) * t] : pa;
   return <>
-    {children && children(geo.pts[i], geo.pts[0], hover != null)}
+    {children && children(activePoint || geo.pts[i], geo.pts[0], hover != null)}
     <div className={"area" + (fade ? " fade" : "")} ref={box} style={{ height }} onPointerDown={pick} onPointerMove={(e) => (e.pointerType === "mouse" || e.buttons) && pick(e)} onPointerLeave={(e) => e.pointerType === "mouse" && setHover(null)} onPointerUp={(e) => { if (e.pointerType !== "mouse") timer.current = setTimeout(() => setHover(null), 2200); }}>
       <svg viewBox="0 0 1000 104" preserveAspectRatio="none" role="img" aria-label="Évolution">
         <defs><linearGradient id={gid} x1="0" x2="0" y1="0" y2="1"><stop offset="0" stopColor={color} stopOpacity={fade ? ".2" : ".32"} /><stop offset=".75" stopColor={color} stopOpacity={fade ? ".02" : ".04"} /><stop offset="1" stopColor={color} stopOpacity="0" /></linearGradient></defs>
         
         {scaleLabels && geo.scaleTicks?.map((t, n) => <g key={n}>
-          <text x="4" y={Math.max(10, Math.min(100, t.y + 3))} fill="rgba(255,255,255,.68)" fontSize="19">{new Intl.NumberFormat("fr-FR", { notation: "compact", maximumFractionDigits: 1 }).format(t.value)} €</text>
+          <line x1={geo.plotLeft} x2="1000" y1={t.y} y2={t.y} stroke="rgba(255,255,255,.11)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+          <text x="4" y={Math.max(10, Math.min(100, t.y + 3))} fill="rgba(255,255,255,.72)" fontSize="17">{new Intl.NumberFormat("fr-FR", { notation: "compact", maximumFractionDigits: 1 }).format(t.value)} €</text>
         </g>)}
         {scaleLabels && geo.zeroY != null && <line x1={geo.plotLeft} x2="1000" y1={geo.zeroY} y2={geo.zeroY} stroke="rgba(255,255,255,.42)" strokeWidth="1.5" strokeDasharray="7 6" vectorEffect="non-scaling-stroke" />}
         <path d={geo.fill} fill={`url(#${gid})`} />
@@ -80,7 +76,7 @@ export function AreaChart({ points, height = 200, children, color: forced, fade,
         const sameDay = markers.slice(0, mi).filter((m) => String(m.date).slice(0, 10) === String(marker.date).slice(0, 10)).length;
         const markerColor = marker.type === "Achat" ? "#2ee59d" : marker.type === "Vente" ? "#ff6b7a" : "#ffb454";
         return <span key={marker.id || mi} title={marker.title} aria-label={marker.title}
-          style={{ position: "absolute", zIndex: 5, left: (nearest / (geo.pts.length - 1) * 100) + "%", top: (78 + (sameDay % 3) * 7) + "%", transform: "translate(-50%, -50%)", width: 9, height: 9, borderRadius: "50%", background: markerColor, border: "2px solid #101827", boxShadow: "0 0 0 1px " + markerColor, pointerEvents: "auto" }} />;
+          style={{ position: "absolute", zIndex: 5, left: (nearest / (geo.pts.length - 1) * 100) + "%", top: (geo.xy[nearest][1] / 104 * 100 + (sameDay % 3) * 2) + "%", transform: "translate(-50%, -50%)", width: 9, height: 9, borderRadius: "50%", background: markerColor, border: "2px solid #101827", boxShadow: "0 0 0 1px " + markerColor, pointerEvents: "auto" }} />;
       })}
       {p && (hover != null || !fade) && <span className={"areaDot" + (hover == null ? " live" : "")} style={{ left: p[0] / 10 + "%", top: (p[1] / 104) * 100 + "%", "--c": color }} />}
       {hover != null && p && <span className="areaRule" style={{ left: p[0] / 10 + "%" }} />}
