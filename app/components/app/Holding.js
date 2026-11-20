@@ -243,7 +243,7 @@ export function PortfolioCurve({ holdings, trades = [], intraday, eurPerUsd, fet
   if (!symbols.length) return null;
   const periodsBar = <div className="seg heroPeriods">{PERIODS.map((p) => <button key={p} className={p === period ? "on" : ""} onClick={() => setPeriod(p)}>{p === "1J" && <i className="liveDot" />}{p}</button>)}</div>;
   return <section className="netWorth heroOpen portfolioCurve fadeIn">
-    {points && points.length > 1 ? <AreaChart points={points} height={180} fade markers={events}>
+    {points && points.length > 1 ? <AreaChart points={points} height={220} fade markers={events} scaleLabels>
       {(pt, first, hovering) => {
         const d = pt.value - first.value, rel = first.value ? (d / first.value) * 100 : 0;
         return <div className="nwTop">
