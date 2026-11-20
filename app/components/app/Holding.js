@@ -105,7 +105,8 @@ export function HoldingSheet({ holding: h, trades, tradesMissing, fetchHistory, 
 /* ---------- Achat / vente / dividende ---------- */
 export function TradeForm({ holding: h, trade, initialType = "Achat", eurPerUsd, accounts = [], onClose, onSave, onDelete }) {
   const editing = Boolean(trade?.id);
-  const currency = trade?.currency || h.live?.currency || h.currency || "EUR";
+  // La devise du cours actuel prime sur l’ancienne devise enregistrée (ex. AAPL coté en USD).
+  const currency = h.live?.currency || trade?.currency || h.currency || "EUR";
   const fx = currency === "USD" ? (eurPerUsd || null) : 1;
   const [settlementCurrency, setSettlementCurrency] = useState(trade?.settlement_currency || "EUR");
   const settlementFx = settlementCurrency === "USD" ? (eurPerUsd || null) : 1;
