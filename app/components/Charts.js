@@ -57,8 +57,7 @@ export function AreaChart({ points, height = 200, children, color: forced, fade,
     <div className={"area" + (fade ? " fade" : "")} ref={box} style={{ height }} onPointerDown={pick} onPointerMove={(e) => (e.pointerType === "mouse" || e.buttons) && pick(e)} onPointerLeave={(e) => e.pointerType === "mouse" && setHover(null)} onPointerUp={(e) => { if (e.pointerType !== "mouse") timer.current = setTimeout(() => setHover(null), 2200); }}>
       <svg viewBox="0 0 1000 104" preserveAspectRatio="none" role="img" aria-label="Évolution">
         <defs><linearGradient id={gid} x1="0" x2="0" y1="0" y2="1"><stop offset="0" stopColor={color} stopOpacity={fade ? ".2" : ".32"} /><stop offset=".75" stopColor={color} stopOpacity={fade ? ".02" : ".04"} /><stop offset="1" stopColor={color} stopOpacity="0" /></linearGradient></defs>
-        <pattern id={gid + "grid"} width="1000" height="26" patternUnits="userSpaceOnUse"><path d="M0 25.5H1000" stroke="rgba(255,255,255,.10)" strokeWidth="1" vectorEffect="non-scaling-stroke" /></pattern>
-        <path d="M0 0H1000V104H0Z" fill={`url(#${gid}grid)`} />
+        
         {scaleLabels && geo.scaleTicks?.map((t, n) => <g key={n}>
           <text x="4" y={Math.max(10, Math.min(100, t.y + 3))} fill="rgba(255,255,255,.68)" fontSize="19">{new Intl.NumberFormat("fr-FR", { notation: "compact", maximumFractionDigits: 1 }).format(t.value)} €</text>
         </g>)}
