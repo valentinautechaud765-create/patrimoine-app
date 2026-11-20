@@ -2,7 +2,7 @@
 import { useId, useMemo, useRef, useState } from "react";
 
 // Courbe principale : l'en-tête (render prop) reçoit le point survolé.
-export function AreaChart({ points, height = 200, children, color: forced, fade, scaleLabels = false }) {
+export function AreaChart({ points, height = 200, children, color: forced, fade, scaleLabels = false, markers = [] }) {
   const [hover, setHover] = useState(null);
   const gid = "ag" + useId().replace(/:/g, "");
   const box = useRef(null), raf = useRef(0), timer = useRef(0);
@@ -66,6 +66,22 @@ export function AreaChart({ points, height = 200, children, color: forced, fade,
         <path d={geo.line} fill="none" stroke={color} strokeWidth="7" opacity=".16" vectorEffect="non-scaling-stroke" strokeLinecap="round" />
         <path d={geo.line} fill="none" stroke={color} strokeWidth="3" vectorEffect="non-scaling-stroke" strokeLinecap="round" />
       </svg>
+      {markers.map((marker, mi) => {
+        if (geo.pts.length < 2) return null;
+        const target = Date.parse(marker.date);
+        if (!Number.isFinite(target)) return null;
+        let nearest = 0, distance = Infinity;
+        geo.pts.forEach((point, index) => {
+          const stamp = Date.parse(point.date);
+          if (!Number.isFinite(stamp)) return;
+          const delta = Math.abs(stamp - target);
+          if (delta < distance) { distance = delta; nearest = index; }
+        });
+        const sameDay = markers.slice(0, mi).filter((m) => String(m.date).slice(0, 10) === String(marker.date).slice(0, 10)).length;
+        const markerColor = marker.type === "Achat" ? "#2ee59d" : marker.type === "Vente" ? "#ff6b7a" : "#ffb454";
+        return <span key={marker.id || mi} title={marker.title} aria-label={marker.title}
+          style={{ position: "absolute", zIndex: 5, left: (nearest / (geo.pts.length - 1) * 100) + "%", top: (78 + (sameDay % 3) * 7) + "%", transform: "translate(-50%, -50%)", width: 9, height: 9, borderRadius: "50%", background: markerColor, border: "2px solid #101827", boxShadow: "0 0 0 1px " + markerColor, pointerEvents: "auto" }} />;
+      })}
       {p && (hover != null || !fade) && <span className={"areaDot" + (hover == null ? " live" : "")} style={{ left: p[0] / 10 + "%", top: (p[1] / 104) * 100 + "%", "--c": color }} />}
       {hover != null && p && <span className="areaRule" style={{ left: p[0] / 10 + "%" }} />}
     </div>
