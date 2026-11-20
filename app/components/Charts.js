@@ -44,7 +44,7 @@ export function AreaChart({ points, height = 200, children, color: forced, fade,
     if (Number.isFinite(ta) && Number.isFinite(tb)) return new Date(ta + (tb - ta) * t).toISOString();
     return t < 0.5 ? a?.date : b?.date;
   };
-  const activePoint = a ? { ...a, value: Number(a.value) + (Number(b?.value ?? a.value) - Number(a.value)) * t, date: interpolateDate() } : null;
+  const activePoint = a ? { ...a, ...Object.fromEntries(Object.keys(a).filter((key) => typeof a[key] === "number" && typeof b?.[key] === "number").map((key) => [key, Number(a[key]) + (Number(b[key]) - Number(a[key])) * t])), value: Number(a.value) + (Number(b?.value ?? a.value) - Number(a.value)) * t, date: interpolateDate() } : null;
   const pa = geo.xy[i], pb = geo.xy[j];
   const p = pa && pb ? [pa[0] + (pb[0] - pa[0]) * t, pa[1] + (pb[1] - pa[1]) * t] : pa;
   return <>
