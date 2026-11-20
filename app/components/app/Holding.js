@@ -184,7 +184,8 @@ export function TradeForm({ holding: h, trade, initialType = "Achat", eurPerUsd,
 /* ---------- Courbe du portefeuille (positions actuelles) ---------- */
 export function PortfolioCurve({ holdings, trades = [], intraday, eurPerUsd, fetchHistory }) {
   const [period, setPeriod] = useState("1J");
-  const lines = holdings.filter((h) => h.ticker && Number(h.quantity) > 0);
+  const tradedHoldingIds = new Set(trades.map((t) => t.holding_id));
+  const lines = holdings.filter((h) => h.ticker && (Number(h.quantity) > 0 || tradedHoldingIds.has(h.id)));
   const symbols = [...new Set(lines.map((h) => String(h.ticker).toUpperCase()))].sort();
   const hist = useHistory(fetchHistory, symbols, period, period !== "1J" && symbols.length > 0);
   const source = period === "1J" ? intraday : hist.data?.series;
