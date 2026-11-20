@@ -171,12 +171,12 @@ export function BudgetForm({ budget, suggested, existing, average, onClose, onSa
 /* ---------- Position ---------- */
 export function HoldingForm({ holding, onClose, onSave, onDelete }) {
   const editing = Boolean(holding?.id);
-  const [f, setF] = useState({ name: holding?.name || "", ticker: holding?.ticker || "", asset_class: holding?.asset_class || "ETF", quantity: str(holding?.quantity), cost_basis: str(holding?.cost_basis), value: str(holding?.value) }), [busy, setBusy] = useState(false);
+  const [f, setF] = useState({ name: holding?.name || "", ticker: holding?.ticker || "", asset_class: holding?.asset_class || "ETF", quantity: str(holding?.quantity), cost_basis: str(holding?.cost_basis), value: str(holding?.value), acquisition_date: holding?.acquisition_date || "" }), [busy, setBusy] = useState(false);
   const set = (k) => (e) => setF({ ...f, [k]: k === "ticker" ? e.target.value.toUpperCase() : e.target.value });
   const ok = f.name.trim() && num(f.quantity) > 0 && f.cost_basis !== "" && f.value !== "" && num(f.cost_basis) >= 0 && num(f.value) >= 0;
   const unit = num(f.quantity) > 0 && f.value !== "" ? num(f.value) / num(f.quantity) : null;
   return <Modal onClose={onClose}>
-    <form className="modalForm" onSubmit={async (e) => { e.preventDefault(); if (!ok) return; setBusy(true); const r = await onSave({ ...(editing ? { id: holding.id } : {}), name: f.name.trim(), ticker: f.ticker.trim() || null, asset_class: f.asset_class, quantity: num(f.quantity), cost_basis: num(f.cost_basis), value: num(f.value), currency: "EUR" }); setBusy(false); if (r !== false) onClose(); }}>
+    <form className="modalForm" onSubmit={async (e) => { e.preventDefault(); if (!ok) return; setBusy(true); const r = await onSave({ ...(editing ? { id: holding.id } : {}), name: f.name.trim(), ticker: f.ticker.trim() || null, asset_class: f.asset_class, quantity: num(f.quantity), cost_basis: num(f.cost_basis), value: num(f.value), acquisition_date: f.acquisition_date || null, currency: "EUR" }); setBusy(false); if (r !== false) onClose(); }}>
       <Head title={editing ? "Mettre à jour la position" : "Ajouter une position"} sub={editing ? "Mettez à jour la valeur actuelle quand vous le souhaitez." : "Action, ETF, crypto, fonds…"} onClose={onClose} />
       <div className="seg billingSeg" style={{ flexWrap: "wrap" }}>{Object.keys(ASSET_COLORS).map((c) => <button type="button" key={c} className={f.asset_class === c ? "on" : ""} onClick={() => setF({ ...f, asset_class: c })}>{c}</button>)}</div>
       <div className="grid g2" style={{ gap: 12 }}>
@@ -185,7 +185,7 @@ export function HoldingForm({ holding, onClose, onSave, onDelete }) {
         <label className="label">Quantité<input className="input" inputMode="decimal" value={f.quantity} onChange={set("quantity")} /></label>
         <label className="label">Montant investi (€)<input className="input" inputMode="decimal" value={f.cost_basis} onChange={set("cost_basis")} /></label>
       </div>
-      <label className="label">Valeur actuelle totale (€)<input className="input" inputMode="decimal" value={f.value} onChange={set("value")} /></label>
+      <label className="label">Valeur actuelle totale (€)<input className="input" inputMode="decimal" value={f.value} onChange={set("value")} /></label>\n      <label className="label">Date d’acquisition<input className="input" type="date" value={f.acquisition_date} onChange={(e) => setF({ ...f, acquisition_date: e.target.value })} /><small className="muted">Facultative : laissez vide si la date exacte n’est pas connue.</small></label>
       {unit !== null && <p className="formHint"><Icon name="info" size={14} />Soit {money(unit)} par part{num(f.cost_basis) > 0 ? ` · plus-value ${num(f.value) - num(f.cost_basis) >= 0 ? "+" : "−"}${money(Math.abs(num(f.value) - num(f.cost_basis)))}` : ""}.</p>}
       <button className="btn primary lg block" disabled={busy || !ok}>{busy ? "Enregistrement…" : editing ? "Enregistrer" : "Ajouter la position"}</button>
       {editing && <DeleteButton onConfirm={async () => { if (await onDelete(holding) !== false) onClose(); }} label="Supprimer la position" />}
