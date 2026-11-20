@@ -113,7 +113,7 @@ export function TradeForm({ holding: h, trade, initialType = "Achat", eurPerUsd,
   const [mode, setMode] = useState(editing && trade.type !== "Dividende" ? "qty" : "amount");
   const [quantity, setQuantity] = useState(str(trade?.quantity)), [price, setPrice] = useState(str(trade?.price ?? h.live?.price ?? (Number(h.quantity) > 0 ? Math.round((h.value / h.quantity) * 10000) / 10000 : ""))), [fees, setFees] = useState(str(trade?.fees ?? 0));
   const [amount, setAmount] = useState(str(trade?.amount)), [date, setDate] = useState(trade?.date || todayISO()), [busy, setBusy] = useState(false);
-  const [accountId, setAccountId] = useState(trade?.account_id || accounts.find((a) => a.kind === "courant")?.id || accounts[0]?.id || "");
+  const [accountId, setAccountId] = useState(trade?.account_id || "");
   const p = num(price), f = num(fees) || 0, enteredAmount = num(amount), held = Number(h.quantity) + (editing && trade.type === "Vente" ? Number(trade.quantity) : 0) - (editing && trade.type === "Achat" ? Number(trade.quantity) : 0);
   // Le montant saisi suit la devise de règlement ; le montant comptable reste normalisé en euros.
   const enteredEur = settlementFx ? enteredAmount * settlementFx : null;
@@ -125,7 +125,7 @@ export function TradeForm({ holding: h, trade, initialType = "Achat", eurPerUsd,
   return <Modal onClose={onClose}>
     <form className="modalForm" onSubmit={async (e) => {
       e.preventDefault(); if (!ok) return; setBusy(true);
-      const r = await onSave({ ...(editing ? { id: trade.id } : {}), holding_id: h.id, type, quantity: Math.round(q * 1e8) / 1e8, price: type === "Dividende" ? Math.round(eur * 100) / 100 : p, fees: f, amount: Math.round(eur * 100) / 100, currency: type === "Dividende" ? "EUR" : currency, settlement_currency: settlementCurrency, settlement_amount: Math.round(settlementAmount * 100) / 100, date, account_id: accountId });
+      const r = await onSave({ ...(editing ? { id: trade.id } : {}), holding_id: h.id, type, quantity: Math.round(q * 1e8) / 1e8, price: type === "Dividende" ? Math.round(eur * 100) / 100 : p, fees: f, amount: Math.round(eur * 100) / 100, currency: type === "Dividende" ? "EUR" : currency, settlement_currency: settlementCurrency, settlement_amount: Math.round(settlementAmount * 100) / 100, date, account_id: accountId || null });
       setBusy(false); if (r !== false) onClose();
     }}>
       <Head title={editing ? "Modifier la transaction" : type === "Achat" ? `Acheter ${h.ticker || h.name}` : type === "Vente" ? `Vendre ${h.ticker || h.name}` : "Ajouter un dividende"} sub={type === "Vente" ? `${held.toLocaleString("fr-FR", { maximumFractionDigits: 8 })} part(s) détenue(s)` : null} onClose={onClose} />
@@ -148,11 +148,11 @@ export function TradeForm({ holding: h, trade, initialType = "Achat", eurPerUsd,
         {q > 0 && <p className="formHint"><Icon name="info" size={14} />{mode === "amount" ? `Soit ${q.toLocaleString("fr-FR", { maximumFractionDigits: 6 })} part(s).` : `Soit ${money(eur)} ${type === "Achat" ? "dépensés" : "reçus"}, frais compris.`}</p>}
         {tooMuch && <div className="msg err">Vous ne pouvez pas vendre plus que les {held.toLocaleString("fr-FR", { maximumFractionDigits: 8 })} part(s) détenues.</div>}
       </>}
-      <label className="label">Compte bancaire de règlement<select className="input" value={accountId} onChange={(e) => setAccountId(e.target.value)} required><option value="">Choisir un compte</option>{accounts.map((a) => <option key={a.id} value={a.id}>{a.name}{a.institution ? " · " + a.institution : ""}</option>)}</select></label>
+      <label className="label">Compte bancaire de règlement <span className="muted">(facultatif)</span><select className="input" value={accountId} onChange={(e) => setAccountId(e.target.value)}><option value="">Aucun compte — ne pas rattacher</option>{accounts.map((a) => <option key={a.id} value={a.id}>{a.name}{a.institution ? " · " + a.institution : ""}</option>)}</select></label>
       {!accounts.length && <p className="formHint"><Icon name="info" size={14} />Ajoutez d’abord un compte dans la rubrique Comptes pour enregistrer le mouvement.</p>}
       {!accounts.length && <p className="formHint"><Icon name="info" size={14} />Ajoutez d’abord un compte dans la rubrique Comptes pour enregistrer le mouvement.</p>}
       <label className="label">Date<input className="input" type="date" value={date} onChange={(e) => setDate(e.target.value)} /></label>
-      <button className={"btn lg block " + (type === "Vente" ? "sellBtn solid" : type === "Dividende" ? "primary" : "buyBtn solid")} disabled={busy || !ok || !accountId}>{busy ? "Enregistrement…" : editing ? "Enregistrer" : type === "Achat" ? "Enregistrer l’achat" : type === "Vente" ? "Enregistrer la vente" : "Ajouter le dividende"}</button>
+      <button className={"btn lg block " + (type === "Vente" ? "sellBtn solid" : type === "Dividende" ? "primary" : "buyBtn solid")} disabled={busy || !ok}>{busy ? "Enregistrement…" : editing ? "Enregistrer" : type === "Achat" ? "Enregistrer l’achat" : type === "Vente" ? "Enregistrer la vente" : "Ajouter le dividende"}</button>
       {editing && <button type="button" className="btn block dangerBtn" disabled={busy} onClick={async () => { setBusy(true); const r = await onDelete(trade); setBusy(false); if (r !== false) onClose(); }}><Icon name="trash" size={16} />Supprimer la transaction</button>}
     </form>
   </Modal>;
