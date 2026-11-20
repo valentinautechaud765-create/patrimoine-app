@@ -223,8 +223,10 @@ function App() {
   async function applyTrades(holdingId, allTrades) {
     const h = live.current.holdings.find((x) => x.id === holdingId); if (!h) return;
     const pos = positionFromTrades(allTrades.filter((x) => x.holding_id === holdingId));
+    const quantity = Math.max(0, Math.round((pos.quantity + Number(h.quantity_adjustment || 0)) * 1e8) / 1e8);
+    const cost = Math.max(0, Math.round((pos.cost + Number(h.cost_basis_adjustment || 0)) * 100) / 100);
     const ratio = Number(h.quantity) > 0 ? Number(h.value) / Number(h.quantity) : 0;
-    const row = { id: h.id, quantity: pos.quantity, cost_basis: pos.cost, value: Math.round(pos.quantity * ratio * 100) / 100 || (pos.quantity > 0 ? pos.cost : 0), updated_at: new Date().toISOString() };
+    const row = { id: h.id, quantity, cost_basis: cost, value: Math.round(quantity * ratio * 100) / 100 || (quantity > 0 ? cost : 0), updated_at: new Date().toISOString() };
     const saved = await write("holdings", row);
     replace("holdings", { ...h, ...saved }, (l) => l.sort((x, y) => y.value - x.value));
   }
@@ -618,6 +620,34 @@ function App() {
     async syncHoldingValues(list) {
       if (demo) return;
       for (const h of list) await supabaseBrowser().from("holdings").update({ value: h.value, updated_at: new Date().toISOString() }).eq("id", h.id);
+    },
+    // Rapproche la position avec le solde réellement affiché chez le courtier, sans falsifier les transactions.
+    async reconcileHolding(holdingId, brokerQuantity) {
+      const h = live.current.holdings.find((x) => x.id === holdingId);
+      if (!h) throw new Error("Position introuvable.");
+      const quantity = Math.max(0, Math.round(Number(brokerQuantity) * 1e8) / 1e8);
+      const trades = (live.current.trades || []).filter((x) => x.holding_id === holdingId);
+      const pos = positionFromTrades(trades);
+      const quantityAdjustment = Math.round((quantity - pos.quantity) * 1e8) / 1e8;
+      const adjustedCost = quantity > 0 && pos.quantity > 0 ? Math.round((pos.cost * quantity / pos.quantity) * 100) / 100 : 0;
+      const costBasisAdjustment = Math.round((adjustedCost - pos.cost) * 100) / 100;
+      // Une quantité supprimée sans produit de vente correspond à une perte de rapprochement,
+      // pas à une vente fictive : elle diminue le réalisé du coût de revient retiré.
+      const realizedAdjustment = Math.min(0, costBasisAdjustment);
+      const unitValue = Number(h.quantity) > 0 ? Number(h.value) / Number(h.quantity) : Number(h.live?.priceEur) || 0;
+      const row = {
+        id: h.id, quantity, cost_basis: adjustedCost,
+        value: Math.round(quantity * unitValue * 100) / 100,
+        quantity_adjustment: quantityAdjustment,
+        cost_basis_adjustment: costBasisAdjustment,
+        realized_adjustment: realizedAdjustment,
+        updated_at: new Date().toISOString(),
+      };
+      const saved = await write("holdings", row);
+      replace("holdings", { ...h, ...saved, ...row }, (l) => l.sort((x, y) => y.value - x.value));
+      return { message: quantity === 0
+        ? "Position rapprochée : 0 part, valeur et coût restant à 0 €. Historique conservé."
+        : "Position rapprochée avec le solde du courtier." };
     },
     // Achats / ventes / dividendes : la position (quantité, prix de revient) est recalculée à chaque fois
     async saveTrade(t) {
