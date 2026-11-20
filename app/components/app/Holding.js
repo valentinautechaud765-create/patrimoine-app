@@ -185,6 +185,7 @@ export function TradeForm({ holding: h, trade, initialType = "Achat", eurPerUsd,
 export function PortfolioCurve({ holdings, trades = [], intraday, eurPerUsd, fetchHistory, accounts = [] }) {
   const [period, setPeriod] = useState("1J");
   const [selectedTradeId, setSelectedTradeId] = useState(null);
+  const [selectedTradePosition, setSelectedTradePosition] = useState(null);
   const tradedHoldingIds = new Set(trades.map((t) => t.holding_id));
   const lines = holdings.filter((h) => h.ticker && (Number(h.quantity) > 0 || tradedHoldingIds.has(h.id)));
   const symbols = [...new Set(lines.map((h) => String(h.ticker).toUpperCase()))].sort();
@@ -298,12 +299,29 @@ export function PortfolioCurve({ holdings, trades = [], intraday, eurPerUsd, fet
       });
   }, [points, trades, lines, holdings, accounts, tradesBy]);
   const selectedTrade = events.find((t) => t.id === selectedTradeId) || null;
+  const tradePopover = selectedTrade ? {
+    x: selectedTradePosition?.x ?? 72, y: selectedTradePosition?.y ?? 42,
+    content: <div className="tradePopoverCard">
+      <div className="tradePopoverHead"><div className="tradePopoverTitle"><span className={"tradePopoverType " + (selectedTrade.type === "Achat" ? "buy" : selectedTrade.type === "Vente" ? "sell" : "dividend")}>{selectedTrade.type}</span><span className="muted">{dayLabel(selectedTrade.date)}</span></div>
+        <button type="button" className="iconBtn" onClick={() => { setSelectedTradeId(null); setSelectedTradePosition(null); }} aria-label="Fermer le détail"><Icon name="x" size={15} /></button>
+      </div>
+      <b className="tradePopoverName">{selectedTrade.holdingName}{selectedTrade.ticker ? " · " + selectedTrade.ticker.toUpperCase() : ""}</b>
+      <div className="tradePopoverGrid">
+        {selectedTrade.type !== "Dividende" && <div><small>Quantité</small><b>{Number(selectedTrade.quantity).toLocaleString("fr-FR", { maximumFractionDigits: 8 })}</b></div>}
+        {selectedTrade.type !== "Dividende" && <div><small>Prix unitaire</small><b>{money(selectedTrade.price, selectedTrade.currency || "EUR")}</b></div>}
+        <div><small>{selectedTrade.type === "Achat" ? "Montant investi" : selectedTrade.type === "Vente" ? "Montant récupéré" : "Dividende reçu"}</small><b>{selectedTrade.type === "Achat" ? "−" : "+"}{money(selectedTrade.settlement_amount ?? selectedTrade.amount, selectedTrade.settlement_currency || "EUR")}</b></div>
+        {Number(selectedTrade.fees) > 0 && <div><small>Frais</small><b>{money(selectedTrade.fees, "EUR")}</b></div>}
+        {selectedTrade.type === "Vente" && <div><small>Plus-value réalisée estimée</small><b className={selectedTrade.realized >= 0 ? "ok" : "bad"}>{signed(selectedTrade.realized)}</b></div>}
+        {selectedTrade.accountName && <div><small>Compte de règlement</small><b>{selectedTrade.accountName}</b></div>}
+      </div>
+    </div>
+  } : null;
 
   if (!symbols.length) return null;
   const periodsBar = <div className="seg heroPeriods" role="tablist" aria-label="Période de la courbe">{PERIODS.map((p) => <button type="button" role="tab" aria-selected={p === period} key={p} className={p === period ? "on" : ""} onClick={() => setPeriod(p)}>{p === "1J" && <i className="liveDot" />}{p}</button>)}</div>;
   const axis = points?.length > 1 ? [points[0], points[Math.floor((points.length - 1) / 2)], points[points.length - 1]].map((p) => fmtWhen(p.date, period)) : null;
   return <section className="netWorth heroOpen portfolioCurve fadeIn">
-    {points && points.length > 1 ? <AreaChart points={points} height={250} fade markers={events} scaleLabels onMarkerClick={(marker) => setSelectedTradeId(marker.id)}>
+    {points && points.length > 1 ? <AreaChart points={points} height={250} fade markers={events} scaleLabels markerPopover={tradePopover} onMarkerClick={(marker, position) => { setSelectedTradeId(marker.id); setSelectedTradePosition(position); }} onMarkerDismiss={() => { setSelectedTradeId(null); setSelectedTradePosition(null); }}>
       {(pt, first, hovering) => {
         const gain = Number(pt.totalGain) || 0, gainPct = Number(pt.gainPct) || 0;
         return <div className="nwTop">
@@ -325,28 +343,10 @@ export function PortfolioCurve({ holdings, trades = [], intraday, eurPerUsd, fet
       }}
     </AreaChart> : <div className="nwTop"><div><div className="eyebrow">Évolution du portefeuille</div><p className="muted" style={{ margin: "8px 0" }}>{period === "1J" || hist.loading ? "Chargement de la courbe…" : "Historique indisponible : ajoutez les achats et ventes datés pour reconstituer le portefeuille."}</p></div></div>}
     {axis && <div className="nwAxis" aria-hidden="true"><span>{axis[0]}</span><span>{axis[1]}</span><span>{period === "1J" ? "Maintenant" : "Aujourd’hui"}</span></div>}
-    {selectedTrade && <div className="tradeDetailCard" style={{ marginTop: 12, padding: 14, borderRadius: 14, border: "1px solid rgba(148,163,184,.24)", background: "rgba(148,163,184,.07)" }}>
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
-        <div style={{ minWidth: 0 }}>
-          <div className="eyebrow">{selectedTrade.type} · {dayLabel(selectedTrade.date)}</div>
-          <b style={{ fontSize: 15 }}>{selectedTrade.holdingName}{selectedTrade.ticker ? " · " + selectedTrade.ticker.toUpperCase() : ""}</b>
-        </div>
-        <button type="button" className="iconBtn" onClick={() => setSelectedTradeId(null)} aria-label="Fermer le détail"><Icon name="x" size={16} /></button>
-      </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(125px,1fr))", gap: "10px 16px", marginTop: 12 }}>
-        {selectedTrade.type !== "Dividende" && <div><small className="muted">Quantité</small><b style={{ display: "block" }}>{Number(selectedTrade.quantity).toLocaleString("fr-FR", { maximumFractionDigits: 8 })}</b></div>}
-        {selectedTrade.type !== "Dividende" && <div><small className="muted">Prix unitaire</small><b style={{ display: "block" }}>{money(selectedTrade.price, selectedTrade.currency || "EUR")}</b></div>}
-        <div><small className="muted">{selectedTrade.type === "Achat" ? "Montant investi" : selectedTrade.type === "Vente" ? "Montant récupéré" : "Dividende reçu"}</small><b style={{ display: "block", color: selectedTrade.type === "Achat" ? "var(--text)" : "#2ee59d" }}>{selectedTrade.type === "Achat" ? "−" : "+"}{money(selectedTrade.settlement_amount ?? selectedTrade.amount, selectedTrade.settlement_currency || "EUR")}</b></div>
-        {Number(selectedTrade.fees) > 0 && <div><small className="muted">Frais</small><b style={{ display: "block" }}>{money(selectedTrade.fees, "EUR")}</b></div>}
-        {selectedTrade.type === "Vente" && <div><small className="muted">Plus-value réalisée estimée</small><b style={{ display: "block" }} className={selectedTrade.realized >= 0 ? "ok" : "bad"}>{signed(selectedTrade.realized)}</b></div>}
-        {selectedTrade.accountName && <div><small className="muted">Compte de règlement</small><b style={{ display: "block" }}>{selectedTrade.accountName}</b></div>}
-      </div>
-      <p className="finePrint" style={{ margin: "10px 0 0" }}>Transaction enregistrée dans Patrimo. Clique sur un autre point pour afficher son détail.</p>
-    </div>}
     {periodsBar}
     {events.length > 0 && <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginTop: 12 }}>
       <span className="finePrint" style={{ margin: "2px 5px 0 0" }}>Transactions :</span>
-      {events.slice(-10).reverse().map((t) => <button type="button" key={t.id} title={t.title} onClick={() => setSelectedTradeId(t.id)} className="chip" style={{ fontSize: 11, border: "1px solid " + (t.type === "Achat" ? "rgba(46,229,157,.35)" : t.type === "Vente" ? "rgba(255,107,122,.35)" : "rgba(255,180,84,.35)"), color: t.type === "Achat" ? "#2ee59d" : t.type === "Vente" ? "#ff6b7a" : "#ffb454" }}>
+      {events.slice(-10).reverse().map((t) => <button type="button" key={t.id} title={t.title} onClick={() => { setSelectedTradeId(t.id); setSelectedTradePosition({ x: 72, y: 42 }); }} className="chip" style={{ fontSize: 11, border: "1px solid " + (t.type === "Achat" ? "rgba(46,229,157,.35)" : t.type === "Vente" ? "rgba(255,107,122,.35)" : "rgba(255,180,84,.35)"), color: t.type === "Achat" ? "#2ee59d" : t.type === "Vente" ? "#ff6b7a" : "#ffb454" }}>
         {t.type} · {t.holdingName} · {String(t.date).slice(5).split("-").reverse().join("/")} · {money(Math.abs(Number(t.amount) || 0), "EUR")}
       </button>)}
     </div>}
