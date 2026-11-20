@@ -70,7 +70,6 @@ function NetWorth({ m, data, limits, openPlans, dayCurve, liveInfo, showChart = 
           return <button key={l} className={l === current[0] ? "on" : ""} onClick={() => lock ? openPlans("plus") : setLabel(l)}>{l === "1J" && <i className="liveDot" />}{l}{lock && <Icon name="lock" size={11} style={{ marginLeft: 4, opacity: 0.6 }} />}</button>;
         })}
       </div>
-}
     </section>
   );
 }
