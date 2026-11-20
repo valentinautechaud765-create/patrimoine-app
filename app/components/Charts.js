@@ -37,9 +37,21 @@ export function AreaChart({ points, height = 200, children, color: forced, fade,
   const pick = (e) => {
     const r = box.current.getBoundingClientRect(), x = e.clientX;
     clearTimeout(timer.current); cancelAnimationFrame(raf.current);
-    raf.current = requestAnimationFrame(() => setHover(Math.round(Math.max(0, Math.min(1, (x - r.left) / r.width)) * (geo.xy.length - 1))));
+    raf.current = requestAnimationFrame(() => setHover(Math.max(0, Math.min(1, (x - r.left) / r.width))));
   };
-  const i = hover == null ? geo.pts.length - 1 : hover, p = geo.xy[i];
+  const position = hover == null ? geo.pts.length - 1 : hover * (geo.pts.length - 1);
+  const i = Math.min(geo.pts.length - 1, Math.floor(position));
+  const j = Math.min(geo.pts.length - 1, i + 1);
+  const t = position - i;
+  const a = geo.pts[i], b = geo.pts[j];
+  const interpolateDate = () => {
+    const ta = Date.parse(a?.date), tb = Date.parse(b?.date);
+    if (Number.isFinite(ta) && Number.isFinite(tb)) return new Date(ta + (tb - ta) * t).toISOString();
+    return t < 0.5 ? a?.date : b?.date;
+  };
+  const activePoint = a ? { ...a, value: Number(a.value) + (Number(b?.value ?? a.value) - Number(a.value)) * t, date: interpolateDate() } : null;
+  const pa = geo.xy[i], pb = geo.xy[j];
+  const p = pa && pb ? [pa[0] + (pb[0] - pa[0]) * t, pa[1] + (pb[1] - pa[1]) * t] : pa;
   return <>
     {children && children(geo.pts[i], geo.pts[0], hover != null)}
     <div className={"area" + (fade ? " fade" : "")} ref={box} style={{ height }} onPointerDown={pick} onPointerMove={(e) => (e.pointerType === "mouse" || e.buttons) && pick(e)} onPointerLeave={(e) => e.pointerType === "mouse" && setHover(null)} onPointerUp={(e) => { if (e.pointerType !== "mouse") timer.current = setTimeout(() => setHover(null), 2200); }}>
