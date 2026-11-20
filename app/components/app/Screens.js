@@ -79,7 +79,7 @@ export function Investments({ m, data, limits, openPlans, open, liveInfo, curve,
     {curve}
     <div className="grid g3">
       <section className="card panel investHero span2">
-        <div className="eyebrow">Valeur des placements{liveInfo && <span className="liveBadge" style={{ textTransform: "none", letterSpacing: 0, marginLeft: 10 }}><i className="liveDot" />en direct · {new Date(liveInfo.at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</span>}</div>
+        <div className="eyebrow">Valeur des placements{liveInfo && <span className="liveBadge" style={{ textTransform: "none", letterSpacing: 0, marginLeft: 10 }}><i className="liveDot" />cours actualisé · {new Date(liveInfo.at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</span>}</div>
         <div className="nwAmount" style={{ fontSize: "clamp(32px, 4vw, 42px)" }}><Amount value={m.invest} /></div>
         <div className="investStats">
           {liveInfo && <div><small>Aujourd’hui</small><b className={liveInfo.dayGain >= 0 ? "ok" : "bad"}>{signed(liveInfo.dayGain)}</b></div>}
@@ -115,7 +115,7 @@ export function Investments({ m, data, limits, openPlans, open, liveInfo, curve,
           </tr>;
         })}</tbody>
       </table></div> : <Empty icon="trending" title="Aucune position" text="Ajoutez vos actions, ETF et cryptos pour suivre vos plus-values."><button className="btn primary sm" onClick={() => open("holding")}><Icon name="plus" size={15} />Ajouter une position</button></Empty>}
-      {holdings.length > 0 && <p className="finePrint" style={{ justifyContent: "flex-start", margin: "10px 0 4px" }}><Icon name="info" size={13} />{liveInfo ? "Les lignes avec un symbole boursier suivent le cours en direct (Tradegate, Yahoo Finance). Touchez une ligne pour voir sa courbe, acheter, vendre ou ajouter un dividende." : "Ajoutez le symbole boursier d’une ligne (ex. VWCE, AAPL) pour suivre son cours en direct. Touchez une ligne pour voir sa courbe, acheter, vendre ou ajouter un dividende."}</p>}
+      {holdings.length > 0 && <p className="finePrint" style={{ justifyContent: "flex-start", margin: "10px 0 4px" }}><Icon name="info" size={13} />{liveInfo ? "Les lignes avec un symbole boursier suivent les dernières cotations disponibles (Tradegate, Yahoo Finance ; délai éventuel selon la place). Touchez une ligne pour voir sa courbe, acheter, vendre ou ajouter un dividende." : "Ajoutez le symbole boursier d’une ligne (ex. VWCE, AAPL) pour suivre son cours en direct. Touchez une ligne pour voir sa courbe, acheter, vendre ou ajouter un dividende."}</p>}
     </Panel>
     <Panel title="Simulation d’investissement" icon="layers">
       <Locked on={!limits.projection} plan="Pro" title="Simulez vos investissements" text="Apport mensuel, durée, rendement : voyez ce que deviennent vos placements." onUnlock={() => openPlans("pro")}>
