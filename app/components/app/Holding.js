@@ -152,32 +152,51 @@ export function TradeForm({ holding: h, trade, initialType = "Achat", eurPerUsd,
 }
 
 /* ---------- Courbe du portefeuille (positions actuelles) ---------- */
-export function PortfolioCurve({ holdings, intraday, eurPerUsd, fetchHistory }) {
+export function PortfolioCurve({ holdings, trades = [], intraday, eurPerUsd, fetchHistory }) {
   const [period, setPeriod] = useState("1J");
   const lines = holdings.filter((h) => h.ticker && Number(h.quantity) > 0);
   const symbols = [...new Set(lines.map((h) => String(h.ticker).toUpperCase()))].sort();
   const hist = useHistory(fetchHistory, symbols, period, period !== "1J" && symbols.length > 0);
   const source = period === "1J" ? intraday : hist.data?.series;
   const fx = eurPerUsd || hist.data?.eurPerUsd;
+  const tradesBy = useMemo(() => {
+    const out = {};
+    for (const t of trades) (out[t.holding_id] ||= []).push(t);
+    for (const list of Object.values(out)) list.sort((a, b) => String(a.date).localeCompare(String(b.date)) || String(a.created_at || "").localeCompare(String(b.created_at || "")));
+    return out;
+  }, [trades]);
   const points = useMemo(() => {
     if (!source || !lines.length) return null;
-    const usable = lines.filter((h) => source[String(h.ticker).toUpperCase()]?.points?.length);
+    // Une position sans historique d'achats/ventes ne permet pas de reconstituer
+    // sa quantité passée : on l'exclut plutôt que de projeter la quantité actuelle.
+    const usable = lines.filter((h) => tradesBy[h.id]?.length && source[String(h.ticker).toUpperCase()]?.points?.length);
     if (!usable.length) return null;
-    const fixed = holdings.reduce((n, h) => n + (usable.includes(h) ? 0 : Number(h.value) || 0), 0);
     const times = [...new Set(usable.flatMap((h) => source[String(h.ticker).toUpperCase()].points.map((x) => x.t)))].sort((a, b) => a - b);
-    const pts = times.map((t) => {
-      let v = fixed;
+    const cursors = Object.fromEntries(usable.map((h) => [h.id, 0]));
+    const quantities = Object.fromEntries(usable.map((h) => [h.id, 0]));
+    const tradeIndexes = Object.fromEntries(usable.map((h) => [h.id, 0]));
+    const out = times.map((t) => {
+      const day = new Date(t).toISOString().slice(0, 10);
+      let total = 0;
       for (const h of usable) {
-        const d = source[String(h.ticker).toUpperCase()], arr = d.points;
-        let k = arr.findIndex((x) => x.t > t); k = k < 0 ? arr.length - 1 : Math.max(0, k - 1);
-        const rate = d.currency === "USD" ? (fx || 0) : 1;
-        v += Number(h.quantity) * arr[k].p * rate;
+        const s = source[String(h.ticker).toUpperCase()], arr = s.points;
+        while (cursors[h.id] + 1 < arr.length && arr[cursors[h.id] + 1].t <= t) cursors[h.id]++;
+        const list = tradesBy[h.id];
+        while (tradeIndexes[h.id] < list.length && String(list[tradeIndexes[h.id]].date) <= day) {
+          const tr = list[tradeIndexes[h.id]++];
+          if (tr.type === "Achat") quantities[h.id] += Number(tr.quantity) || 0;
+          else if (tr.type === "Vente") quantities[h.id] = Math.max(0, quantities[h.id] - (Number(tr.quantity) || 0));
+        }
+        const rate = s.currency === "USD" ? (fx || 0) : 1;
+        total += quantities[h.id] * arr[cursors[h.id]].p * rate;
       }
-      return { date: new Date(t).toISOString(), value: Math.round(v * 100) / 100 };
+      return { date: new Date(t).toISOString(), value: Math.round(total * 100) / 100 };
     });
-    pts.push({ date: new Date().toISOString(), value: Math.round(holdings.reduce((n, h) => n + (Number(h.value) || 0), 0) * 100) / 100 });
-    return pts;
-  }, [source, holdings, fx]); // eslint-disable-line
+    const latest = usable.reduce((n, h) => n + (Number(h.value) || 0), 0);
+    out.push({ date: new Date().toISOString(), value: Math.round(latest * 100) / 100 });
+    return out;
+  }, [source, lines, tradesBy, fx]);
+  const hasUntracked = lines.some((h) => !tradesBy[h.id]?.length);
   if (!symbols.length) return null;
   const periodsBar = <div className="seg heroPeriods">{PERIODS.map((p) => <button key={p} className={p === period ? "on" : ""} onClick={() => setPeriod(p)}>{p === "1J" && <i className="liveDot" />}{p}</button>)}</div>;
   return <section className="netWorth heroOpen portfolioCurve fadeIn">
@@ -192,9 +211,8 @@ export function PortfolioCurve({ holdings, intraday, eurPerUsd, fetchHistory }) 
           </div>
         </div>;
       }}
-    </AreaChart> : <div className="nwTop"><div><div className="eyebrow">Évolution du portefeuille</div><p className="muted" style={{ margin: "8px 0" }}>{period === "1J" || hist.loading ? "Chargement de la courbe…" : "Courbe indisponible pour le moment."}</p></div>
-      </div>}
+    </AreaChart> : <div className="nwTop"><div><div className="eyebrow">Évolution du portefeuille</div><p className="muted" style={{ margin: "8px 0" }}>{period === "1J" || hist.loading ? "Chargement de la courbe…" : "Historique indisponible : ajoutez les achats et ventes datés pour reconstituer le portefeuille."}</p></div></div>}
     {periodsBar}
-    <p className="finePrint" style={{ justifyContent: "flex-start", margin: "10px 0 0" }}><Icon name="info" size={13} />Calculée avec vos quantités actuelles.</p>
+    <p className="finePrint" style={{ justifyContent: "flex-start", margin: "10px 0 0" }}><Icon name="info" size={13} />Valeur historique reconstituée à partir des transactions enregistrées et des cours historiques disponibles.{hasUntracked ? " Certaines positions sans transactions datées sont exclues de la courbe." : ""}</p>
   </section>;
 }
