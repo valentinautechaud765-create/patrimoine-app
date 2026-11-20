@@ -384,8 +384,35 @@ function App() {
       return { message: "Compte supprimé" };
     },
     async saveHolding(h) {
-      const saved = await write("holdings", { ...h, updated_at: new Date().toISOString() });
-      replace("holdings", { ...h, ...saved }, (l) => l.sort((x, y) => y.value - x.value));
+      const { opening_trade, ...holdingFields } = h;
+      const saved = await write("holdings", { ...holdingFields, updated_at: new Date().toISOString() });
+      replace("holdings", { ...holdingFields, ...saved }, (l) => l.sort((x, y) => y.value - x.value));
+
+      // Une position saisie avec sa date d’acquisition représente aussi son achat initial.
+      // On crée donc une transaction d’ouverture pour alimenter l’historique et la courbe.
+      // Si des transactions existent déjà, on ne crée rien : aucune duplication.
+      const hasTrades = (live.current.trades || []).some((t) => t.holding_id === saved.id);
+      if (!hasTrades && saved.acquisition_date && Number(saved.quantity) > 0 && Number(saved.cost_basis) > 0) {
+        if (live.current.tradesMissing) {
+          throw new Error("La position est enregistrée, mais l’historique des achats nécessite la mise à jour de la base : relance supabase/schema.sql dans Supabase → SQL Editor → Run.");
+        }
+        const quantity = Number(saved.quantity);
+        const cost = Number(saved.cost_basis);
+        const details = opening_trade || {};
+        const initialTrade = await write("trades", {
+          holding_id: saved.id,
+          type: "Achat",
+          quantity,
+          price: Number(details.price) > 0 ? Number(details.price) : Math.round((cost / quantity) * 1e6) / 1e6,
+          fees: Number(details.fees) || 0,
+          amount: cost,
+          currency: details.currency || saved.currency || "EUR",
+          settlement_currency: details.settlement_currency || "EUR",
+          settlement_amount: Number(details.settlement_amount) > 0 ? Number(details.settlement_amount) : cost,
+          date: saved.acquisition_date,
+        });
+        setData((d) => ({ ...d, trades: [...(d.trades || []), initialTrade] }));
+      }
       return { message: h.id ? "Position mise à jour" : "Position ajoutée" };
     },
     async deleteHolding(h) {
