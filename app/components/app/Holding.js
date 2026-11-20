@@ -303,7 +303,7 @@ export function PortfolioCurve({ holdings, trades = [], intraday, eurPerUsd, fet
     x: selectedTradePosition?.x ?? 72, y: selectedTradePosition?.y ?? 42,
     content: <div className="tradePopoverCard">
       <div className="tradePopoverHead"><div className="tradePopoverTitle"><span className={"tradePopoverType " + (selectedTrade.type === "Achat" ? "buy" : selectedTrade.type === "Vente" ? "sell" : "dividend")}>{selectedTrade.type}</span><span className="muted">{dayLabel(selectedTrade.date)}</span></div>
-        <button type="button" className="iconBtn" onClick={() => { setSelectedTradeId(null); setSelectedTradePosition(null); }} aria-label="Fermer le détail"><Icon name="x" size={15} /></button>
+        <button type="button" className="tradePopoverClose" onClick={() => { setSelectedTradeId(null); setSelectedTradePosition(null); }} aria-label="Fermer le détail"><span aria-hidden="true">×</span></button>
       </div>
       <b className="tradePopoverName">{selectedTrade.holdingName}{selectedTrade.ticker ? " · " + selectedTrade.ticker.toUpperCase() : ""}</b>
       <div className="tradePopoverGrid">
