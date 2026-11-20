@@ -83,6 +83,11 @@ export function HoldingSheet({ holding: h, trades, tradesMissing, fetchHistory, 
       {pos.realized !== 0 && <div><small>Plus-values réalisées</small><b className={pos.realized >= 0 ? "ok" : "bad"}>{signed(pos.realized)}</b></div>}
     </div>
 
+    {pos.quantity > 0 && pos.quantity < 0.01 && <div className="msg info" role="status">
+      <b>Petite quantité résiduelle à vérifier</b><br />
+      L’historique des transactions laisse {pos.quantity.toLocaleString("fr-FR", { maximumFractionDigits: 8 })} part(s), soit environ {money(h.value)} au dernier cours. Vérifiez la quantité réellement détenue chez votre courtier. Les ordres annulés ou rejetés ne doivent pas être comptabilisés. Patrimo ne supprime pas automatiquement ce reliquat.
+    </div>}
+
     {tradesMissing ? <div className="msg info">Pour enregistrer achats, ventes et dividendes, une petite mise à jour de la base est nécessaire : dans Supabase → SQL Editor, colle à nouveau le fichier <b>schema.sql</b> puis clique sur Run (aucune donnée n’est effacée).</div> : <>
       <div className="tradeBtns">
         <button className="btn buyBtn" onClick={() => onTrade("Achat")}><Icon name="plus" size={16} />Acheter</button>
@@ -140,6 +145,13 @@ export function TradeForm({ holding: h, trade, initialType = "Achat", eurPerUsd,
     }}>
       <Head title={editing ? "Modifier la transaction" : type === "Achat" ? `Acheter ${h.ticker || h.name}` : type === "Vente" ? `Vendre ${h.ticker || h.name}` : "Ajouter un dividende"} sub={type === "Vente" ? `${held.toLocaleString("fr-FR", { maximumFractionDigits: 8 })} part(s) détenue(s)` : null} onClose={onClose} />
       <div className="seg billingSeg">{["Achat", "Vente", "Dividende"].map((t) => <button type="button" key={t} className={type === t ? "on" : ""} onClick={() => setType(t)}>{t}</button>)}</div>
+      {type === "Vente" && held > 0 && p > 0 && fx && settlementFx && <button type="button" className="btn block" onClick={() => {
+        const proceedsEur = Math.max(0, held * p * fx - f);
+        setQuantity(str(held));
+        setManualQuantity(true);
+        setAmount(str(Math.round((proceedsEur / settlementFx) * 100) / 100));
+        setAmountEdited(true);
+      }}>Remplir toute la quantité détenue</button>}
       {type === "Dividende" ? <>
         <label className="amountField"><span className="ok">+</span><input inputMode="decimal" placeholder="0,00" value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^\d.,]/g, ""))} autoFocus aria-label="Montant reçu" /><span>{settlementCurrency === "USD" ? "$" : "€"}</span></label>
         <p className="formHint"><Icon name="info" size={14} />Montant net reçu sur votre compte.</p>
@@ -158,7 +170,6 @@ export function TradeForm({ holding: h, trade, initialType = "Achat", eurPerUsd,
         {tooMuch && <div className="msg err">Vous ne pouvez pas vendre plus que les {held.toLocaleString("fr-FR", { maximumFractionDigits: 8 })} part(s) détenues.</div>}
       </>}
       <label className="label">Compte bancaire de règlement <span className="muted">(facultatif)</span><select className="input" value={accountId} onChange={(e) => setAccountId(e.target.value)}><option value="">Aucun compte — ne pas rattacher</option>{accounts.map((a) => <option key={a.id} value={a.id}>{a.name}{a.institution ? " · " + a.institution : ""}</option>)}</select></label>
-      {!accounts.length && <p className="formHint"><Icon name="info" size={14} />Ajoutez d’abord un compte dans la rubrique Comptes pour enregistrer le mouvement.</p>}
       {!accounts.length && <p className="formHint"><Icon name="info" size={14} />Ajoutez d’abord un compte dans la rubrique Comptes pour enregistrer le mouvement.</p>}
       <label className="label">Date<input className="input" type="date" value={date} onChange={(e) => setDate(e.target.value)} /></label>
       <button className={"btn lg block " + (type === "Vente" ? "sellBtn solid" : type === "Dividende" ? "primary" : "buyBtn solid")} disabled={busy || !ok}>{busy ? "Enregistrement…" : editing ? "Enregistrer" : type === "Achat" ? "Enregistrer l’achat" : type === "Vente" ? "Enregistrer la vente" : "Ajouter le dividende"}</button>
