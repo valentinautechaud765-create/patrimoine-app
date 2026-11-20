@@ -107,37 +107,44 @@ export function TradeForm({ holding: h, trade, initialType = "Achat", eurPerUsd,
   const editing = Boolean(trade?.id);
   const currency = trade?.currency || h.live?.currency || h.currency || "EUR";
   const fx = currency === "USD" ? (eurPerUsd || null) : 1;
+  const [settlementCurrency, setSettlementCurrency] = useState(trade?.settlement_currency || "EUR");
+  const settlementFx = settlementCurrency === "USD" ? (eurPerUsd || null) : 1;
   const [type, setType] = useState(trade?.type || initialType);
   const [mode, setMode] = useState(editing && trade.type !== "Dividende" ? "qty" : "amount");
   const [quantity, setQuantity] = useState(str(trade?.quantity)), [price, setPrice] = useState(str(trade?.price ?? h.live?.price ?? (Number(h.quantity) > 0 ? Math.round((h.value / h.quantity) * 10000) / 10000 : ""))), [fees, setFees] = useState(str(trade?.fees ?? 0));
   const [amount, setAmount] = useState(str(trade?.amount)), [date, setDate] = useState(trade?.date || todayISO()), [busy, setBusy] = useState(false);
   const [accountId, setAccountId] = useState(trade?.account_id || accounts.find((a) => a.kind === "courant")?.id || accounts[0]?.id || "");
-  const p = num(price), f = num(fees) || 0, held = Number(h.quantity) + (editing && trade.type === "Vente" ? Number(trade.quantity) : 0) - (editing && trade.type === "Achat" ? Number(trade.quantity) : 0);
-  // En mode « montant » : on saisit les euros dépensés, la quantité est déduite du prix
-  const q = type === "Dividende" ? 0 : mode === "amount" ? (p > 0 && fx ? Math.max(0, (num(amount) - (type === "Achat" ? f : -f)) / (p * fx)) : 0) : num(quantity);
-  const eur = type === "Dividende" ? num(amount) : mode === "amount" ? num(amount) : fx ? Math.round((q * p * fx + (type === "Achat" ? f : -f)) * 100) / 100 : num(amount);
+  const p = num(price), f = num(fees) || 0, enteredAmount = num(amount), held = Number(h.quantity) + (editing && trade.type === "Vente" ? Number(trade.quantity) : 0) - (editing && trade.type === "Achat" ? Number(trade.quantity) : 0);
+  // Le montant saisi suit la devise de règlement ; le montant comptable reste normalisé en euros.
+  const enteredEur = settlementFx ? enteredAmount * settlementFx : null;
+  const q = type === "Dividende" ? 0 : mode === "amount" ? (p > 0 && fx && enteredEur !== null ? Math.max(0, (enteredEur - (type === "Achat" ? f : -f)) / (p * fx)) : 0) : num(quantity);
+  const eur = type === "Dividende" ? enteredEur : mode === "amount" ? enteredEur : fx ? Math.round((q * p * fx + (type === "Achat" ? f : -f)) * 100) / 100 : null;
+  const settlementAmount = eur !== null && settlementFx ? eur / settlementFx : null;
   const tooMuch = type === "Vente" && q > held + 1e-8;
   const ok = type === "Dividende" ? eur > 0 : q > 0 && p > 0 && eur > 0 && !tooMuch;
   return <Modal onClose={onClose}>
     <form className="modalForm" onSubmit={async (e) => {
       e.preventDefault(); if (!ok) return; setBusy(true);
-      const r = await onSave({ ...(editing ? { id: trade.id } : {}), holding_id: h.id, type, quantity: Math.round(q * 1e8) / 1e8, price: type === "Dividende" ? Math.round(eur * 100) / 100 : p, fees: f, amount: Math.round(eur * 100) / 100, currency: type === "Dividende" ? "EUR" : currency, date, account_id: accountId });
+      const r = await onSave({ ...(editing ? { id: trade.id } : {}), holding_id: h.id, type, quantity: Math.round(q * 1e8) / 1e8, price: type === "Dividende" ? Math.round(eur * 100) / 100 : p, fees: f, amount: Math.round(eur * 100) / 100, currency: type === "Dividende" ? "EUR" : currency, settlement_currency: settlementCurrency, settlement_amount: Math.round(settlementAmount * 100) / 100, date, account_id: accountId });
       setBusy(false); if (r !== false) onClose();
     }}>
       <Head title={editing ? "Modifier la transaction" : type === "Achat" ? `Acheter ${h.ticker || h.name}` : type === "Vente" ? `Vendre ${h.ticker || h.name}` : "Ajouter un dividende"} sub={type === "Vente" ? `${held.toLocaleString("fr-FR", { maximumFractionDigits: 8 })} part(s) détenue(s)` : null} onClose={onClose} />
       <div className="seg billingSeg">{["Achat", "Vente", "Dividende"].map((t) => <button type="button" key={t} className={type === t ? "on" : ""} onClick={() => setType(t)}>{t}</button>)}</div>
       {type === "Dividende" ? <>
-        <label className="amountField"><span className="ok">+</span><input inputMode="decimal" placeholder="0,00" value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^\d.,]/g, ""))} autoFocus aria-label="Montant reçu" /><span>€</span></label>
+        <label className="amountField"><span className="ok">+</span><input inputMode="decimal" placeholder="0,00" value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^\d.,]/g, ""))} autoFocus aria-label="Montant reçu" /><span>{settlementCurrency === "USD" ? "$" : "€"}</span></label>
         <p className="formHint"><Icon name="info" size={14} />Montant net reçu sur votre compte.</p>
       </> : <>
-        <div className="seg billingSeg"><button type="button" className={mode === "amount" ? "on" : ""} onClick={() => setMode("amount")}>Par montant (€)</button><button type="button" className={mode === "qty" ? "on" : ""} onClick={() => setMode("qty")}>Par quantité</button></div>
-        {mode === "amount" ? <label className="amountField"><span>{type === "Achat" ? "−" : "+"}</span><input inputMode="decimal" placeholder="0,00" value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^\d.,]/g, ""))} autoFocus aria-label="Montant" /><span>€</span></label>
+        <div className="seg billingSeg"><button type="button" className={mode === "amount" ? "on" : ""} onClick={() => setMode("amount")}>Par montant ({settlementCurrency === "USD" ? "$" : "€"})</button><button type="button" className={mode === "qty" ? "on" : ""} onClick={() => setMode("qty")}>Par quantité</button></div>
+        {mode === "amount" ? <label className="amountField"><span>{type === "Achat" ? "−" : "+"}</span><input inputMode="decimal" placeholder="0,00" value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^\d.,]/g, ""))} autoFocus aria-label="Montant" /><span>{settlementCurrency === "USD" ? "$" : "€"}</span></label>
           : <label className="label">Quantité<input className="input" inputMode="decimal" value={quantity} onChange={(e) => setQuantity(e.target.value.replace(/[^\d.,]/g, ""))} autoFocus /></label>}
+        <label className="label">Devise du règlement<select className="input" value={settlementCurrency} onChange={(e) => setSettlementCurrency(e.target.value)}><option value="EUR">Euro (€)</option><option value="USD">Dollar américain ($)</option></select></label>
+        {settlementCurrency === "USD" && !settlementFx && <p className="formHint"><Icon name="info" size={14} />Taux EUR/USD indisponible : impossible de convertir ce règlement sans inventer de montant.</p>}
         <div className="grid g2" style={{ gap: 12 }}>
           <label className="label">Prix par part ({currency === "USD" ? "$" : "€"})<input className="input" inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value.replace(/[^\d.,]/g, ""))} /></label>
           <label className="label">Frais (€)<input className="input" inputMode="decimal" value={fees} onChange={(e) => setFees(e.target.value.replace(/[^\d.,]/g, ""))} /></label>
         </div>
-        {currency === "USD" && !fx && <p className="formHint"><Icon name="info" size={14} />Taux euro / dollar indisponible : saisissez le montant en euros.</p>}
+        {eur !== null && settlementCurrency === "USD" && <p className="formHint"><Icon name="info" size={14} />Équivalent comptabilisé : {money(eur)}. Le cours de l’action reste coté en {currency}.</p>}
+        {currency === "USD" && !fx && <p className="formHint"><Icon name="info" size={14} />Cours de conversion EUR/USD indisponible : quantité et contre-valeur non calculées.</p>}
         {q > 0 && <p className="formHint"><Icon name="info" size={14} />{mode === "amount" ? `Soit ${q.toLocaleString("fr-FR", { maximumFractionDigits: 6 })} part(s).` : `Soit ${money(eur)} ${type === "Achat" ? "dépensés" : "reçus"}, frais compris.`}</p>}
         {tooMuch && <div className="msg err">Vous ne pouvez pas vendre plus que les {held.toLocaleString("fr-FR", { maximumFractionDigits: 8 })} part(s) détenues.</div>}
       </>}
