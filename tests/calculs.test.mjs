@@ -60,6 +60,15 @@ test("position : prix de revient moyen pondéré et plus-value réalisée", () =
   assert.equal(p.dividends, 12);
 });
 
+test("position : conserve un reliquat réel au lieu de l'arrondir artificiellement à zéro", () => {
+  const p = positionFromTrades([
+    { type: "Achat", quantity: 1.00100001, amount: 170, date: "2026-01-01" },
+    { type: "Vente", quantity: 1, amount: 166.34, date: "2026-02-01" },
+  ]);
+  assert.equal(p.quantity, 0.00100001);
+  assert.equal(p.cost, 0.17);
+});
+
 test("échéances automatiques : fin de mois et années bissextiles", () => {
   assert.equal(advanceDate("2026-01-31", "mensuelle", 31), "2026-02-28");
   assert.equal(advanceDate("2026-02-28", "mensuelle", 31), "2026-03-31");
