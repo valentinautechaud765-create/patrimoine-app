@@ -182,8 +182,9 @@ export function TradeForm({ holding: h, trade, initialType = "Achat", eurPerUsd,
 }
 
 /* ---------- Courbe du portefeuille (positions actuelles) ---------- */
-export function PortfolioCurve({ holdings, trades = [], intraday, eurPerUsd, fetchHistory }) {
+export function PortfolioCurve({ holdings, trades = [], intraday, eurPerUsd, fetchHistory, accounts = [] }) {
   const [period, setPeriod] = useState("1J");
+  const [selectedTradeId, setSelectedTradeId] = useState(null);
   const tradedHoldingIds = new Set(trades.map((t) => t.holding_id));
   const lines = holdings.filter((h) => h.ticker && (Number(h.quantity) > 0 || tradedHoldingIds.has(h.id)));
   const symbols = [...new Set(lines.map((h) => String(h.ticker).toUpperCase()))].sort();
@@ -279,15 +280,30 @@ export function PortfolioCurve({ holdings, trades = [], intraday, eurPerUsd, fet
       .map((t) => {
         const h = holdings.find((x) => x.id === t.holding_id);
         const amount = Number(t.amount) || 0;
-        return { ...t, title: t.type + " · " + (h?.name || h?.ticker || "Placement") + " · " + dayLabel(String(t.date)) + " · " + money(Math.abs(amount), "EUR") };
+        const account = accounts.find((a) => a.id === t.account_id);
+        let realized = null;
+        if (t.type === "Vente") {
+          let quantity = 0, cost = 0;
+          for (const prior of tradesBy[t.holding_id] || []) {
+            if (prior.id === t.id) break;
+            const q = Number(prior.quantity) || 0, a = Number(prior.amount) || 0;
+            if (prior.type === "Achat") { quantity += q; cost += a; }
+            else if (prior.type === "Vente") { const avg = quantity > 0 ? cost / quantity : 0, sold = Math.min(q, quantity); cost = Math.max(0, cost - avg * sold); quantity = Math.max(0, quantity - sold); }
+          }
+          const avg = quantity > 0 ? cost / quantity : 0;
+          realized = amount - avg * Math.min(Number(t.quantity) || 0, quantity);
+        }
+        return { ...t, holdingName: h?.name || h?.ticker || "Placement", ticker: h?.ticker || "", accountName: account?.name || "", realized,
+          title: t.type + " · " + (h?.name || h?.ticker || "Placement") + " · " + dayLabel(String(t.date)) + " · " + money(Math.abs(amount), "EUR") };
       });
-  }, [points, trades, lines, holdings]);
+  }, [points, trades, lines, holdings, accounts, tradesBy]);
+  const selectedTrade = events.find((t) => t.id === selectedTradeId) || null;
 
   if (!symbols.length) return null;
   const periodsBar = <div className="seg heroPeriods" role="tablist" aria-label="Période de la courbe">{PERIODS.map((p) => <button type="button" role="tab" aria-selected={p === period} key={p} className={p === period ? "on" : ""} onClick={() => setPeriod(p)}>{p === "1J" && <i className="liveDot" />}{p}</button>)}</div>;
   const axis = points?.length > 1 ? [points[0], points[Math.floor((points.length - 1) / 2)], points[points.length - 1]].map((p) => fmtWhen(p.date, period)) : null;
   return <section className="netWorth heroOpen portfolioCurve fadeIn">
-    {points && points.length > 1 ? <AreaChart points={points} height={250} fade markers={events} scaleLabels>
+    {points && points.length > 1 ? <AreaChart points={points} height={250} fade markers={events} scaleLabels onMarkerClick={(marker) => setSelectedTradeId(marker.id)}>
       {(pt, first, hovering) => {
         const gain = Number(pt.totalGain) || 0, gainPct = Number(pt.gainPct) || 0;
         return <div className="nwTop">
@@ -309,12 +325,30 @@ export function PortfolioCurve({ holdings, trades = [], intraday, eurPerUsd, fet
       }}
     </AreaChart> : <div className="nwTop"><div><div className="eyebrow">Évolution du portefeuille</div><p className="muted" style={{ margin: "8px 0" }}>{period === "1J" || hist.loading ? "Chargement de la courbe…" : "Historique indisponible : ajoutez les achats et ventes datés pour reconstituer le portefeuille."}</p></div></div>}
     {axis && <div className="nwAxis" aria-hidden="true"><span>{axis[0]}</span><span>{axis[1]}</span><span>{period === "1J" ? "Maintenant" : "Aujourd’hui"}</span></div>}
+    {selectedTrade && <div className="tradeDetailCard" style={{ marginTop: 12, padding: 14, borderRadius: 14, border: "1px solid rgba(148,163,184,.24)", background: "rgba(148,163,184,.07)" }}>
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+        <div style={{ minWidth: 0 }}>
+          <div className="eyebrow">{selectedTrade.type} · {dayLabel(selectedTrade.date)}</div>
+          <b style={{ fontSize: 15 }}>{selectedTrade.holdingName}{selectedTrade.ticker ? " · " + selectedTrade.ticker.toUpperCase() : ""}</b>
+        </div>
+        <button type="button" className="iconBtn" onClick={() => setSelectedTradeId(null)} aria-label="Fermer le détail"><Icon name="x" size={16} /></button>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(125px,1fr))", gap: "10px 16px", marginTop: 12 }}>
+        {selectedTrade.type !== "Dividende" && <div><small className="muted">Quantité</small><b style={{ display: "block" }}>{Number(selectedTrade.quantity).toLocaleString("fr-FR", { maximumFractionDigits: 8 })}</b></div>}
+        {selectedTrade.type !== "Dividende" && <div><small className="muted">Prix unitaire</small><b style={{ display: "block" }}>{money(selectedTrade.price, selectedTrade.currency || "EUR")}</b></div>}
+        <div><small className="muted">{selectedTrade.type === "Achat" ? "Montant investi" : selectedTrade.type === "Vente" ? "Montant récupéré" : "Dividende reçu"}</small><b style={{ display: "block", color: selectedTrade.type === "Achat" ? "var(--text)" : "#2ee59d" }}>{selectedTrade.type === "Achat" ? "−" : "+"}{money(selectedTrade.settlement_amount ?? selectedTrade.amount, selectedTrade.settlement_currency || "EUR")}</b></div>
+        {Number(selectedTrade.fees) > 0 && <div><small className="muted">Frais</small><b style={{ display: "block" }}>{money(selectedTrade.fees, "EUR")}</b></div>}
+        {selectedTrade.type === "Vente" && <div><small className="muted">Plus-value réalisée estimée</small><b style={{ display: "block" }} className={selectedTrade.realized >= 0 ? "ok" : "bad"}>{signed(selectedTrade.realized)}</b></div>}
+        {selectedTrade.accountName && <div><small className="muted">Compte de règlement</small><b style={{ display: "block" }}>{selectedTrade.accountName}</b></div>}
+      </div>
+      <p className="finePrint" style={{ margin: "10px 0 0" }}>Transaction enregistrée dans Patrimo. Clique sur un autre point pour afficher son détail.</p>
+    </div>}
     {periodsBar}
     {events.length > 0 && <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginTop: 12 }}>
       <span className="finePrint" style={{ margin: "2px 5px 0 0" }}>Transactions :</span>
-      {events.slice(-10).reverse().map((t) => <span key={t.id} title={t.title} className="chip" style={{ fontSize: 11, border: "1px solid " + (t.type === "Achat" ? "rgba(46,229,157,.35)" : t.type === "Vente" ? "rgba(255,107,122,.35)" : "rgba(255,180,84,.35)"), color: t.type === "Achat" ? "#2ee59d" : t.type === "Vente" ? "#ff6b7a" : "#ffb454" }}>
-        {t.type} · {String(t.date).slice(5).split("-").reverse().join("/")} · {money(Math.abs(Number(t.amount) || 0), "EUR")}
-      </span>)}
+      {events.slice(-10).reverse().map((t) => <button type="button" key={t.id} title={t.title} onClick={() => setSelectedTradeId(t.id)} className="chip" style={{ fontSize: 11, border: "1px solid " + (t.type === "Achat" ? "rgba(46,229,157,.35)" : t.type === "Vente" ? "rgba(255,107,122,.35)" : "rgba(255,180,84,.35)"), color: t.type === "Achat" ? "#2ee59d" : t.type === "Vente" ? "#ff6b7a" : "#ffb454" }}>
+        {t.type} · {t.holdingName} · {String(t.date).slice(5).split("-").reverse().join("/")} · {money(Math.abs(Number(t.amount) || 0), "EUR")}
+      </button>)}
     </div>}
     {events.length === 0 && <p className="finePrint" style={{ margin: "10px 0 0" }}>Aucune transaction sur cette période.</p>}
     <p className="finePrint" style={{ justifyContent: "flex-start", margin: "10px 0 0" }}><Icon name="info" size={13} />Courbe de valeur du portefeuille. Les points verts signalent les achats, les rouges les ventes et les jaunes les dividendes ; survolez un point pour voir le détail.{hasUntracked ? " Certaines positions sans transactions datées sont exclues de la courbe." : ""}</p>
