@@ -254,6 +254,7 @@ export function PortfolioCurve({ holdings, trades = [], intraday, eurPerUsd, fet
         unrealized: Math.round(unrealized * 100) / 100,
         realized: Math.round(realized * 100) / 100,
         dividends: Math.round(dividends * 100) / 100,
+        grossBuys: Math.round(grossBuys * 100) / 100,
         totalGain: Math.round(gain * 100) / 100,
         gainPct: grossBuys > 0 ? gain / grossBuys * 100 : 0,
       };
