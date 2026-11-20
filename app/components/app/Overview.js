@@ -3,8 +3,7 @@ import { useMemo, useState } from "react";
 import Icon from "../Icon.js";
 import { AreaChart, Donut, FlowBars } from "../Charts.js";
 import { money, money0, signed, pct, todayISO, dayLabel, monthLabel } from "../../../lib/format.js";
-import { monthlySeries, upcomingItems, buildWealthCurve, balanceHistory } from "../../../lib/model.js";
-import { useHistory } from "./Holding.js";
+import { monthlySeries, upcomingItems, balanceHistory } from "../../../lib/model.js";
 import { WealthProjection } from "./Projection.js";
 import { cat, distinctColors } from "../../../lib/categories.js";
 import { Amount, CatIcon, InstIcon, Panel, Empty, Locked, ago, KIND_LABEL } from "./ui.js";
@@ -25,22 +24,12 @@ function NetWorth({ m, data, limits, openPlans, dayCurve, liveInfo, showChart = 
   const [label, setLabel] = useState(dayCurve ? "1J" : "1M");
   const current = periods.find((x) => x[0] === label) || periods.find((x) => x[0] === "1M");
   const days = current[1];
-  // Courbe détaillée : cours de chaque placement (toutes les 15 min à 1 jour selon la période)
-  const symbols = useMemo(() => [...new Set(data.holdings.filter((h) => h.ticker && (Number(h.quantity) > 0 || (data.trades || []).some((t) => t.holding_id === h.id))).map((h) => String(h.ticker).toUpperCase()))].sort(), [data.holdings, data.trades]);
-  const apiPeriod = { "1S": "1S", "1M": "1M", "3M": "3M", "1A": "1A", Tout: "Max" }[current[0]];
-  const hist = useHistory(fetchHistory, symbols, apiPeriod || "1M", Boolean(apiPeriod && fetchHistory && symbols.length));
-  const detailed = useMemo(() => {
-    if (!apiPeriod || !hist.data?.series) return null;
-    let since = null;
-    if (current[0] === "Tout") {
-      const firsts = [...(data.trades || []).map((t) => String(t.date)), ...data.transactions.map((t) => String(t.date)), ...data.snapshots.map((x) => x.date)].filter(Boolean).sort();
-      since = firsts[0] || null;
-    }
-    return buildWealthCurve({ series: hist.data.series, holdings: data.holdings, trades: data.trades || [], transactions: data.transactions, eurPerUsd: eurPerUsd || hist.data.eurPerUsd, totalNow: m.total, sinceISO: since });
-  }, [hist.data, data.holdings, data.trades, data.transactions, data.snapshots, m.total, eurPerUsd, apiPeriod]); // eslint-disable-line
+  // La courbe du patrimoine total repose sur les photos quotidiennes enregistrées.
+  // Elles incluent comptes, placements, immobilier et dettes à leur date réelle,
+  // sans réinjecter rétroactivement la valeur actuelle d'un bien.
   const points = useMemo(() => current[0] === "1J" ? dayCurve
     : data.scoped && !data.holdings.some((h) => h.ticker) ? balanceHistory(data.accounts, data.transactions, days)
-    : detailed && detailed.length > 2 ? detailed : historyPoints(data.snapshots, m.total, days), [data.snapshots, data.scoped, data.accounts, data.transactions, data.holdings, m.total, days, current, dayCurve, detailed]);
+    : historyPoints(data.snapshots, m.total, days), [data.snapshots, data.scoped, data.accounts, data.transactions, data.holdings, m.total, days, current, dayCurve]);
   const intraday = current[0] === "1J" || ((current[0] === "1S" || current[0] === "1M") && detailed);
   const when = (iso) => current[0] === "1J" ? new Date(iso).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : intraday ? new Date(iso).toLocaleString("fr-FR", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : dayLabel(String(iso).slice(0, 10));
   const parts = [
