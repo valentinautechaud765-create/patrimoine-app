@@ -41,6 +41,7 @@ create table if not exists public.holdings (
   quantity numeric(20,8) not null default 0,
   cost_basis numeric(14,2) not null default 0,
   value numeric(14,2) not null default 0,
+  acquisition_date date,
   currency text not null default 'EUR',
   updated_at timestamptz not null default now()
 );
