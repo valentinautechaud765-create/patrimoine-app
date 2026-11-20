@@ -46,6 +46,8 @@ export function HoldingSheet({ holding: h, trades, tradesMissing, fetchHistory, 
   }, [series, h.live?.price]);
   const cur = h.live?.currency || series?.currency || "EUR";
   const pos = positionFromTrades(trades);
+  const effectiveQuantity = Math.max(0, pos.quantity + Number(h.quantity_adjustment || 0));
+  const realized = Math.round((pos.realized + Number(h.realized_adjustment || 0)) * 100) / 100;
   const list = [...trades].sort((a, b) => String(b.date).localeCompare(String(a.date)) || String(b.created_at || "").localeCompare(String(a.created_at || "")));
   const gain = h.value - h.cost_basis, gainPct = h.cost_basis > 0 ? (gain / h.cost_basis) * 100 : null;
   const pru = Number(h.quantity) > 0 ? h.cost_basis / Number(h.quantity) : null;
@@ -80,12 +82,13 @@ export function HoldingSheet({ holding: h, trades, tradesMissing, fetchHistory, 
       <div><small>Total investi</small><b className="money">{money(h.cost_basis)}</b></div>
       {h.live?.dayGain != null && <div><small>Aujourd’hui</small><b className={h.live.dayGain >= 0 ? "ok" : "bad"}>{signed(h.live.dayGain)}</b></div>}
       {pos.dividends > 0 && <div><small>Dividendes reçus</small><b className="ok">+{money(pos.dividends)}</b></div>}
-      {pos.realized !== 0 && <div><small>Plus-values réalisées</small><b className={pos.realized >= 0 ? "ok" : "bad"}>{signed(pos.realized)}</b></div>}
+      {realized !== 0 && <div><small>Plus-values réalisées</small><b className={realized >= 0 ? "ok" : "bad"}>{signed(realized)}</b></div>}
     </div>
 
-    {pos.quantity > 0 && pos.quantity < 0.01 && <div className="msg info" role="status">
-      <b>Petite quantité résiduelle à vérifier</b><br />
-      L’historique des transactions laisse {pos.quantity.toLocaleString("fr-FR", { maximumFractionDigits: 8 })} part(s), soit environ {money(h.value)} au dernier cours. Vérifiez la quantité réellement détenue chez votre courtier. Les ordres annulés ou rejetés ne doivent pas être comptabilisés. Patrimo ne supprime pas automatiquement ce reliquat.
+    {effectiveQuantity > 0 && effectiveQuantity < 0.01 && <div className="msg info" role="status">
+      <b>Petite quantité résiduelle à rapprocher</b><br />
+      Les transactions laissent {effectiveQuantity.toLocaleString("fr-FR", { maximumFractionDigits: 8 })} part(s). Si ton courtier affiche 0, tu peux rapprocher la position : l’historique des achats et ventes restera intact et l’écart sera comptabilisé séparément.
+      <button type="button" className="btn block" style={{ marginTop: 10 }} onClick={onReconcile}>Confirmer le solde du courtier : 0 part</button>
     </div>}
 
     {tradesMissing ? <div className="msg info">Pour enregistrer achats, ventes et dividendes, une petite mise à jour de la base est nécessaire : dans Supabase → SQL Editor, colle à nouveau le fichier <b>schema.sql</b> puis clique sur Run (aucune donnée n’est effacée).</div> : <>
