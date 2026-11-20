@@ -14,7 +14,7 @@ export function AreaChart({ points, height = 200, children, color: forced, fade,
     const vals = pts.map((p) => p.value);
     if (!vals.length) return { pts, xy: [], line: "", fill: "" };
     const lo = Math.min(...vals), hi = Math.max(...vals), pad = (hi - lo) * 0.14 || Math.max(1, hi * 0.01);
-    const plotLeft = scaleLabels ? 86 : 0;
+    const plotLeft = 0;
     const plotWidth = 1000 - plotLeft;
     const yFor = (v) => 100 - ((v - lo + pad) / (hi - lo + 2 * pad)) * 100;
     const xy = vals.map((v, i) => [pts.length === 1 ? plotLeft + plotWidth / 2 : plotLeft + (i / (pts.length - 1)) * plotWidth, yFor(v)]);
@@ -55,7 +55,6 @@ export function AreaChart({ points, height = 200, children, color: forced, fade,
         
         {scaleLabels && geo.scaleTicks?.map((t, n) => <g key={n}>
           <line x1={geo.plotLeft} x2="1000" y1={t.y} y2={t.y} stroke="rgba(255,255,255,.11)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
-          <text x="4" y={Math.max(10, Math.min(100, t.y + 3))} fill="rgba(255,255,255,.72)" fontSize="17">{new Intl.NumberFormat("fr-FR", { notation: "compact", maximumFractionDigits: 1 }).format(t.value)} €</text>
         </g>)}
         {scaleLabels && geo.zeroY != null && <line x1={geo.plotLeft} x2="1000" y1={geo.zeroY} y2={geo.zeroY} stroke="rgba(255,255,255,.42)" strokeWidth="1.5" strokeDasharray="7 6" vectorEffect="non-scaling-stroke" />}
         <path d={geo.fill} fill={`url(#${gid})`} />
