@@ -30,7 +30,7 @@ function NetWorth({ m, data, limits, openPlans, dayCurve, liveInfo, showChart = 
   const points = useMemo(() => current[0] === "1J" ? dayCurve
     : data.scoped && !data.holdings.some((h) => h.ticker) ? balanceHistory(data.accounts, data.transactions, days)
     : historyPoints(data.snapshots, m.total, days), [data.snapshots, data.scoped, data.accounts, data.transactions, data.holdings, m.total, days, current, dayCurve]);
-  const intraday = current[0] === "1J" || ((current[0] === "1S" || current[0] === "1M") && detailed);
+  const intraday = current[0] === "1J";
   const when = (iso) => current[0] === "1J" ? new Date(iso).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : intraday ? new Date(iso).toLocaleString("fr-FR", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : dayLabel(String(iso).slice(0, 10));
   const parts = [
     { label: "Comptes courants", value: m.cash, color: "#7fa8ff" },
