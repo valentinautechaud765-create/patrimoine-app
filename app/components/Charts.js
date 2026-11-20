@@ -2,7 +2,7 @@
 import { useId, useMemo, useRef, useState } from "react";
 
 // Courbe principale : l'en-tête (render prop) reçoit le point survolé.
-export function AreaChart({ points, height = 200, children, color: forced, fade, scaleLabels = false, markers = [], onMarkerClick }) {
+export function AreaChart({ points, height = 200, children, color: forced, fade, scaleLabels = false, markers = [], onMarkerClick, onMarkerDismiss, markerPopover }) {
   const [hover, setHover] = useState(null);
   const gid = "ag" + useId().replace(/:/g, "");
   const box = useRef(null), raf = useRef(0), timer = useRef(0);
@@ -68,7 +68,7 @@ export function AreaChart({ points, height = 200, children, color: forced, fade,
   })() : pa;
   return <>
     {children && children(activePoint || geo.pts[i], geo.pts[0], hover != null)}
-    <div className={"area" + (fade ? " fade" : "")} ref={box} style={{ height }} onPointerDown={pick} onPointerMove={(e) => (e.pointerType === "mouse" || e.buttons) && pick(e)} onPointerLeave={(e) => e.pointerType === "mouse" && setHover(null)} onPointerUp={(e) => { if (e.pointerType !== "mouse") timer.current = setTimeout(() => setHover(null), 2200); }}>
+    <div className={"area" + (fade ? " fade" : "")} ref={box} style={{ height }} onPointerDown={(e) => { if (!e.target.closest(".areaMarker, .markerPopover")) onMarkerDismiss?.(); pick(e); }} onPointerMove={(e) => (e.pointerType === "mouse" || e.buttons) && pick(e)} onPointerLeave={(e) => e.pointerType === "mouse" && setHover(null)} onPointerUp={(e) => { if (e.pointerType !== "mouse") timer.current = setTimeout(() => setHover(null), 2200); }}>
       <svg viewBox="0 0 1000 104" preserveAspectRatio="none" role="img" aria-label="Évolution">
         <defs><linearGradient id={gid} x1="0" x2="0" y1="0" y2="1"><stop offset="0" stopColor={color} stopOpacity={fade ? ".2" : ".32"} /><stop offset=".75" stopColor={color} stopOpacity={fade ? ".02" : ".04"} /><stop offset="1" stopColor={color} stopOpacity="0" /></linearGradient></defs>
         
@@ -93,10 +93,11 @@ export function AreaChart({ points, height = 200, children, color: forced, fade,
         });
         const sameDay = markers.slice(0, mi).filter((m) => String(m.date).slice(0, 10) === String(marker.date).slice(0, 10)).length;
         const markerColor = marker.type === "Achat" ? "#2ee59d" : marker.type === "Vente" ? "#ff6b7a" : "#ffb454";
-        return <button type="button" key={marker.id || mi} title={marker.title} aria-label={marker.title} onClick={() => onMarkerClick?.(marker)}
-          style={{ position: "absolute", zIndex: 6, cursor: "pointer", padding: 0, left: (nearest / (geo.pts.length - 1) * 100) + "%", top: (geo.xy[nearest][1] / 104 * 100 + (sameDay % 3) * 2) + "%", transform: "translate(-50%, -50%)", width: 12, height: 12, borderRadius: "50%", background: markerColor, border: "2px solid #101827", boxShadow: "0 0 0 1px " + markerColor, pointerEvents: "auto" }} />;
+        return <button type="button" className="areaMarker" key={marker.id || mi} title={marker.title} aria-label={marker.title} onClick={(e) => { e.stopPropagation(); const r = box.current.getBoundingClientRect(), b = e.currentTarget.getBoundingClientRect(); onMarkerClick?.(marker, { x: ((b.left + b.width / 2 - r.left) / r.width) * 100, y: ((b.top + b.height / 2 - r.top) / r.height) * 100 }); }}
+          style={{ position: "absolute", zIndex: 8, cursor: "pointer", padding: 0, left: (nearest / (geo.pts.length - 1) * 100) + "%", top: (geo.xy[nearest][1] / 104 * 100 + (sameDay % 3) * 2) + "%", transform: "translate(-50%, -50%)", width: 12, height: 12, borderRadius: "50%", background: markerColor, border: "2px solid #101827", boxShadow: "0 0 0 1px " + markerColor, pointerEvents: "auto" }} />;
       })}
-      {p && (hover != null || !fade) && <span className={"areaDot" + (hover == null ? " live" : "")} style={{ left: p[0] / 10 + "%", top: (p[1] / 104) * 100 + "%", "--c": color }} />}
+      {markerPopover && <div className="markerPopover" style={{ left: markerPopover.x < 58 ? `calc(${markerPopover.x}% + 15px)` : "auto", right: markerPopover.x >= 58 ? `calc(${100 - markerPopover.x}% + 15px)` : "auto", top: `${Math.max(8, Math.min(76, markerPopover.y - 18))}%` }} onPointerDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>{markerPopover.content}</div>}
+      {p && (hover != null || !fade) && <span className={"areaDot" + (hover == null ? " live" : "")} style={{ left: p[0] / 10 + "%", top: (p[1] / 104) * 100 + "%", "--c": color }} /> }
       {hover != null && p && <span className="areaRule" style={{ left: p[0] / 10 + "%" }} />}
     </div>
   </>;
