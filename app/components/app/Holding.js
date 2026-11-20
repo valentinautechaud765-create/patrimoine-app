@@ -10,8 +10,8 @@ import { TickerIcon, Amount, Empty } from "./ui.js";
 
 const num = (v) => Number(String(v ?? "").replace(/\s/g, "").replace(",", "."));
 const str = (n) => (n === undefined || n === null || n === "" ? "" : String(n).replace(".", ","));
-const PERIODS = ["1J", "1S", "1M", "6M", "1A", "Max"];
-const LABEL = { "1J": "aujourd’hui", "1S": "sur 7 jours", "1M": "sur 1 mois", "6M": "sur 6 mois", "1A": "sur 1 an", Max: "depuis le début" };
+const PERIODS = ["1J", "1S", "1M", "3M", "1A", "Tout"];
+const LABEL = { "1J": "aujourd’hui", "1S": "sur 7 jours", "1M": "sur 1 mois", "3M": "sur 3 mois", "1A": "sur 1 an", Tout: "depuis le début" };
 const fmtWhen = (t, period) => period === "1J" || period === "1S" ? new Date(t).toLocaleString("fr-FR", { weekday: period === "1S" ? "short" : undefined, hour: "2-digit", minute: "2-digit" }) : dayLabel(new Date(t).toISOString().slice(0, 10));
 
 // Charge une courbe (une ou plusieurs valeurs) pour une période, avec un petit cache en mémoire
@@ -196,37 +196,78 @@ export function PortfolioCurve({ holdings, trades = [], intraday, eurPerUsd, fet
     for (const list of Object.values(out)) list.sort((a, b) => String(a.date).localeCompare(String(b.date)) || String(a.created_at || "").localeCompare(String(b.created_at || "")));
     return out;
   }, [trades]);
+
+  // Chaque point conserve la valeur du portefeuille ET sa performance réelle :
+  // latent + réalisé + dividendes, comparés au montant total des achats.
+  // Les opérations antérieures au début de la période servent à reconstituer
+  // les quantités et le prix de revient déjà détenus au premier point.
   const points = useMemo(() => {
     if (!source || !lines.length) return null;
-    // Une position sans historique d'achats/ventes ne permet pas de reconstituer
-    // sa quantité passée : on l'exclut plutôt que de projeter la quantité actuelle.
     const usable = lines.filter((h) => tradesBy[h.id]?.length && source[String(h.ticker).toUpperCase()]?.points?.length);
     if (!usable.length) return null;
     const times = [...new Set(usable.flatMap((h) => source[String(h.ticker).toUpperCase()].points.map((x) => x.t)))].sort((a, b) => a - b);
+    if (!times.length) return null;
+    const firstDay = new Date(times[0]).toISOString().slice(0, 10);
     const cursors = Object.fromEntries(usable.map((h) => [h.id, 0]));
-    const quantities = Object.fromEntries(usable.map((h) => [h.id, 0]));
     const tradeIndexes = Object.fromEntries(usable.map((h) => [h.id, 0]));
+    const state = Object.fromEntries(usable.map((h) => [h.id, { quantity: 0, cost: 0, realized: 0, dividends: 0, grossBuys: 0 }]));
+
+    // Amorçage : les achats/ventes/dividendes avant la fenêtre restent comptés.
+    for (const h of usable) {
+      const s = state[h.id];
+      for (const tr of tradesBy[h.id]) {
+        if (String(tr.date) >= firstDay) break;
+        const q = Number(tr.quantity) || 0, amount = Number(tr.amount) || 0;
+        if (tr.type === "Achat") { s.quantity += q; s.cost += amount; s.grossBuys += amount; }
+        else if (tr.type === "Vente") {
+          const avg = s.quantity > 0 ? s.cost / s.quantity : 0, sold = Math.min(q, s.quantity);
+          s.cost = Math.max(0, s.cost - avg * sold); s.quantity = Math.max(0, s.quantity - sold);
+          s.realized += amount - avg * sold;
+        } else if (tr.type === "Dividende") s.dividends += amount;
+        tradeIndexes[h.id]++;
+      }
+    }
+
     const out = times.map((t) => {
       const day = new Date(t).toISOString().slice(0, 10);
-      let total = 0;
+      let total = 0, costBasis = 0, realized = 0, dividends = 0, grossBuys = 0;
       for (const h of usable) {
-        const s = source[String(h.ticker).toUpperCase()], arr = s.points;
+        const symbol = String(h.ticker).toUpperCase(), srs = source[symbol], arr = srs.points, st = state[h.id], list = tradesBy[h.id];
         while (cursors[h.id] + 1 < arr.length && arr[cursors[h.id] + 1].t <= t) cursors[h.id]++;
-        const list = tradesBy[h.id];
         while (tradeIndexes[h.id] < list.length && String(list[tradeIndexes[h.id]].date) <= day) {
-          const tr = list[tradeIndexes[h.id]++];
-          if (tr.type === "Achat") quantities[h.id] += Number(tr.quantity) || 0;
-          else if (tr.type === "Vente") quantities[h.id] = Math.max(0, quantities[h.id] - (Number(tr.quantity) || 0));
+          const tr = list[tradeIndexes[h.id]++], q = Number(tr.quantity) || 0, amount = Number(tr.amount) || 0;
+          if (tr.type === "Achat") { st.quantity += q; st.cost += amount; st.grossBuys += amount; }
+          else if (tr.type === "Vente") {
+            const avg = st.quantity > 0 ? st.cost / st.quantity : 0, sold = Math.min(q, st.quantity);
+            st.cost = Math.max(0, st.cost - avg * sold); st.quantity = Math.max(0, st.quantity - sold);
+            st.realized += amount - avg * sold;
+          } else if (tr.type === "Dividende") st.dividends += amount;
         }
-        const rate = s.currency === "USD" ? (fx || 0) : 1;
-        total += quantities[h.id] * arr[cursors[h.id]].p * rate;
+        const rate = srs.currency === "USD" ? (fx || 0) : 1;
+        total += Math.max(0, st.quantity) * arr[cursors[h.id]].p * rate;
+        costBasis += st.cost; realized += st.realized; dividends += st.dividends; grossBuys += st.grossBuys;
       }
-      return { date: new Date(t).toISOString(), value: Math.round(total * 100) / 100 };
+      const unrealized = total - costBasis, gain = unrealized + realized + dividends;
+      return {
+        date: new Date(t).toISOString(), value: Math.round(total * 100) / 100,
+        costBasis: Math.round(costBasis * 100) / 100,
+        unrealized: Math.round(unrealized * 100) / 100,
+        realized: Math.round(realized * 100) / 100,
+        dividends: Math.round(dividends * 100) / 100,
+        totalGain: Math.round(gain * 100) / 100,
+        gainPct: grossBuys > 0 ? gain / grossBuys * 100 : 0,
+      };
     });
-    const latest = usable.reduce((n, h) => n + (Number(h.value) || 0), 0);
-    out.push({ date: new Date().toISOString(), value: Math.round(latest * 100) / 100 });
+    // Dernier point valorisé avec les cours actuels réellement affichés dans Patrimo.
+    const latestValue = usable.reduce((n, h) => n + (Number(h.value) || 0), 0);
+    const last = out[out.length - 1];
+    if (last) out.push({ ...last, date: new Date().toISOString(), value: Math.round(latestValue * 100) / 100,
+      unrealized: Math.round((latestValue - last.costBasis) * 100) / 100,
+      totalGain: Math.round((latestValue - last.costBasis + last.realized + last.dividends) * 100) / 100,
+      gainPct: last.grossBuys > 0 ? ((latestValue - last.costBasis + last.realized + last.dividends) / last.grossBuys) * 100 : 0 });
     return out;
   }, [source, lines, tradesBy, fx]);
+
   const hasUntracked = lines.some((h) => !tradesBy[h.id]?.length);
   const events = useMemo(() => {
     if (!points?.length) return [];
@@ -240,28 +281,41 @@ export function PortfolioCurve({ holdings, trades = [], intraday, eurPerUsd, fet
         return { ...t, title: t.type + " · " + (h?.name || h?.ticker || "Placement") + " · " + dayLabel(String(t.date)) + " · " + money(Math.abs(amount), "EUR") };
       });
   }, [points, trades, lines, holdings]);
+
   if (!symbols.length) return null;
-  const periodsBar = <div className="seg heroPeriods">{PERIODS.map((p) => <button key={p} className={p === period ? "on" : ""} onClick={() => setPeriod(p)}>{p === "1J" && <i className="liveDot" />}{p}</button>)}</div>;
+  const periodsBar = <div className="seg heroPeriods" role="tablist" aria-label="Période de la courbe">{PERIODS.map((p) => <button type="button" role="tab" aria-selected={p === period} key={p} className={p === period ? "on" : ""} onClick={() => setPeriod(p)}>{p === "1J" && <i className="liveDot" />}{p}</button>)}</div>;
+  const axis = points?.length > 1 ? [points[0], points[Math.floor((points.length - 1) / 2)], points[points.length - 1]].map((p) => fmtWhen(p.date, period)) : null;
   return <section className="netWorth heroOpen portfolioCurve fadeIn">
-    {points && points.length > 1 ? <AreaChart points={points} height={220} fade markers={events} scaleLabels>
+    {points && points.length > 1 ? <AreaChart points={points} height={250} fade markers={events} scaleLabels>
       {(pt, first, hovering) => {
-        const d = pt.value - first.value, rel = first.value ? (d / first.value) * 100 : 0;
+        const gain = Number(pt.totalGain) || 0, gainPct = Number(pt.gainPct) || 0;
         return <div className="nwTop">
           <div>
-            <div className="eyebrow">Évolution du portefeuille</div>
+            <div className="eyebrow">Valeur du portefeuille</div>
             <div className="projAmount"><Amount value={pt.value} /></div>
-            <div className="nwDelta"><span className={"chip " + (d >= 0 ? "up" : "down")}>{pct(rel)}</span><span className={d >= 0 ? "ok" : "bad"}>{signed(d)}</span><span className="nwWhen">{hovering ? fmtWhen(pt.date, period) : LABEL[period]}</span></div>
+            <div className="nwDelta">
+              <span className={"chip " + (gain >= 0 ? "up" : "down")}>{pct(gainPct)}</span>
+              <span className={gain >= 0 ? "ok" : "bad"}>{signed(gain)} de plus-value totale</span>
+              <span className="nwWhen">{hovering ? fmtWhen(pt.date, period) : LABEL[period]}</span>
+            </div>
+            <div className="finePrint" style={{ marginTop: 7, justifyContent: "flex-start", gap: 12 }}>
+              <span>Latente <b className={pt.unrealized >= 0 ? "ok" : "bad"}>{signed(pt.unrealized)}</b></span>
+              <span>Réalisée <b className={pt.realized >= 0 ? "ok" : "bad"}>{signed(pt.realized)}</b></span>
+              <span>Dividendes <b className="ok">{signed(pt.dividends)}</b></span>
+            </div>
           </div>
         </div>;
       }}
     </AreaChart> : <div className="nwTop"><div><div className="eyebrow">Évolution du portefeuille</div><p className="muted" style={{ margin: "8px 0" }}>{period === "1J" || hist.loading ? "Chargement de la courbe…" : "Historique indisponible : ajoutez les achats et ventes datés pour reconstituer le portefeuille."}</p></div></div>}
+    {axis && <div className="nwAxis" aria-hidden="true"><span>{axis[0]}</span><span>{axis[1]}</span><span>{period === "1J" ? "Maintenant" : "Aujourd’hui"}</span></div>}
+    {periodsBar}
     {events.length > 0 && <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginTop: 12 }}>
       <span className="finePrint" style={{ margin: "2px 5px 0 0" }}>Transactions :</span>
-      {events.slice(-8).reverse().map((t) => <span key={t.id} title={t.title} className="chip" style={{ fontSize: 11, border: "1px solid " + (t.type === "Achat" ? "rgba(46,229,157,.35)" : t.type === "Vente" ? "rgba(255,107,122,.35)" : "rgba(255,180,84,.35)"), color: t.type === "Achat" ? "#2ee59d" : t.type === "Vente" ? "#ff6b7a" : "#ffb454" }}>
+      {events.slice(-10).reverse().map((t) => <span key={t.id} title={t.title} className="chip" style={{ fontSize: 11, border: "1px solid " + (t.type === "Achat" ? "rgba(46,229,157,.35)" : t.type === "Vente" ? "rgba(255,107,122,.35)" : "rgba(255,180,84,.35)"), color: t.type === "Achat" ? "#2ee59d" : t.type === "Vente" ? "#ff6b7a" : "#ffb454" }}>
         {t.type} · {String(t.date).slice(5).split("-").reverse().join("/")} · {money(Math.abs(Number(t.amount) || 0), "EUR")}
       </span>)}
     </div>}
-    {events.length === 0 && <p className="finePrint" style={{ margin: "10px 0 0" }}>Aucun achat ou vente sur cette période.</p>}
+    {events.length === 0 && <p className="finePrint" style={{ margin: "10px 0 0" }}>Aucune transaction sur cette période.</p>}
     <p className="finePrint" style={{ justifyContent: "flex-start", margin: "10px 0 0" }}><Icon name="info" size={13} />Courbe de valeur du portefeuille. Les points verts signalent les achats, les rouges les ventes et les jaunes les dividendes ; survolez un point pour voir le détail.{hasUntracked ? " Certaines positions sans transactions datées sont exclues de la courbe." : ""}</p>
   </section>;
 }
