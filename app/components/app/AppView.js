@@ -167,7 +167,7 @@ export default function AppView({ data, demo, embedded, initialTab = "overview",
   const setPrivacy = (v) => { setPrivacyState(v); try { localStorage.setItem("patrimo.privacy", v ? "1" : "0"); } catch {} };
   const toastTimer = useRef(0), searchRef = useRef(null), scroller = useRef(null);
   const p0 = data.profile || { plan: "free" }, limits0 = limitsFor((p0.access || accessFor(p0)).plan);
-  // ---------- Cours en direct : rafraîchis toutes les 10 s, courbe du jour toutes les 5 min ----------
+  // ---------- Cours de marché : actualisés régulièrement, selon les délais du fournisseur ----------
   const [market, setMarket] = useState({ quotes: {}, eurPerUsd: null, intraday: {}, at: null });
   const symbols = useMemo(() => [...new Set(data.holdings.filter((h) => h.ticker && Number(h.quantity) > 0).map((h) => String(h.ticker).toUpperCase()))].sort(), [data.holdings]);
   const symKey = symbols.join(",");
@@ -180,7 +180,16 @@ export default function AppView({ data, demo, embedded, initialTab = "overview",
         const r = await actions.fetchQuotes(symbols, withDay);
         if (stop) return;
         if (withDay) lastDay = Date.now();
-        setMarket((m0) => ({ quotes: { ...m0.quotes, ...r.quotes }, eurPerUsd: r.eurPerUsd || m0.eurPerUsd, intraday: withDay ? r.intraday : m0.intraday, at: r.at }));
+        setMarket((m0) => ({
+          // Remplacer les cours à chaque réponse : ne jamais conserver un ancien cours
+          // lorsqu'un fournisseur ne renvoie plus de cotation pour un symbole.
+          quotes: r.quotes || {},
+          // Un taux de change absent doit rester absent : ne pas recycler un ancien FX.
+          eurPerUsd: r.eurPerUsd ?? null,
+          intraday: withDay ? (r.intraday || {}) : m0.intraday,
+          // L'heure de récupération n'est pas l'heure de cotation du marché.
+          at: Object.keys(r.quotes || {}).length ? r.at : null,
+        }));
       } catch {}
       // Toutes les 10 s, calé sur l'horloge (:00, :10, :20…) comme Mon Patrimoine
       if (!stop) timer = setTimeout(tick, document.hidden ? 120e3 : 10e3 - (Date.now() % 10e3));
