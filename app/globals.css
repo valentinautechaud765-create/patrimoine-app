@@ -1443,3 +1443,26 @@ button.budgetRow.tap:hover { background: rgba(255, 255, 255, 0.03); }
   .heroOpen .nwAmount { font-size: clamp(36px, 9vw, 46px); }
   .heroOpen .area { height: 230px !important; }
 }
+
+
+/* Ajustements réels du bloc Patrimoine net */
+.netWorth.heroOpen .nwAmount .money {
+  display: inline-flex;
+  align-items: baseline;
+  font-size: clamp(42px, 4vw, 52px);
+  line-height: 1.04;
+  letter-spacing: -0.045em;
+  font-weight: 600;
+}
+.netWorth.heroOpen .nwAmount .money small {
+  font-size: .48em;
+  font-weight: 550;
+}
+.netWorth.heroOpen .area {
+  height: 310px !important;
+  margin-top: 12px;
+}
+@media (max-width: 700px) {
+  .netWorth.heroOpen .nwAmount .money { font-size: clamp(36px, 9vw, 46px); }
+  .netWorth.heroOpen .area { height: 250px !important; }
+}
