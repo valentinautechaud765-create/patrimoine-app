@@ -227,10 +227,22 @@ export function PortfolioCurve({ holdings, trades = [], intraday, eurPerUsd, fet
     return out;
   }, [source, lines, tradesBy, fx]);
   const hasUntracked = lines.some((h) => !tradesBy[h.id]?.length);
+  const events = useMemo(() => {
+    if (!points?.length) return [];
+    const firstDay = String(points[0].date).slice(0, 10), lastDay = String(points[points.length - 1].date).slice(0, 10);
+    const ids = new Set(lines.map((h) => h.id));
+    return trades.filter((t) => ids.has(t.holding_id) && String(t.date) >= firstDay && String(t.date) <= lastDay)
+      .sort((a, b) => String(a.date).localeCompare(String(b.date)) || String(a.created_at || "").localeCompare(String(b.created_at || "")))
+      .map((t) => {
+        const h = holdings.find((x) => x.id === t.holding_id);
+        const amount = Number(t.amount) || 0;
+        return { ...t, title: t.type + " · " + (h?.name || h?.ticker || "Placement") + " · " + dayLabel(String(t.date)) + " · " + money(Math.abs(amount), "EUR") };
+      });
+  }, [points, trades, lines, holdings]);
   if (!symbols.length) return null;
   const periodsBar = <div className="seg heroPeriods">{PERIODS.map((p) => <button key={p} className={p === period ? "on" : ""} onClick={() => setPeriod(p)}>{p === "1J" && <i className="liveDot" />}{p}</button>)}</div>;
   return <section className="netWorth heroOpen portfolioCurve fadeIn">
-    {points && points.length > 1 ? <AreaChart points={points} height={180} fade>
+    {points && points.length > 1 ? <AreaChart points={points} height={180} fade markers={events}>
       {(pt, first, hovering) => {
         const d = pt.value - first.value, rel = first.value ? (d / first.value) * 100 : 0;
         return <div className="nwTop">
@@ -242,7 +254,13 @@ export function PortfolioCurve({ holdings, trades = [], intraday, eurPerUsd, fet
         </div>;
       }}
     </AreaChart> : <div className="nwTop"><div><div className="eyebrow">Évolution du portefeuille</div><p className="muted" style={{ margin: "8px 0" }}>{period === "1J" || hist.loading ? "Chargement de la courbe…" : "Historique indisponible : ajoutez les achats et ventes datés pour reconstituer le portefeuille."}</p></div></div>}
-    {periodsBar}
-    <p className="finePrint" style={{ justifyContent: "flex-start", margin: "10px 0 0" }}><Icon name="info" size={13} />Valeur historique reconstituée à partir des transactions enregistrées et des cours historiques disponibles.{hasUntracked ? " Certaines positions sans transactions datées sont exclues de la courbe." : ""}</p>
+    {events.length > 0 && <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginTop: 12 }}>
+      <span className="finePrint" style={{ margin: "2px 5px 0 0" }}>Transactions :</span>
+      {events.slice(-8).reverse().map((t) => <span key={t.id} title={t.title} className="chip" style={{ fontSize: 11, border: "1px solid " + (t.type === "Achat" ? "rgba(46,229,157,.35)" : t.type === "Vente" ? "rgba(255,107,122,.35)" : "rgba(255,180,84,.35)"), color: t.type === "Achat" ? "#2ee59d" : t.type === "Vente" ? "#ff6b7a" : "#ffb454" }}>
+        {t.type} · {String(t.date).slice(5).split("-").reverse().join("/")} · {money(Math.abs(Number(t.amount) || 0), "EUR")}
+      </span>)}
+    </div>}
+    {events.length === 0 && <p className="finePrint" style={{ margin: "10px 0 0" }}>Aucun achat ou vente sur cette période.</p>}
+    <p className="finePrint" style={{ justifyContent: "flex-start", margin: "10px 0 0" }}><Icon name="info" size={13} />Courbe de valeur du portefeuille. Les points verts signalent les achats, les rouges les ventes et les jaunes les dividendes ; survolez un point pour voir le détail.{hasUntracked ? " Certaines positions sans transactions datées sont exclues de la courbe." : ""}</p>
   </section>;
 }
