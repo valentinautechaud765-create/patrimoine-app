@@ -78,6 +78,8 @@ create table if not exists public.trades (
   fees numeric(14,2) not null default 0,
   amount numeric(14,2) not null default 0,
   currency text not null default 'EUR',
+  settlement_currency text not null default 'EUR' check (settlement_currency in ('EUR','USD')),
+  settlement_amount numeric(14,2),
   date date not null default current_date,
   created_at timestamptz not null default now()
 );
