@@ -2,7 +2,7 @@
 import { useId, useMemo, useRef, useState } from "react";
 
 // Courbe principale : l'en-tête (render prop) reçoit le point survolé.
-export function AreaChart({ points, height = 200, children, color: forced, fade, scaleLabels = false, markers = [], onMarkerClick, onMarkerDismiss, markerPopover }) {
+export function AreaChart({ points, height = 200, children, color: forced, fade, scaleLabels = false, markers = [], onMarkerClick, onMarkerDismiss, markerPopover, selectedMarkerId }) {
   const [hover, setHover] = useState(null);
   const gid = "ag" + useId().replace(/:/g, "");
   const box = useRef(null), raf = useRef(0), timer = useRef(0);
@@ -93,8 +93,12 @@ export function AreaChart({ points, height = 200, children, color: forced, fade,
         });
         const sameDay = markers.slice(0, mi).filter((m) => String(m.date).slice(0, 10) === String(marker.date).slice(0, 10)).length;
         const markerColor = marker.type === "Achat" ? "#2ee59d" : marker.type === "Vente" ? "#ff6b7a" : "#ffb454";
-        return <button type="button" className="areaMarker" key={marker.id || mi} title={marker.title} aria-label={marker.title} onClick={(e) => { e.stopPropagation(); const r = box.current.getBoundingClientRect(), b = e.currentTarget.getBoundingClientRect(); onMarkerClick?.(marker, { x: ((b.left + b.width / 2 - r.left) / r.width) * 100, y: ((b.top + b.height / 2 - r.top) / r.height) * 100 }); }}
-          style={{ position: "absolute", zIndex: 8, cursor: "pointer", padding: 0, left: (nearest / (geo.pts.length - 1) * 100) + "%", top: (geo.xy[nearest][1] / 104 * 100 + (sameDay % 3) * 2) + "%", transform: "translate(-50%, -50%)", width: 12, height: 12, borderRadius: "50%", background: markerColor, border: "2px solid #101827", boxShadow: "0 0 0 1px " + markerColor, pointerEvents: "auto" }} />;
+        const selected = marker.id === selectedMarkerId;
+        const activeColor = marker.type === "Achat" ? "#42ffad" : marker.type === "Vente" ? "#ff3158" : "#ffd078";
+        return <button type="button" className="areaMarker" key={marker.id || mi} title={marker.title} aria-label={marker.title} aria-pressed={selected} onClick={(e) => { e.stopPropagation(); const r = box.current.getBoundingClientRect(), b = e.currentTarget.getBoundingClientRect(); onMarkerClick?.(marker, { x: ((b.left + b.width / 2 - r.left) / r.width) * 100, y: ((b.top + b.height / 2 - r.top) / r.height) * 100 }); }}
+          style={{ position: "absolute", zIndex: selected ? 10 : 8, cursor: "pointer", padding: 0, display: "grid", placeItems: "center", left: (nearest / (geo.pts.length - 1) * 100) + "%", top: (geo.xy[nearest][1] / 104 * 100 + (sameDay % 3) * 2) + "%", transform: "translate(-50%, -50%)", width: 32, height: 32, border: 0, borderRadius: "50%", background: "transparent", pointerEvents: "auto", touchAction: "manipulation" }}>
+          <span style={{ display: "block", width: selected ? 15 : 10, height: selected ? 15 : 10, borderRadius: "50%", background: selected ? activeColor : markerColor, border: "2px solid #101827", boxShadow: selected ? "0 0 0 3px " + activeColor + "66, 0 0 15px 5px " + activeColor : "0 0 0 1px " + markerColor, transition: "all .16s ease" }} />
+        </button>;
       })}
       {markerPopover && <div className="markerPopover" style={{ left: `clamp(8px, ${markerPopover.x}%, calc(100% - 336px))`, right: "auto", top: `clamp(8px, ${markerPopover.y}%, calc(100% - 228px))` }} onPointerDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>{markerPopover.content}</div>}
       {p && (hover != null || !fade) && <span className={"areaDot" + (hover == null ? " live" : "")} style={{ left: p[0] / 10 + "%", top: (p[1] / 104) * 100 + "%", "--c": color }} /> }
