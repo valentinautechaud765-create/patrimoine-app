@@ -71,7 +71,7 @@ export function Accounts({ m, data, connectBank, syncBank, limits, openPlans, op
 
 /* ---------------- Investissements ---------------- */
 export function Investments({ m, data, limits, openPlans, open, liveInfo, curve, fetchHistory }) {
-  const holdings = [...data.holdings].sort((a, b) => b.value - a.value);
+  const holdings = data.holdings.filter((h) => Number(h.quantity) > 0 || Number(h.value) > 0).sort((a, b) => b.value - a.value);
   const gain = m.hValue - m.cost, gainPct = m.cost > 0 ? (gain / m.cost) * 100 : 0;
   const parts = Object.entries(m.allocation).map(([label, value]) => ({ label, value, color: ASSET_COLORS[label] || "#7fa8ff" })).sort((a, b) => b.value - a.value);
   const best = holdings.filter((h) => h.cost_basis > 0).map((h) => ({ ...h, g: (h.value - h.cost_basis) / h.cost_basis })).sort((a, b) => b.g - a.g);
