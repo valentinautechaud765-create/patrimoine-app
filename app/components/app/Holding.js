@@ -119,7 +119,7 @@ export function TradeForm({ holding: h, trade, initialType = "Achat", eurPerUsd,
   const [settlementCurrency, setSettlementCurrency] = useState(trade?.settlement_currency || "EUR");
   const settlementFx = settlementCurrency === "USD" ? (eurPerUsd || null) : 1;
   const [type, setType] = useState(trade?.type || initialType);
-  const [quantity, setQuantity] = useState(str(trade?.quantity)), [manualQuantity, setManualQuantity] = useState(false);
+  const [quantity, setQuantity] = useState(str(trade?.quantity)), [manualQuantity, setManualQuantity] = useState(Boolean(trade?.id));
   const [price, setPrice] = useState(str(trade?.price ?? h.live?.price ?? (Number(h.quantity) > 0 ? Math.round((h.value / h.quantity) * 10000) / 10000 : ""))), [fees, setFees] = useState(str(trade?.fees ?? 0));
   const [amount, setAmount] = useState(str(trade?.settlement_amount ?? trade?.amount)), [amountEdited, setAmountEdited] = useState(false);
   const [date, setDate] = useState(trade?.date || todayISO()), [busy, setBusy] = useState(false);
