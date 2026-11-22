@@ -310,11 +310,11 @@ export function PortfolioCurve({ holdings, trades = [], intraday, eurPerUsd, fet
         {selectedTradeGroup.length > 1 && <div className="tradePopoverNav" aria-label="Changer de transaction">
           <button type="button" className="tradePopoverNavBtn" title="Transaction précédente" aria-label="Transaction précédente"
             onClick={() => setSelectedTradeId(selectedTradeGroup[(selectedTradeIndex - 1 + selectedTradeGroup.length) % selectedTradeGroup.length].id)}>
-            <Icon name="chevron-left" size={16} />
+            <Icon name="chevronLeft" size={16} />
           </button>
           <button type="button" className="tradePopoverNavBtn" title="Transaction suivante" aria-label="Transaction suivante"
             onClick={() => setSelectedTradeId(selectedTradeGroup[(selectedTradeIndex + 1) % selectedTradeGroup.length].id)}>
-            <Icon name="chevron-right" size={16} />
+            <Icon name="chevronRight" size={16} />
           </button>
         </div>}
       </div>

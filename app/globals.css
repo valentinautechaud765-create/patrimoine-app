@@ -103,7 +103,7 @@ h1, h2, h3 { letter-spacing: -0.025em; }
 
 /* Graphiques */
 .area { position: relative; width: 100%; touch-action: pan-y; user-select: none; -webkit-user-select: none; cursor: crosshair; }
-.area svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.area > svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
 .areaRule { position: absolute; top: -4px; bottom: 0; width: 1px; background: linear-gradient(180deg, transparent, rgba(255, 255, 255, 0.35) 15%, rgba(255, 255, 255, 0.35) 85%, transparent); pointer-events: none; }
 .areaDot { position: absolute; width: 10px; height: 10px; border-radius: 50%; background: var(--c); border: 2px solid var(--bg); transform: translate(-50%, -50%); box-shadow: 0 0 0 4px color-mix(in srgb, var(--c) 25%, transparent); pointer-events: none; }
 .areaDot.live::after { content: ""; position: absolute; inset: -6px; border-radius: 50%; border: 1px solid var(--c); animation: pulse 2s var(--ease) infinite; }
