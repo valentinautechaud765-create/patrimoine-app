@@ -192,6 +192,70 @@ function App() {
   const user = data?.session?.user?.id;
   const live = useRef(data); live.current = data;
 
+  // Répare l'historique des placements : chaque achat/vente/dividende doit aussi
+  // avoir une opération de trésorerie. Idempotent grâce à trade_id.
+  const tradeBackfillUser = useRef(null);
+  useEffect(() => {
+    if (demo || !user || !data || data.tradesMissing || tradeBackfillUser.current === user) return;
+    tradeBackfillUser.current = user;
+    (async () => {
+      const sb = supabaseBrowser();
+      const current = live.current;
+      const txs = [...(current.transactions || [])];
+      const holdings = current.holdings || [];
+      const created = [], updated = [];
+      const dayGap = (a, b) => Math.abs(new Date(String(a).slice(0, 10) + "T12:00:00Z").getTime() - new Date(String(b).slice(0, 10) + "T12:00:00Z").getTime()) / 864e5;
+      const round = (n) => Math.round(Number(n || 0) * 100) / 100;
+      for (const tr of [...(current.trades || [])].sort((a, b) => String(a.date).localeCompare(String(b.date)))) {
+        if (txs.some((x) => x.trade_id === tr.id)) continue;
+        const holding = holdings.find((h) => h.id === tr.holding_id);
+        const amount = round(Number(tr.amount) * (tr.type === "Achat" ? -1 : 1));
+        if (!amount || !tr.date) continue;
+        const accountId = holding?.account_id || tr.account_id || null;
+        // D'abord retrouver le mouvement bancaire Powens du même compte, montant et date.
+        const bankTwin = accountId ? txs.find((x) =>
+          x.external_id && String(x.external_id).startsWith("powens:") &&
+          x.account_id === accountId && round(x.amount) === amount &&
+          dayGap(x.date, tr.date) <= 3 && !x.trade_id
+        ) : null;
+        // Puis une opération synthétique créée avant le lien trade_id (même libellé).
+        const prefix = tr.type === "Achat" ? "Achat" : tr.type === "Vente" ? "Vente" : "Dividende";
+        const label = `${prefix} · ${holding?.name || "Placement"}`;
+        const manualTwin = !bankTwin ? txs.find((x) =>
+          !x.trade_id && x.account_id === accountId && round(x.amount) === amount &&
+          dayGap(x.date, tr.date) <= 3 &&
+          (String(x.label || "").toLowerCase() === label.toLowerCase() ||
+           (String(x.label || "").toLowerCase().startsWith(prefix.toLowerCase() + " · ") &&
+            String(x.label || "").toLowerCase().includes(String(holding?.name || "").toLowerCase())))
+        ) : null;
+        const twin = bankTwin || manualTwin;
+        if (twin) {
+          const { data: saved, error } = await sb.from("transactions").update({ trade_id: tr.id }).eq("id", twin.id).eq("user_id", user).select().single();
+          if (error) throw error;
+          const row = clean(saved); updated.push(row);
+          const at = txs.findIndex((x) => x.id === row.id); if (at >= 0) txs[at] = row;
+          continue;
+        }
+        const row = {
+          user_id: user, trade_id: tr.id, account_id: accountId,
+          date: tr.date, label, amount, category: "Investissements",
+        };
+        const { data: saved, error } = await sb.from("transactions").insert(row).select().single();
+        if (error) throw error;
+        const normalized = clean(saved); created.push(normalized); txs.push(normalized);
+      }
+      if (created.length || updated.length) {
+        setData((d) => d && ({ ...d, transactions: byDate([
+          ...d.transactions.filter((x) => !updated.some((u) => u.id === x.id)),
+          ...updated, ...created,
+        ]) }));
+      }
+    })().catch((e) => {
+      console.error("[trade backfill]", e.message);
+      tradeBackfillUser.current = null; // permet de réessayer au prochain rechargement
+    });
+  }, [demo, user, data?.trades, data?.transactions, data?.holdings, data?.tradesMissing]);
+
   // Écriture générique : ajout (sans id) ou modification (avec id). En démo, tout reste en mémoire.
   async function write(table, row) {
     if (demo) return { ...row, id: row.id || "local" + Date.now() + Math.random().toString(36).slice(2, 6) };
