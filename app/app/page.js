@@ -668,7 +668,9 @@ function App() {
       const cashAmount = Math.round(Number(saved.amount || tradePayload.amount) * (tradePayload.type === "Achat" ? -1 : 1) * 100) / 100;
       const holding = live.current.holdings.find((x) => x.id === tradePayload.holding_id);
       const cashTx = { ...(existingCashTx ? { id: existingCashTx.id } : {}), trade_id: saved.id, account_id: account_id || existingCashTx?.account_id || null, date: tradePayload.date, label: `${tradePayload.type === "Achat" ? "Achat" : tradePayload.type === "Vente" ? "Vente" : "Dividende"} · ${holding?.name || "Placement"}`, amount: cashAmount, category: "Investissements" };
-      if (cashTx.account_id) await actions.saveTransaction(cashTx);
+      // Toujours créer le mouvement de trésorerie : sans compte lié, il reste visible dans Opérations
+      // avec account_id = null ; avec un compte choisi, saveTransaction met aussi son solde à jour.
+      await actions.saveTransaction(cashTx);
       setData((d) => ({ ...d, trades }));
       await applyTrades(t.holding_id, trades);
       return { message: t.id ? "Transaction modifiée" : t.type === "Dividende" ? "Dividende ajouté" : t.type === "Achat" ? "Achat enregistré" : "Vente enregistrée" };
