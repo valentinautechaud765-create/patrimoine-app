@@ -667,10 +667,25 @@ function App() {
       const existingCashTx = live.current.transactions.find((x) => x.trade_id === saved.id);
       const cashAmount = Math.round(Number(saved.amount || tradePayload.amount) * (tradePayload.type === "Achat" ? -1 : 1) * 100) / 100;
       const holding = live.current.holdings.find((x) => x.id === tradePayload.holding_id);
-      const cashTx = { ...(existingCashTx ? { id: existingCashTx.id } : {}), trade_id: saved.id, account_id: account_id || existingCashTx?.account_id || null, date: tradePayload.date, label: `${tradePayload.type === "Achat" ? "Achat" : tradePayload.type === "Vente" ? "Vente" : "Dividende"} · ${holding?.name || "Placement"}`, amount: cashAmount, category: "Investissements" };
-      // Toujours créer le mouvement de trésorerie : sans compte lié, il reste visible dans Opérations
-      // avec account_id = null ; avec un compte choisi, saveTransaction met aussi son solde à jour.
-      await actions.saveTransaction(cashTx);
+      const cashAccountId = account_id || existingCashTx?.account_id || null;
+      const cashTx = { ...(existingCashTx ? { id: existingCashTx.id } : {}), trade_id: saved.id, account_id: cashAccountId, date: tradePayload.date, label: `${tradePayload.type === "Achat" ? "Achat" : tradePayload.type === "Vente" ? "Vente" : "Dividende"} · ${holding?.name || "Placement"}`, amount: cashAmount, category: "Investissements" };
+      // Si Powens a déjà importé le mouvement bancaire, on rattache la transaction boursière
+      // à cette opération au lieu d'en créer une seconde.
+      const bankTwin = cashAccountId ? live.current.transactions.find((x) =>
+        x.id !== existingCashTx?.id &&
+        x.external_id &&
+        x.account_id === cashAccountId &&
+        Number(x.amount).toFixed(2) === cashAmount.toFixed(2) &&
+        Math.abs(new Date(String(x.date).slice(0, 10) + "T12:00:00").getTime() - new Date(String(tradePayload.date).slice(0, 10) + "T12:00:00").getTime()) <= 3 * 864e5
+      ) : null;
+      if (bankTwin) {
+        // Supprime l'écriture synthétique antérieure si elle existe, puis conserve l'écriture bancaire Powens.
+        if (existingCashTx) await actions.deleteTransaction(existingCashTx);
+        await actions.saveTransaction({ ...bankTwin, trade_id: saved.id });
+      } else {
+        // Sans opération bancaire correspondante, on crée le mouvement visible dans Opérations.
+        await actions.saveTransaction(cashTx);
+      }
       setData((d) => ({ ...d, trades }));
       await applyTrades(t.holding_id, trades);
       return { message: t.id ? "Transaction modifiée" : t.type === "Dividende" ? "Dividende ajouté" : t.type === "Achat" ? "Achat enregistré" : "Vente enregistrée" };
