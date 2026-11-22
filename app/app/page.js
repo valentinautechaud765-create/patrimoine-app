@@ -211,13 +211,17 @@ function App() {
         const holding = holdings.find((h) => h.id === tr.holding_id);
         const amount = round(Number(tr.amount) * (tr.type === "Achat" ? -1 : 1));
         if (!amount || !tr.date) continue;
-        const accountId = holding?.account_id || tr.account_id || null;
+        let accountId = holding?.account_id || tr.account_id || null;
         // D'abord retrouver le mouvement bancaire Powens du même compte, montant et date.
-        const bankTwin = accountId ? txs.find((x) =>
+        // Si l'ancien trade n'a pas conservé le compte choisi, on ne le rattache que si
+        // un seul mouvement bancaire correspond : aucun compte n'est deviné en cas d'ambiguïté.
+        const bankCandidates = txs.filter((x) =>
           x.external_id && String(x.external_id).startsWith("powens:") &&
-          x.account_id === accountId && round(x.amount) === amount &&
+          (!accountId || x.account_id === accountId) && round(x.amount) === amount &&
           dayGap(x.date, tr.date) <= 3 && !x.trade_id
-        ) : null;
+        );
+        const bankTwin = bankCandidates.length === 1 ? bankCandidates[0] : null;
+        if (bankTwin && !accountId) accountId = bankTwin.account_id || null;
         // Puis une opération synthétique créée avant le lien trade_id (même libellé).
         const prefix = tr.type === "Achat" ? "Achat" : tr.type === "Vente" ? "Vente" : "Dividende";
         const label = `${prefix} · ${holding?.name || "Placement"}`;
