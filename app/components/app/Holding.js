@@ -302,20 +302,20 @@ export function PortfolioCurve({ holdings, trades = [], intraday, eurPerUsd, fet
   const selectedTradeGroup = selectedTrade
     ? events.filter((t) => String(t.date).slice(0, 10) === String(selectedTrade.date).slice(0, 10))
     : [];
+  const selectedTradeIndex = selectedTradeGroup.findIndex((trade) => trade.id === selectedTradeId);
   const tradePopover = selectedTrade ? {
     x: selectedTradePosition?.x ?? 72, y: selectedTradePosition?.y ?? 42,
     content: <div className="tradePopoverCard">
       <div className="tradePopoverHead"><div className="tradePopoverTitle"><span className={"tradePopoverType " + (selectedTrade.type === "Achat" ? "buy" : selectedTrade.type === "Vente" ? "sell" : "dividend")}>{selectedTrade.type}</span><span className="muted">{dayLabel(selectedTrade.date)}</span></div>
-        {selectedTradeGroup.length > 1 && <div style={{ display: "flex", alignItems: "center", gap: 2, flex: "none" }} aria-label="Autres transactions du même jour">
-          {selectedTradeGroup.map((trade, index) => {
-            const active = trade.id === selectedTrade.id;
-            const dotColor = trade.type === "Achat" ? "#42ffad" : trade.type === "Vente" ? "#ff3158" : "#ffd078";
-            return <button key={trade.id} type="button" title={trade.title} aria-label={"Afficher " + trade.title} aria-pressed={active}
-              onClick={() => setSelectedTradeId(trade.id)}
-              style={{ width: 30, height: 30, padding: 0, border: 0, borderRadius: "50%", background: "transparent", display: "grid", placeItems: "center", cursor: "pointer", touchAction: "manipulation" }}>
-              <span style={{ width: active ? 13 : 9, height: active ? 13 : 9, display: "block", borderRadius: "50%", background: dotColor, boxShadow: active ? "0 0 0 3px " + dotColor + "66, 0 0 12px 4px " + dotColor : "0 0 0 1px " + dotColor, transition: "all .16s ease" }} />
-            </button>;
-          })}
+        {selectedTradeGroup.length > 1 && <div className="tradePopoverNav" aria-label="Changer de transaction">
+          <button type="button" className="tradePopoverNavBtn" title="Transaction précédente" aria-label="Transaction précédente"
+            onClick={() => setSelectedTradeId(selectedTradeGroup[(selectedTradeIndex - 1 + selectedTradeGroup.length) % selectedTradeGroup.length].id)}>
+            <Icon name="chevron-left" size={16} />
+          </button>
+          <button type="button" className="tradePopoverNavBtn" title="Transaction suivante" aria-label="Transaction suivante"
+            onClick={() => setSelectedTradeId(selectedTradeGroup[(selectedTradeIndex + 1) % selectedTradeGroup.length].id)}>
+            <Icon name="chevron-right" size={16} />
+          </button>
         </div>}
       </div>
       <b className="tradePopoverName">{selectedTrade.holdingName}{selectedTrade.ticker ? " · " + selectedTrade.ticker.toUpperCase() : ""}</b>
