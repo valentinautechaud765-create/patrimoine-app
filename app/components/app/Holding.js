@@ -299,11 +299,24 @@ export function PortfolioCurve({ holdings, trades = [], intraday, eurPerUsd, fet
       });
   }, [points, trades, lines, holdings, accounts, tradesBy]);
   const selectedTrade = events.find((t) => t.id === selectedTradeId) || null;
+  const selectedTradeGroup = selectedTrade
+    ? events.filter((t) => String(t.date).slice(0, 10) === String(selectedTrade.date).slice(0, 10))
+    : [];
   const tradePopover = selectedTrade ? {
     x: selectedTradePosition?.x ?? 72, y: selectedTradePosition?.y ?? 42,
     content: <div className="tradePopoverCard">
       <div className="tradePopoverHead"><div className="tradePopoverTitle"><span className={"tradePopoverType " + (selectedTrade.type === "Achat" ? "buy" : selectedTrade.type === "Vente" ? "sell" : "dividend")}>{selectedTrade.type}</span><span className="muted">{dayLabel(selectedTrade.date)}</span></div>
-        
+        {selectedTradeGroup.length > 1 && <div style={{ display: "flex", alignItems: "center", gap: 2, flex: "none" }} aria-label="Autres transactions du même jour">
+          {selectedTradeGroup.map((trade, index) => {
+            const active = trade.id === selectedTrade.id;
+            const dotColor = trade.type === "Achat" ? "#42ffad" : trade.type === "Vente" ? "#ff3158" : "#ffd078";
+            return <button key={trade.id} type="button" title={trade.title} aria-label={"Afficher " + trade.title} aria-pressed={active}
+              onClick={() => setSelectedTradeId(trade.id)}
+              style={{ width: 30, height: 30, padding: 0, border: 0, borderRadius: "50%", background: "transparent", display: "grid", placeItems: "center", cursor: "pointer", touchAction: "manipulation" }}>
+              <span style={{ width: active ? 13 : 9, height: active ? 13 : 9, display: "block", borderRadius: "50%", background: dotColor, boxShadow: active ? "0 0 0 3px " + dotColor + "66, 0 0 12px 4px " + dotColor : "0 0 0 1px " + dotColor, transition: "all .16s ease" }} />
+            </button>;
+          })}
+        </div>}
       </div>
       <b className="tradePopoverName">{selectedTrade.holdingName}{selectedTrade.ticker ? " · " + selectedTrade.ticker.toUpperCase() : ""}</b>
       <div className="tradePopoverGrid">
@@ -321,7 +334,7 @@ export function PortfolioCurve({ holdings, trades = [], intraday, eurPerUsd, fet
   const periodsBar = <div className="seg heroPeriods" role="tablist" aria-label="Période de la courbe">{PERIODS.map((p) => <button type="button" role="tab" aria-selected={p === period} key={p} className={p === period ? "on" : ""} onClick={() => setPeriod(p)}>{p === "1J" && <i className="liveDot" />}{p}</button>)}</div>;
   const axis = points?.length > 1 ? [points[0], points[Math.floor((points.length - 1) / 2)], points[points.length - 1]].map((p) => fmtWhen(p.date, period)) : null;
   return <section className="netWorth heroOpen portfolioCurve fadeIn">
-    {points && points.length > 1 ? <AreaChart points={points} height={250} fade markers={events} scaleLabels markerPopover={tradePopover} onMarkerClick={(marker, position) => { setSelectedTradeId(marker.id); setSelectedTradePosition(position); }} onMarkerDismiss={() => { setSelectedTradeId(null); setSelectedTradePosition(null); }}>
+    {points && points.length > 1 ? <AreaChart points={points} height={250} fade markers={events} scaleLabels markerPopover={tradePopover} selectedMarkerId={selectedTradeId} onMarkerClick={(marker, position) => { setSelectedTradeId(marker.id); setSelectedTradePosition(position); }} onMarkerDismiss={() => { setSelectedTradeId(null); setSelectedTradePosition(null); }}>
       {(pt, first, hovering) => {
         const gain = Number(pt.totalGain) || 0, gainPct = Number(pt.gainPct) || 0;
         return <div className="nwTop">
