@@ -18,7 +18,7 @@ Pourquoi ces prix : Finary et les applis équivalentes se situent entre ~8 et ~1
 
 - **Site commercial** (`/`) : accroche, fonctionnalités, sécurité, tarifs mensuel/annuel, FAQ, appels à l’action.
 - **Connexion / inscription** (`/connexion`) avec Supabase (e-mail + mot de passe, réinitialisation).
-- **Appli** (`/app`) : patrimoine total avec courbe interactive, comptes, investissements, budgets, opérations, ajout d’opération.
+- **Appli** (`/app`) : patrimoine total avec courbe interactive, comptes, virements internes entre comptes, investissements, budgets et opérations.
 - **Paywall** : fonctions réservées aux abonnés (historique complet, investissements, plusieurs banques) avec fenêtre d’abonnement.
 - **Abonnements Stripe** : paiement, essai gratuit unique, espace client (factures, changement de formule, résiliation), webhook qui met à jour la formule.
 - **Connexion bancaire Powens** : ouverture de la page de connexion, import des comptes au retour, jeton chiffré.
@@ -56,7 +56,8 @@ npm run dev
 ## Nouveautés (novembre 2026)
 
 - **Banque** : connexion Powens, import des comptes et de 6 mois d'opérations, synchro automatique, aucun doublon
-  (banque reconnectée, virements entre ses propres comptes classés « Virement interne »).
+  (banque reconnectée, virements internes rapprochés des opérations déjà importées).
+- **Virements internes** : débit/crédit atomiques entre deux comptes, soldes manuels ajustés, comptes synchronisés laissés à la main de la banque, une seule ligne visible dans l'historique et aucun impact sur les dépenses, revenus ou le patrimoine total.
 - **Comptes affichés** : masquer un compte ou n'afficher que certains comptes.
 - **Dettes** : je dois / on me doit / crédits, remboursements, reste dû déduit du patrimoine net.
 - **Placements** : cours en direct (10 s), fiche par ligne avec courbe, achats / ventes / dividendes.
