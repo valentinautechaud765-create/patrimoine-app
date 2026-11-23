@@ -281,8 +281,8 @@ export function Operations({ data, query, setQuery, limits, openPlans, open, fla
         <div className="list">{d.items.map((t) => t.transfer_view
           ? <button key={t.transfer_id} className="item hover tap" onClick={() => open("transferView", { id: t.transfer_id })}>
               <span className="kindIco"><Icon name="arrowLeftRight" size={17} /></span>
-              <div className="itemMain"><b>{t.transfer_from} → {t.transfer_to}</b><small>Virement interne · non compté dans les dépenses</small></div>
-              <div className="itemSide"><b>{money(t.transfer_amount)}</b><small className="faint">Transfert</small></div>
+              <div className="itemMain"><b>{t.transfer_from} → {t.transfer_to}</b></div>
+              <div className="itemSide"><b>{money(t.transfer_amount)}</b></div>
             </button>
           : <TxRow key={t.id} t={t} onClick={() => t.transfer_id ? open("transferView", { id: t.transfer_id }) : open("tx", { tx: t })} />)}</div>
       </div>) : <Empty icon="search" title={data.transactions.length ? "Aucun résultat" : "Aucune opération"} text={query ? `Rien ne correspond à « ${query} ».` : data.transactions.length ? "Aucune opération pour ce filtre." : "Ajoutez votre première dépense ou votre premier revenu."}>{!data.transactions.length && <button className="btn primary sm" onClick={() => open("tx")}><Icon name="plus" size={15} />Ajouter</button>}</Empty>}
