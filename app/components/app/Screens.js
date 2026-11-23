@@ -36,7 +36,7 @@ export function Accounts({ m, data, connectBank, syncBank, limits, openPlans, op
         <Icon name="chevronRight" size={18} className="faint" />
       </button>
       <button className="card actionCard fadeIn" onClick={() => open("transfer")}>
-        <span className="actionIco"><Icon name="arrow-left-right" size={20} /></span>
+        <span className="actionIco"><Icon name="arrowLeftRight" size={20} /></span>
         <div><b>Effectuer un virement</b><small>Transférer de l’argent entre deux de vos comptes, sans fausse dépense.</small></div>
         <Icon name="chevronRight" size={18} className="faint" />
       </button>
@@ -280,7 +280,7 @@ export function Operations({ data, query, setQuery, limits, openPlans, open, fla
         <div className="dayHead"><span>{dayTitle(d.date)}</span><span className="num">{d.total >= 0 ? "+" : "−"}{money(Math.abs(d.total))}</span></div>
         <div className="list">{d.items.map((t) => t.transfer_view
           ? <button key={t.transfer_id} className="item hover tap" onClick={() => open("transferView", { id: t.transfer_id })}>
-              <span className="kindIco"><Icon name="arrow-left-right" size={17} /></span>
+              <span className="kindIco"><Icon name="arrowLeftRight" size={17} /></span>
               <div className="itemMain"><b>{t.transfer_from} → {t.transfer_to}</b><small>Virement interne · non compté dans les dépenses</small></div>
               <div className="itemSide"><b>{money(t.transfer_amount)}</b><small className="faint">Transfert</small></div>
             </button>
