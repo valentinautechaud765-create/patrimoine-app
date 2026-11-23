@@ -12,7 +12,7 @@ import { Debts, DebtForm, DebtSheet, PaymentForm } from "./Debts.js";
 import RealEstate from "./RealEstate.js";
 import { RecurrenceForm } from "./Forms.js";
 import { Avatar } from "./ui.js";
-import { Modal, Head, TxForm, AccountForm, AccountSheet, BudgetForm, HoldingForm, DeleteMeModal, ImportModal } from "./Forms.js";
+import { Modal, Head, TxForm, AccountForm, AccountSheet, BudgetForm, HoldingForm, DeleteMeModal, ImportModal, TransferForm, TransferSheet } from "./Forms.js";
 
 export const NAV = [
   { id: "overview", label: "Vue d’ensemble", short: "Accueil", icon: "home" },
@@ -384,8 +384,10 @@ export default function AppView({ data, demo, embedded, initialTab = "overview",
 
       {modal?.type === "plans" && <PlansModal current={access.paid ? plan : null} initial={modal.plan} trial={trialing ? access : null} onClose={() => setModal(null)} onChoose={(pl, b) => run(actions.checkout, pl, b)} virement={virementApi} />}
       {modal?.type === "tx" && <TxForm tx={modal.tx} defaultAccount={modal.account_id} accounts={data.accounts} onClose={close} onSave={(t, f) => run(actions.saveTransaction, t, f)} onDelete={(t) => run(actions.deleteTransaction, t)} onAddCategory={(c) => run(actions.addCategory, c)} />}
+      {modal?.type === "transfer" && <TransferForm accounts={data.accounts} onClose={close} onSave={(t) => run(actions.createTransfer, t)} />}
+      {modal?.type === "transferView" && <TransferSheet transfer={data.transactions.find((t) => t.transfer_id === modal.id)} accounts={{ list: data.accounts, transactions: data.transactions.filter((t) => t.transfer_id === modal.id) }} onClose={close} />}
       {modal?.type === "account" && <AccountForm account={modal.account} onClose={close} onSave={(a) => run(actions.saveAccount, a)} onDelete={(a) => run(actions.deleteAccount, a)} />}
-      {viewed && <AccountSheet account={viewed} transactions={data.transactions} onClose={close} onEdit={() => open("account", { account: viewed })} onAddTx={() => open("tx", { account_id: viewed.id })} onOpenTx={(t) => open("tx", { tx: t })} />}
+      {viewed && <AccountSheet account={viewed} transactions={data.transactions} onClose={close} onEdit={() => open("account", { account: viewed })} onAddTx={() => open("tx", { account_id: viewed.id })} onOpenTx={(t) => t.transfer_id ? open("transferView", { id: t.transfer_id }) : open("tx", { tx: t })} />}
       {modal?.type === "budget" && <BudgetForm budget={modal.budget} suggested={modal.suggested} existing={data.budgets.map((b) => b.category)} average={average} onClose={close} onSave={(b, prev) => run(actions.saveBudget, b, prev)} onDelete={(c) => run(actions.deleteBudget, c)} onAddCategory={(c) => run(actions.addCategory, c)} />}
       {modal?.type === "holding" && <HoldingForm holding={modal.holding} eurPerUsd={market.eurPerUsd} onClose={close} onSave={(h) => run(actions.saveHolding, h)} onDelete={(h) => run(actions.deleteHolding, h)} />}
       {modal?.type === "import" && <ImportModal email={email} onClose={close} onImport={(f) => run(actions.importMonPatrimoine, f)} />}

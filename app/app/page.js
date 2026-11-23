@@ -404,6 +404,28 @@ function App() {
       try { localStorage.setItem("patrimo.bankPending", String(Date.now())); } catch {}
       window.location.href = url;
     },
+    async createTransfer(payload) {
+      const amount = Math.round(Number(payload.amount) * 100) / 100;
+      if (!(amount > 0) || payload.from_account_id === payload.to_account_id) throw new Error("Vérifiez les deux comptes et le montant.");
+      if (demo) {
+        const source = live.current.accounts.find((a) => a.id === payload.from_account_id);
+        const target = live.current.accounts.find((a) => a.id === payload.to_account_id);
+        if (!source || !target || source.currency !== target.currency) throw new Error("Comptes invalides ou devises différentes.");
+        const transferId = "local-transfer-" + Date.now();
+        const debit = await write("transactions", { transfer_id: transferId, transfer_side: "out", account_id: source.id, date: payload.date, label: "Virement vers " + target.name, amount: -amount, category: "Virement interne" });
+        const credit = await write("transactions", { transfer_id: transferId, transfer_side: "in", account_id: target.id, date: payload.date, label: "Virement depuis " + source.name, amount, category: "Virement interne" });
+        setData((d) => ({ ...d, transactions: byDate([...d.transactions, debit, credit]) }));
+        await shiftBalance(source.id, -amount); await shiftBalance(target.id, amount);
+      } else {
+        const { error } = await supabaseBrowser().rpc("create_internal_transfer", {
+          p_from_account: payload.from_account_id, p_to_account: payload.to_account_id,
+          p_amount: amount, p_date: payload.date, p_note: payload.note || null,
+        });
+        if (error) throw new Error("Virement impossible : " + error.message);
+        await load();
+      }
+      return { message: "Virement enregistré. Les deux comptes sont mis à jour sans modifier vos dépenses ni vos revenus." };
+    },
     async saveTransaction(t, repeatFreq) {
       if (repeatFreq && live.current.recurrencesMissing) throw new Error("Mise à jour de la base nécessaire pour les opérations automatiques : relance supabase/schema.sql dans Supabase (SQL Editor → Run).");
       const before = t.id ? live.current.transactions.find((x) => x.id === t.id) : null;
@@ -424,6 +446,18 @@ function App() {
       return { message: before ? "Opération modifiée" : "Opération ajoutée" };
     },
     async deleteTransaction(t) {
+      if (t.transfer_id) {
+        if (demo) {
+          const legs = live.current.transactions.filter((x) => x.transfer_id === t.transfer_id);
+          for (const leg of legs) await shiftBalance(leg.account_id, -Number(leg.amount));
+          setData((d) => ({ ...d, transactions: d.transactions.filter((x) => x.transfer_id !== t.transfer_id) }));
+        } else {
+          const { error } = await supabaseBrowser().rpc("delete_internal_transfer", { p_transfer_id: t.transfer_id });
+          if (error) throw new Error("Suppression impossible : " + error.message);
+          await load();
+        }
+        return { message: "Virement retiré de l’historique." };
+      }
       await erase("transactions", { id: t.id });
       drop("transactions", t.id);
       if (t.account_id) await shiftBalance(t.account_id, -Number(t.amount));

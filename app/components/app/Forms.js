@@ -94,6 +94,68 @@ export function TxForm({ tx, accounts, defaultAccount, onClose, onSave, onDelete
   </Modal>;
 }
 
+
+/* ---------- Virement interne entre deux comptes ---------- */
+export function TransferForm({ accounts, onClose, onSave }) {
+  const usable = accounts.filter((a) => !a.hidden);
+  const [from, setFrom] = useState(usable[0]?.id || "");
+  const [to, setTo] = useState(usable.find((a) => a.id !== usable[0]?.id)?.id || "");
+  const [amount, setAmount] = useState("");
+  const [date, setDate] = useState(todayISO());
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+  const source = usable.find((a) => a.id === from), target = usable.find((a) => a.id === to);
+  const value = num(amount), sameCurrency = Boolean(source && target && source.currency === target.currency);
+  const ok = from && to && from !== to && value > 0 && sameCurrency && /^\d{4}-\d{2}-\d{2}$/.test(date);
+  return <Modal onClose={busy ? () => {} : onClose}>
+    <form className="modalForm" onSubmit={async (e) => {
+      e.preventDefault(); if (!ok) return; setBusy(true);
+      const result = await onSave({ from_account_id: from, to_account_id: to, amount: Math.round(value * 100) / 100, date, note: note.trim() });
+      setBusy(false); if (result !== false) onClose();
+    }}>
+      <Head title="Virement entre mes comptes" sub="Déplacez de l’argent sans créer de dépense ni de revenu." onClose={onClose} />
+      <label className="label">Compte à débiter<select className="input" value={from} onChange={(e) => { setFrom(e.target.value); if (e.target.value === to) setTo(usable.find((a) => a.id !== e.target.value)?.id || ""); }}>
+        {usable.map((a) => <option key={a.id} value={a.id}>{a.name}{a.institution ? " · " + a.institution : ""}{a.powens_account_id ? " (synchronisé)" : ""} · {money(a.balance, a.currency)}</option>)}
+      </select></label>
+      <div className="transferArrow"><Icon name="arrow-down" size={18} /></div>
+      <label className="label">Compte à créditer<select className="input" value={to} onChange={(e) => setTo(e.target.value)}>
+        {usable.filter((a) => a.id !== from).map((a) => <option key={a.id} value={a.id}>{a.name}{a.institution ? " · " + a.institution : ""}{a.powens_account_id ? " (synchronisé)" : ""} · {money(a.balance, a.currency)}</option>)}
+      </select></label>
+      <label className="amountField"><input inputMode="decimal" placeholder="0,00" value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^\d.,]/g, ""))} aria-label="Montant du virement" /><span>{source?.currency || "EUR"}</span></label>
+      <div className="grid g2" style={{ gap: 12 }}>
+        <label className="label">Date<input className="input" type="date" value={date} onChange={(e) => setDate(e.target.value)} /></label>
+        <label className="label">Motif (facultatif)<input className="input" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Ex. Budget appartement" maxLength={80} /></label>
+      </div>
+      {source?.powens_account_id || target?.powens_account_id ? <p className="formHint"><Icon name="info" size={14} />Un compte synchronisé garde son solde fourni par la banque. Lors de la prochaine synchronisation, le mouvement bancaire correspondant sera rapproché de ce virement, sans doublon.</p> : <p className="formHint"><Icon name="info" size={14} />Les deux soldes seront ajustés automatiquement. Le patrimoine total et les statistiques de dépenses/revenus ne changeront pas.</p>}
+      {source && target && !sameCurrency && <div className="msg info">Les deux comptes doivent être dans la même devise pour ce transfert.</div>}
+      {!usable.length && <div className="msg info">Ajoutez d’abord au moins deux comptes.</div>}
+      <button className="btn primary lg block" disabled={busy || !ok}>{busy ? "Enregistrement…" : "Confirmer le virement"}</button>
+    </form>
+  </Modal>;
+}
+
+export function TransferSheet({ transfer, accounts, onClose }) {
+  const legs = accounts.transactions || [];
+  const out = legs.find((t) => t.transfer_side === "out") || transfer;
+  const incoming = legs.find((t) => t.transfer_side === "in");
+  const names = Object.fromEntries(accounts.list.map((a) => [a.id, a.name]));
+  const from = names[out?.account_id] || "Compte de départ";
+  const to = names[incoming?.account_id] || "Compte destinataire";
+  return <Modal onClose={onClose}>
+    <div className="modalForm">
+      <Head title="Détail du virement" sub="Mouvement interne · non comptabilisé comme dépense ou revenu" onClose={onClose} />
+      <div className="transferDetail">
+        <div><small>De</small><b>{from}</b></div>
+        <Icon name="arrow-down" size={18} />
+        <div><small>Vers</small><b>{to}</b></div>
+      </div>
+      <div className="sheetBalance"><small>Montant transféré</small><b className="money">{money(Math.abs(Number(out?.amount || 0)), out?.currency || "EUR")}</b><span className="faint">{out?.date ? new Date(out.date + "T12:00:00").toLocaleDateString("fr-FR", { dateStyle: "long" }) : ""}</span></div>
+      {out?.label && <p className="formHint">{out.label}</p>}
+      <button className="btn lg block" onClick={onClose}>Fermer</button>
+    </div>
+  </Modal>;
+}
+
 /* ---------- Compte ---------- */
 const KINDS = [["courant", "Courant", "card"], ["epargne", "Épargne", "piggy"], ["investissement", "Placements", "trending"]];
 export function AccountForm({ account, onClose, onSave, onDelete }) {

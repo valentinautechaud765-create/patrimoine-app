@@ -29,10 +29,15 @@ export function Accounts({ m, data, connectBank, syncBank, limits, openPlans, op
         <small className="muted">{m.total > 0 ? Math.round((v / m.total) * 100) + " % du patrimoine" : "—"}</small>
       </div>)}
     </div>
-    <div className="grid g2">
+    <div className="grid g3">
       <button className="card actionCard fadeIn" onClick={() => open("account")}>
         <span className="actionIco"><Icon name="plus" size={20} /></span>
         <div><b>Ajouter un compte</b><small>Courant, livret, PEA… saisi à la main en 10 secondes.</small></div>
+        <Icon name="chevronRight" size={18} className="faint" />
+      </button>
+      <button className="card actionCard fadeIn" onClick={() => open("transfer")}>
+        <span className="actionIco"><Icon name="arrow-left-right" size={20} /></span>
+        <div><b>Effectuer un virement</b><small>Transférer de l’argent entre deux de vos comptes, sans fausse dépense.</small></div>
         <Icon name="chevronRight" size={18} className="faint" />
       </button>
       <button className="card actionCard blue fadeIn" onClick={() => canSync ? connectBank() : openPlans("plus")}>
@@ -215,8 +220,25 @@ export function Operations({ data, query, setQuery, limits, openPlans, open, fla
   const months = useMemo(() => [...new Set(data.transactions.map((t) => String(t.date).slice(0, 7)))].sort().reverse(), [data.transactions]);
   const list = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return data.transactions.filter((t) => (kind === "all" || (kind === "out" ? t.amount < 0 : t.amount > 0)) && (!category || t.category === category) && (!month || String(t.date).startsWith(month)) && (!q || (t.label + " " + t.category + " " + Math.abs(t.amount)).toLowerCase().includes(q)));
-  }, [data.transactions, kind, category, month, query]);
+    const selected = data.transactions.filter((t) =>
+      (kind === "all" || (t.category !== "Virement interne" && (kind === "out" ? t.amount < 0 : t.amount > 0))) &&
+      (!category || t.category === category) && (!month || String(t.date).startsWith(month)) &&
+      (!q || (t.label + " " + t.category + " " + Math.abs(t.amount)).toLowerCase().includes(q))
+    );
+    if (kind !== "all") return selected;
+    const seen = new Set();
+    const names = Object.fromEntries(data.accounts.map((a) => [a.id, a.name]));
+    return selected.flatMap((t) => {
+      if (!t.transfer_id) return [t];
+      if (seen.has(t.transfer_id)) return [];
+      seen.add(t.transfer_id);
+      const legs = data.transactions.filter((x) => x.transfer_id === t.transfer_id);
+      const debit = legs.find((x) => x.transfer_side === "out") || legs[0];
+      const credit = legs.find((x) => x.transfer_side === "in") || legs[1];
+      if (!debit || !credit) return [t];
+      return [{ ...debit, transfer_view: true, transfer_amount: Math.abs(Number(debit.amount)), transfer_from: names[debit.account_id] || "Compte", transfer_to: names[credit.account_id] || "Compte", label: "Virement · " + (names[debit.account_id] || "Compte") + " → " + (names[credit.account_id] || "Compte"), amount: 0 }];
+    });
+  }, [data.transactions, data.accounts, kind, category, month, query]);
   const days = useMemo(() => {
     const g = []; let cur = null;
     list.slice(0, 400).forEach((t) => { if (!cur || cur.date !== t.date) g.push(cur = { date: t.date, items: [], total: 0 }); cur.items.push(t); cur.total += Number(t.amount); });
@@ -230,7 +252,7 @@ export function Operations({ data, query, setQuery, limits, openPlans, open, fla
   function exportCsv() {
     if (!limits.export) return openPlans("pro");
     const acc = Object.fromEntries(data.accounts.map((a) => [a.id, a.name]));
-    const rows = [["Date", "Libellé", "Catégorie", "Compte", "Montant"], ...list.map((t) => [t.date, t.label, t.category, acc[t.account_id] || "", String(t.amount).replace(".", ",")])];
+    const rows = [["Date", "Libellé", "Catégorie", "Compte", "Montant"], ...list.map((t) => [t.date, t.label, t.category, t.transfer_view ? `${t.transfer_from} → ${t.transfer_to}` : acc[t.account_id] || "", String(t.transfer_view ? t.transfer_amount : t.amount).replace(".", ",")])];
     const csv = "﻿" + rows.map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(";")).join("\n");
     const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" })); a.download = `${BRAND.name.toLowerCase()}-operations${month ? "-" + month : ""}.csv`; a.click();
     flash("Export téléchargé");
@@ -256,7 +278,13 @@ export function Operations({ data, query, setQuery, limits, openPlans, open, fla
     <section className="card panel">
       {days.length ? days.map((d) => <div key={d.date}>
         <div className="dayHead"><span>{dayTitle(d.date)}</span><span className="num">{d.total >= 0 ? "+" : "−"}{money(Math.abs(d.total))}</span></div>
-        <div className="list">{d.items.map((t) => <TxRow key={t.id} t={t} onClick={() => open("tx", { tx: t })} />)}</div>
+        <div className="list">{d.items.map((t) => t.transfer_view
+          ? <button key={t.transfer_id} className="item hover tap" onClick={() => open("transferView", { id: t.transfer_id })}>
+              <span className="kindIco"><Icon name="arrow-left-right" size={17} /></span>
+              <div className="itemMain"><b>{t.transfer_from} → {t.transfer_to}</b><small>Virement interne · non compté dans les dépenses</small></div>
+              <div className="itemSide"><b>{money(t.transfer_amount)}</b><small className="faint">Transfert</small></div>
+            </button>
+          : <TxRow key={t.id} t={t} onClick={() => t.transfer_id ? open("transferView", { id: t.transfer_id }) : open("tx", { tx: t })} />)}</div>
       </div>) : <Empty icon="search" title={data.transactions.length ? "Aucun résultat" : "Aucune opération"} text={query ? `Rien ne correspond à « ${query} ».` : data.transactions.length ? "Aucune opération pour ce filtre." : "Ajoutez votre première dépense ou votre premier revenu."}>{!data.transactions.length && <button className="btn primary sm" onClick={() => open("tx")}><Icon name="plus" size={15} />Ajouter</button>}</Empty>}
     </section>
   </>;
