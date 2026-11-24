@@ -263,8 +263,15 @@ function App() {
   // Écriture générique : ajout (sans id) ou modification (avec id). En démo, tout reste en mémoire.
   async function write(table, row) {
     if (demo) return { ...row, id: row.id || "local" + Date.now() + Math.random().toString(36).slice(2, 6) };
-    const sb = supabaseBrowser(), { id, user_id, created_at, ...fields } = row;
-    const q = id ? sb.from(table).update(fields).eq("id", id) : sb.from(table).insert({ ...fields, user_id: user });
+    const sb = supabaseBrowser();
+    const { data: authData, error: authError } = await sb.auth.getUser();
+    const ownerId = authData?.user?.id;
+    if (authError || !ownerId) throw new Error("Session Supabase expirée. Reconnectez-vous puis réessayez.");
+    const { id, user_id, created_at, ...fields } = row;
+    if (user_id && user_id !== ownerId) throw new Error("Sécurité : cette opération ne correspond pas à l’utilisateur connecté.");
+    const q = id
+      ? sb.from(table).update(fields).eq("id", id)
+      : sb.from(table).insert({ ...fields, user_id: ownerId });
     const { data: saved, error } = await q.select().single();
     if (error) throw new Error("Enregistrement impossible : " + error.message);
     return clean(saved);
